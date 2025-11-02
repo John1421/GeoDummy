@@ -182,7 +182,7 @@ def add_layer():
     layer_id = "layer123"
     return jsonify({"message": f"Layer '{name}' added successfully", "layer_id": layer_id}), 200
 
-app.route('/export_layer', methods=['POST'])
+@app.route('/export_layer', methods=['POST'])
 def export_layer():    
     data = request.get_json()
     layer_id = data.get('layer_id')
