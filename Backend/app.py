@@ -37,14 +37,14 @@ def home():
 
 # Files Management Endpoints
 
-@app.route('/add_file', methods=['POST'])
+@app.route('/files', methods=['POST'])
 def add_file():
 
     # TODO: Implement file upload
 
     return jsonify({"message": f"File added successfully"}), 200
 
-@app.route('/export_file', methods=['POST'])
+@app.route('/files', methods=['PUT'])
 def export_file():
 
     # TODO: Implement file export
@@ -54,7 +54,7 @@ def export_file():
 
 # Script Management Endpoints
 
-@app.route('/add_script', methods=['POST'])
+@app.route('/scripts', methods=['POST'])
 def add_script():
 
     # TODO: Implement script upload
@@ -62,9 +62,8 @@ def add_script():
     script_id = "script123"
     return jsonify({"message": f"Script added successfully", "script_id": script_id}), 200
 
-@app.route('/remove_script', methods=['POST'])
-def remove_script():
-    script_id = request.args.get('script_id')
+@app.route('/scripts/<script_id>', methods=['DELETE'])
+def remove_script(script_id):
     if not script_id:
         raise BadRequest("script_id parameter is required")
 
@@ -72,16 +71,15 @@ def remove_script():
 
     return jsonify({"message": f"Script {script_id} removed successfully"}), 200
 
-@app.route('/list_scripts', methods=['GET'])
+@app.route('/scripts', methods=['GET'])
 def list_scripts():
 
     # TODO: Implement script listing
     scripts = ["script001", "script002", "script003"]
     return jsonify({"message": f"List of scripts received", "scripts":scripts}), 200
 
-@app.route('/script_metadata', methods=['GET'])
-def script_metadata():
-    script_id = request.args.get('script_id')
+@app.route('/scripts/<script_id>', methods=['GET'])
+def script_metadata(script_id):
     if not script_id:
         raise BadRequest("script_id parameter is required")
 
@@ -93,10 +91,9 @@ def script_metadata():
 
 # Script Execution Endpoints
 
-@app.route('/run_script', methods=['POST'])
-def run_script():
+@app.route('/execute_script/<script_id>', methods=['POST'])
+def run_script(script_id):
     data = request.get_json()
-    script_id = data.get('script_id')
     if not script_id:
         raise BadRequest("script_id is required")
     parameters = data.get('parameters', {})
@@ -105,20 +102,9 @@ def run_script():
 
     return jsonify({"message": f"Running script {script_id}", "parameters": parameters}), 200
 
-@app.route('/get_script_output', methods=['GET'])
-def get_script_output():
-    script_id = request.args.get('script_id')
-    if not script_id:
-        raise BadRequest("script_id parameter is required")
-
-    # TODO: retrieve output
-
-    return jsonify({"script_id": script_id, "output": "Sample output here"}), 200
-
-@app.route('/stop_script', methods=['POST'])
-def stop_script():
+@app.route('/execute_script/<script_id>', methods=['DELETE'])
+def stop_script(script_id):
     data = request.get_json()
-    script_id = data.get('script_id')
     if not script_id:
         raise BadRequest("script_id is required")
 
@@ -126,9 +112,8 @@ def stop_script():
 
     return jsonify({"message": f"Script {script_id} stopped"}), 200
 
-@app.route('/get_script_status', methods=['GET'])
-def get_script_status():    
-    script_id = request.args.get('script_id')
+@app.route('/execute_script/<script_id>', methods=['GET'])
+def get_script_status(script_id):    
     if not script_id:
         raise BadRequest("script_id parameter is required")
 
@@ -137,19 +122,28 @@ def get_script_status():
     return jsonify({"script_id": script_id, "status": "running"}), 200
 
 
+@app.route('/script_output/<script_id>', methods=['GET'])
+def get_script_output(script_id):
+    if not script_id:
+        raise BadRequest("script_id parameter is required")
+
+    # TODO: retrieve output
+
+    return jsonify({"script_id": script_id, "output": "Sample output here"}), 200
+
+
 # Map Interaction Endpoints
 
-@app.route('/load_default_basemap', methods=['GET'])
-def load_default_basemap():
-    basemap = "Terrain.img"
+@app.route('/basemap/<basemap_id>', methods=['GET'])
+def load_basemap(basemap_id):
+    if not basemap_id:
+        raise BadRequest("basemap_id parameter is required")
 
     # TODO: fetch default basemap from config
 
-    return jsonify({"message": "Default basemap loaded", "basemaps": basemap}), 200 
+    return jsonify({"message": ~"Loaded basemap {basemap_id}"}), 200 
 
-    
-
-@app.route('/list_basemaps', methods=['GET'])
+@app.route('/basemaps', methods=['GET'])
 def list_basemaps():
     basemaps = ["Terrain", "Gray", "Satellite", "None"]
 
@@ -157,21 +151,19 @@ def list_basemaps():
 
     return jsonify({"basemaps": basemaps}), 200
 
-@app.route('/change_basemap', methods=['POST'])
-def change_basemap():
-    data = request.get_json()
-    basemap_name = data.get('basemap_name')
-    if not basemap_name:
-        raise BadRequest("basemap_name is required")
+@app.route('/basemap/<basemap_id>', methods=['POST'])
+def change_basemap(basemap_id):
+    if not basemap_id:
+        raise BadRequest("basemap_id is required")
 
     # TODO: change basemap
 
-    return jsonify({"message": f"Basemap changed to {basemap_name}"}), 200
+    return jsonify({"message": f"Basemap changed to {basemap_id}"}), 200
 
 
 # Layer Management Endpoints
 
-@app.route('/add_layer', methods=['POST'])
+@app.route('/layers', methods=['POST'])
 def add_layer():    
     layer_file = request.files['layer_file']
     if not layer_file:
@@ -182,10 +174,10 @@ def add_layer():
     layer_id = "layer123"
     return jsonify({"message": f"Layer '{name}' added successfully", "layer_id": layer_id}), 200
 
-app.route('/export_layer', methods=['POST'])
-def export_layer():    
+@app.route('/layers/<layer_id>', methods=['POST'])
+def export_layer(layer_id):    
     data = request.get_json()
-    layer_id = data.get('layer_id')
+
     if not layer_id:
         raise BadRequest("layer_id is required")
 
@@ -193,10 +185,9 @@ def export_layer():
 
     return jsonify({"message": f"Layer {layer_id} exported"}), 200
 
-@app.route('/remove_layer', methods=['POST'])
-def remove_layer():    
+@app.route('/layers/<layer_id>', methods=['DELETE'])
+def remove_layer(layer_id):    
     data = request.get_json()
-    layer_id = data.get('layer_id')
     if not layer_id:
         raise BadRequest("layer_id is required")
 
@@ -204,13 +195,11 @@ def remove_layer():
 
     return jsonify({"message": f"Layer {layer_id} removed"}), 200
 
-@app.route('/set_layer_priority', methods=['POST'])
-def set_layer_priority():  
+@app.route('/layers/<layer_id>/<priority>', methods=['POST'])
+def set_layer_priority(layer_id,priority):  
     data = request.get_json()
-    layer_id = data.get('layer_id')
     if not layer_id:
         raise BadRequest("layer_id is required")
-    priority = data.get('priority', [])
     if not priority:
         raise BadRequest("No priority provided")
 
@@ -221,9 +210,8 @@ def set_layer_priority():
 
 # Layer Information Endpoints
 
-@app.route('/identify_layer_information', methods=['GET'])
-def identify_layer_information():
-    layer_id = request.args.get('layer_id')
+@app.route('/layer_information/<id>', methods=['GET'])
+def identify_layer_information(layer_id):
     if not layer_id:
         raise BadRequest("layer_id parameter is required")
 
@@ -231,9 +219,10 @@ def identify_layer_information():
 
     return jsonify({"layer_id": layer_id, "info": {"geometry": "Polygon", "features": 124}}), 200
 
-@app.route('/extract_data_from_layer_for_table_view', methods=['GET'])
-def extract_data_from_layer_for_table_view():
-    layer_id = request.args.get('layer_id')
+@app.route('/layer_information/<layer_id>/table', methods=['GET'])
+def extract_data_from_layer_for_table_view(layer_id):
+    if not layer_id:
+        raise BadRequest("layer_id parameter is required")
 
     # TODO: extract data from file
 
