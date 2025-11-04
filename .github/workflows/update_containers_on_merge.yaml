@@ -90,14 +90,14 @@ jobs:
 
       - name: Build and Push Backend Image
         run: |
-          docker build -t $DOCKERHUB_USERNAME/backend:${{ steps.version.outputs.version }} ./backend
+          docker build -t $DOCKERHUB_USERNAME/backend:${{ steps.version.outputs.version }} ./Backend
           docker push $DOCKERHUB_USERNAME/backend:${{ steps.version.outputs.version }}
           docker tag $DOCKERHUB_USERNAME/backend:${{ steps.version.outputs.version }} $DOCKERHUB_USERNAME/backend:latest
           docker push $DOCKERHUB_USERNAME/backend:latest
 
       - name: Build and Push Frontend Image
         run: |
-          docker build -t $DOCKERHUB_USERNAME/frontend:${{ steps.version.outputs.version }} ./frontend
+          docker build -t $DOCKERHUB_USERNAME/frontend:${{ steps.version.outputs.version }} ./Frontend
           docker push $DOCKERHUB_USERNAME/frontend:${{ steps.version.outputs.version }}
           docker tag $DOCKERHUB_USERNAME/frontend:${{ steps.version.outputs.version }} $DOCKERHUB_USERNAME/frontend:latest
           docker push $DOCKERHUB_USERNAME/frontend:latest
