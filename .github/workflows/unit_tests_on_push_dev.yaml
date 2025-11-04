@@ -19,18 +19,18 @@ jobs:
         with:
           python-version: '3.12'
       
-      - name: Debug workspace structure
-        run: |
-          echo "Current directory:"
-          pwd
-          echo "List of files:"
-          ls -la
-          echo "Backend directory content:"
-          ls -la backend || echo "⚠️ Pasta backend não encontrada!"
+      # - name: Debug workspace structure
+      #   run: |
+      #     echo "Current directory:"
+      #     pwd
+      #     echo "List of files:"
+      #     ls -la
+      #     echo "Backend directory content:"
+      #     ls -la backend || echo "⚠️ Pasta backend não encontrada!"
 
       - name: Install dependencies
         run: |
-          cd backend
+          cd Backend
           python -m venv venv
           source venv/bin/activate
           pip install -r requirements.txt
@@ -38,7 +38,7 @@ jobs:
 
       - name: Run tests
         run: |
-          cd backend
+          cd Backend
           source venv/bin/activate
           pytest -v
 
@@ -57,10 +57,10 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd frontend
+          cd Frontend
           npm ci
 
       - name: Run unit tests
         run: |
-          cd frontend
+          cd Frontend
           npm test -- --watchAll=false
