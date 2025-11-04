@@ -134,14 +134,14 @@ def get_script_output(script_id):
 
 # Map Interaction Endpoints
 
-@app.route('/basemap/<basemap_id>', methods=['GET'])
+@app.route('/basemaps/<basemap_id>', methods=['GET'])
 def load_basemap(basemap_id):
     if not basemap_id:
         raise BadRequest("basemap_id parameter is required")
 
     # TODO: fetch default basemap from config
 
-    return jsonify({"message": ~"Loaded basemap {basemap_id}"}), 200 
+    return jsonify({"message": "Loaded basemap {basemap_id}"}), 200 
 
 @app.route('/basemaps', methods=['GET'])
 def list_basemaps():
@@ -151,7 +151,7 @@ def list_basemaps():
 
     return jsonify({"basemaps": basemaps}), 200
 
-@app.route('/basemap/<basemap_id>', methods=['POST'])
+@app.route('/basemaps/<basemap_id>', methods=['POST'])
 def change_basemap(basemap_id):
     if not basemap_id:
         raise BadRequest("basemap_id is required")
@@ -174,7 +174,7 @@ def add_layer():
     layer_id = "layer123"
     return jsonify({"message": f"Layer '{name}' added successfully", "layer_id": layer_id}), 200
 
-@app.route('/layers/<layer_id>', methods=['POST'])
+@app.route('/layers/<layer_id>', methods=['PUT'])
 def export_layer(layer_id):    
     data = request.get_json()
 
@@ -210,7 +210,7 @@ def set_layer_priority(layer_id,priority):
 
 # Layer Information Endpoints
 
-@app.route('/layer_information/<id>', methods=['GET'])
+@app.route('/layers/<layer_id>/information', methods=['GET'])
 def identify_layer_information(layer_id):
     if not layer_id:
         raise BadRequest("layer_id parameter is required")
@@ -219,7 +219,7 @@ def identify_layer_information(layer_id):
 
     return jsonify({"layer_id": layer_id, "info": {"geometry": "Polygon", "features": 124}}), 200
 
-@app.route('/layer_information/<layer_id>/table', methods=['GET'])
+@app.route('/layers/<layer_id>/table', methods=['GET'])
 def extract_data_from_layer_for_table_view(layer_id):
     if not layer_id:
         raise BadRequest("layer_id parameter is required")
