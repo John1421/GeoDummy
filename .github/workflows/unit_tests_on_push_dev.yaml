@@ -18,6 +18,15 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      
+      - name: Debug workspace structure
+        run: |
+          echo "Current directory:"
+          pwd
+          echo "List of files:"
+          ls -la
+          echo "Backend directory content:"
+          ls -la backend || echo "⚠️ Pasta backend não encontrada!"
 
       - name: Install dependencies
         run: |
