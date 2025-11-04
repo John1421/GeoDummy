@@ -122,7 +122,7 @@ def get_script_status(script_id):
     return jsonify({"script_id": script_id, "status": "running"}), 200
 
 
-@app.route('/script_output/<script_id>', methods=['GET'])
+@app.route('/execute_script/<script_id>/output', methods=['GET'])
 def get_script_output(script_id):
     if not script_id:
         raise BadRequest("script_id parameter is required")
