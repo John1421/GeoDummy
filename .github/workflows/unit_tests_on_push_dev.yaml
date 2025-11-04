@@ -20,20 +20,19 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        working-directory: ./backend
         run: |
+          cd backend
           python -m venv venv
           source venv/bin/activate
           pip install -r requirements.txt
           pip install pytest
 
       - name: Run tests
-        working-directory: ./backend
         run: |
           cd backend
           source venv/bin/activate
           pytest -v
-          
+
   test_frontend:
     name: Run Frontend Tests
     runs-on: ubuntu-latest
@@ -48,11 +47,11 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        working-directory: ./frontend
         run: |
+          cd frontend
           npm ci
 
       - name: Run unit tests
-        working-directory: ./frontend
         run: |
+          cd frontend
           npm test -- --watchAll=false
