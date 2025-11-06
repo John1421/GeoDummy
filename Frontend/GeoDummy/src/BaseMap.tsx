@@ -1,8 +1,8 @@
 import { useEffect } from "react";
-//Coimbra coordinates
-const INITIAL_LATITUDE = 40.2033;
-const INITIAL_LONGITUDE = -8.4103;
-const INITIAL_ZOOM = 10;
+//Portugal center coordinates
+const INITIAL_LATITUDE = 39.557191;
+const INITIAL_LONGITUDE = -7.8536599;
+const INITIAL_ZOOM = 7;
 const BASE_MAPS:{ [key: string]: string } ={
   "OpenStreetMap":"https://tile.openstreetmap.org/{z}/{x}/{y}.png"
 }
