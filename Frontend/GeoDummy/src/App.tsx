@@ -1,8 +1,8 @@
-
+import BaseMap from "./BaseMap"
 
 function App() {
     return(
-      <h1>Hi</h1>
+      <BaseMap/>
     )
 }
 
