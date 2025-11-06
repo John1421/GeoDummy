@@ -1,0 +1,66 @@
+name: Test and Push Docker Image
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  test_backend:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      # - name: Debug workspace structure
+      #   run: |
+      #     echo "Current directory:"
+      #     pwd
+      #     echo "List of files:"
+      #     ls -la
+      #     echo "Backend directory content:"
+      #     ls -la backend || echo "⚠️ Pasta backend não encontrada!"
+
+      - name: Install dependencies
+        run: |
+          cd Backend
+          python -m venv venv
+          source venv/bin/activate
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run tests
+        run: |
+          cd Backend
+          source venv/bin/activate
+          pytest -v
+
+  test_frontend:
+    name: Run Frontend Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          cd Frontend
+          npm ci
+
+      - name: Run unit tests
+        run: |
+          cd Frontend
+          npm test -- --watchAll=false
