@@ -21,15 +21,15 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd Backend
+          cd Backend/Pytest
           python -m venv venv
           source venv/bin/activate
-          pip install -r requirements.txt
+          pip install -r ../requirements.txt
           pip install pytest
 
       - name: Run tests
         run: |
-          cd Backend
+          cd Backend/Pytest
           source venv/bin/activate
           pytest -v
 
@@ -90,14 +90,14 @@ jobs:
 
       - name: Build and Push Backend Image
         run: |
-          docker build -t $DOCKERHUB_USERNAME/backend:${{ steps.version.outputs.version }} ./Backend
+          docker build -t $DOCKERHUB_USERNAME/backend:${{ steps.version.outputs.version }} ./backend
           docker push $DOCKERHUB_USERNAME/backend:${{ steps.version.outputs.version }}
           docker tag $DOCKERHUB_USERNAME/backend:${{ steps.version.outputs.version }} $DOCKERHUB_USERNAME/backend:latest
           docker push $DOCKERHUB_USERNAME/backend:latest
 
       - name: Build and Push Frontend Image
         run: |
-          docker build -t $DOCKERHUB_USERNAME/frontend:${{ steps.version.outputs.version }} ./Frontend
+          docker build -t $DOCKERHUB_USERNAME/frontend:${{ steps.version.outputs.version }} ./frontend
           docker push $DOCKERHUB_USERNAME/frontend:${{ steps.version.outputs.version }}
           docker tag $DOCKERHUB_USERNAME/frontend:${{ steps.version.outputs.version }} $DOCKERHUB_USERNAME/frontend:latest
           docker push $DOCKERHUB_USERNAME/frontend:latest
