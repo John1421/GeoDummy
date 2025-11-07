@@ -18,8 +18,8 @@ function BaseMap() {
   }, []);
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div id="map" className="h-[600px] w-[1000px] rounded-sm translate-y-[5px]" />
+    <div className="flex items-start justify-center ">
+      <div id="map" className="h-[590px] w-[1000px] rounded-sm " />
     </div>
   );
 
