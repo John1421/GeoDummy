@@ -77,7 +77,7 @@ def add_file(path):
                 except Exception as e:
                     raise BadRequest(f"Error converting and storing file: {e}")
 
-            return f"File stored at {destination_path}"
+            return jsonify({"message": f"File added successfully"}), 200
 
         else:
             raise BadRequest("Unsupported file type")
@@ -85,9 +85,7 @@ def add_file(path):
         raise BadRequest("Invalid file path")
     
 
-    # TODO: Implement file upload
-
-    return jsonify({"message": f"File added successfully"}), 200
+    
 
 @app.route('/files', methods=['PUT'])
 def export_file():
