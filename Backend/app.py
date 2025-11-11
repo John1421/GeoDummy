@@ -1,3 +1,6 @@
+import geopandas as gpd
+import shutil
+import os
 from flask import Flask
 from flask import request, jsonify
 from werkzeug.exceptions import HTTPException, BadRequest
@@ -37,8 +40,50 @@ def home():
 
 # Files Management Endpoints
 
-@app.route('/files', methods=['POST'])
-def add_file():
+@app.route('/files/<path:path>', methods=['POST'])
+def add_file(path):
+
+    if isinstance(path, str) and os.path.isfile(path):
+        # Extract file name and extension
+        file_name_full = os.path.basename(path)
+
+        # Split file name and extension
+        file_name, filen_name_ext = os.path.splitext(file_name_full)
+        allowed_extensions = { '.geojson', '.shp', '.gpkg', '.tif'}
+
+        if filen_name_ext.lower() in allowed_extensions:
+
+            # Get/ensure the existence of input_layers/
+            destination_path = './input_layers/'
+            if not os.path.exists(destination_path):
+                os.makedirs(destination_path) 
+
+            # Process the file based on its type
+            if filen_name_ext.lower() == '.geojson' or filen_name_ext.lower() == '.tif':
+                try:
+                    # Simply copy the file to the destination as is
+                    shutil.copy(path, os.path.join(destination_path, file_name_full))
+                except Exception as e:
+                    raise BadRequest(f"Error copying file: {e}")
+
+            else:
+                # Read the file using geopandas
+                input_file = gpd.read_file(path)
+
+                try: 
+                    # Convert and save the file in GeoJSON format
+                    output_file = os.path.join(destination_path, file_name + '.geojson')
+                    input_file.to_file(output_file, driver='GeoJSON')
+                except Exception as e:
+                    raise BadRequest(f"Error converting and storing file: {e}")
+
+            return f"File stored at {destination_path}"
+
+        else:
+            raise BadRequest("Unsupported file type")
+    else:
+        raise BadRequest("Invalid file path")
+    
 
     # TODO: Implement file upload
 
