@@ -1,9 +1,9 @@
+
+from flask import Flask, request, jsonify
+from werkzeug.exceptions import HTTPException, BadRequest
 import geopandas as gpd
 import shutil
 import os
-from flask import Flask
-from flask import request, jsonify
-from werkzeug.exceptions import HTTPException, BadRequest
 app = Flask(__name__)
 
 @app.errorhandler(HTTPException)
@@ -40,8 +40,15 @@ def home():
 
 # Files Management Endpoints
 
-@app.route('/files/<path:path>', methods=['POST'])
+@app.route('/files', methods=['POST'])
 def add_file(path):
+    # Parse JSON body
+    data = request.get_json()
+    if not data or 'path' not in data:
+        raise BadRequest("Missing 'path' in request body")
+
+    path = data['path']
+
 
     if isinstance(path, str) and os.path.isfile(path):
         # Extract file name and extension
@@ -83,14 +90,13 @@ def add_file(path):
             raise BadRequest("Unsupported file type")
     else:
         raise BadRequest("Invalid file path")
-    
 
     
 
 @app.route('/files', methods=['PUT'])
 def export_file():
 
-    # TODO: Implement file export
+    
 
     return jsonify({"message": f"File exported successfully"}), 200
 
