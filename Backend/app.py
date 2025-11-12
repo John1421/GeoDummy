@@ -41,7 +41,7 @@ def home():
 # Files Management Endpoints
 
 @app.route('/files', methods=['POST'])
-def add_file(path):
+def add_file():
     # Parse JSON body
     data = request.get_json()
     if not data or 'path' not in data:
