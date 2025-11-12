@@ -51,22 +51,20 @@ def add_file():
     if not data or 'path' not in data:
         raise BadRequest("Missing 'path' in request body")
 
+    # Get source path and determine file type
     source_path = data['path']
-
     file_name = os.path.basename(source_path)
-
     _, file_extension = os.path.splitext(file_name)
-
-    if file_extension.lower() not in file_manager.allowed_extensions:
-        return jsonify({"error": "Unsupported file extension"}), 400
     
+    # If the file is already in GeoJSON or TIFF format, copy it directly to output directory
     if file_extension.lower() in ['.geojson', '.tif']:
         try:
             file_manager.copy_file(source_path, file_manager.output_dir)
         except ValueError as e:
             return jsonify({"error": str(e)}), 400
     
-    else: 
+    # Otherwise, convert it to GeoJSON first, then move to output directory
+    else:  
         converted_file_path = file_manager.convert_to_geojson(source_path)
 
         try:
@@ -86,10 +84,12 @@ def export_file():
     if not data or 'destination_path' not in data or 'file_id' not in data:
         raise BadRequest("Missing 'destination_path' or 'file_id' in request body")
     
+    # Get destination path and source file path
     destination_path = data['destination_path']
     file_name = os.path.basename(data['file_id'])
     source_path = os.path.join(file_manager.output_dir, file_name)
 
+    # Export the file to the specified destination
     try:
         file_manager.copy_file(source_path, destination_path)
     except ValueError as e:
