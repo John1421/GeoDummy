@@ -4,7 +4,10 @@ from werkzeug.exceptions import HTTPException, BadRequest
 import geopandas as gpd
 import shutil
 import os
+import FileManager
+
 app = Flask(__name__)
+file_manager = FileManager.FileManager()
 
 @app.errorhandler(HTTPException)
 def handle_http_exception(e):
@@ -48,46 +51,28 @@ def add_file():
     if not data or 'path' not in data:
         raise BadRequest("Missing 'path' in request body")
 
-    path = data['path']
+    source_path = data['path']
 
-    # Validate the file path
-    if not isinstance(path, str) or not os.path.isfile(path):
-        raise BadRequest("Invalid file path")
+    file_name = os.path.basename(source_path)
+
+    _, file_extension = os.path.splitext(file_name)
+
+    if file_extension.lower() not in file_manager.allowed_extensions:
+        return jsonify({"error": "Unsupported file extension"}), 400
     
-    # Extract file name and extension
-    file_name_full = os.path.basename(path)
-
-    # Split file name and extension
-    file_name, filen_name_ext = os.path.splitext(file_name_full)
-    allowed_extensions = { '.geojson', '.shp', '.gpkg', '.tif'}
-
-    # Check if the file extension is supported
-    if filen_name_ext.lower() not in allowed_extensions:
-        raise BadRequest("Unsupported file type")
-
-    # Get/ensure the existence of input_layers/
-    destination_path = './input_layers/'
-    if not os.path.exists(destination_path):
-        os.makedirs(destination_path) 
-
-    # Process the file based on its type
-    if filen_name_ext.lower() == '.geojson' or filen_name_ext.lower() == '.tif':
+    if file_extension.lower() in ['.geojson', '.tif']:
         try:
-            # Simply copy the file to the destination as is
-            shutil.copy(path, os.path.join(destination_path, file_name_full))
-        except Exception as e:
-            raise BadRequest(f"Error copying file: {e}")
+            file_manager.copy_file(source_path, file_manager.output_dir)
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+    
+    else: 
+        converted_file_path = file_manager.convert_to_geojson(source_path)
 
-    else:
-        # Read the file using geopandas
-        input_file = gpd.read_file(path)
-
-        try: 
-            # Convert and save the file in GeoJSON format
-            output_file = os.path.join(destination_path, file_name + '.geojson')
-            input_file.to_file(output_file, driver='GeoJSON')
-        except Exception as e:
-            raise BadRequest(f"Error converting and storing file: {e}")
+        try:
+            file_manager.move_file(converted_file_path, file_manager.output_dir)
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
 
     return jsonify({"message": f"File added successfully"}), 200
 
@@ -102,33 +87,13 @@ def export_file():
         raise BadRequest("Missing 'destination_path' or 'file_id' in request body")
     
     destination_path = data['destination_path']
-    file_id = data['file_id']
+    file_name = os.path.basename(data['file_id'])
+    source_path = os.path.join(file_manager.output_dir, file_name)
 
-    # Validate destination path
-    if not isinstance(destination_path, str) or not os.path.isdir(destination_path):
-        raise BadRequest("Invalid destination path")
-    
-    # Check if there is a file with the same name in the destination path
-    if os.path.exists(os.path.join(destination_path, file_id)):
-        raise BadRequest("A file with the same name already exists in the destination")
-
-    outputs_folder = './output/'
-
-    # Confirm the existance of output/
-    if not os.path.exists(outputs_folder):
-        os.makedirs(outputs_folder)
-
-    output_file = os.path.join(outputs_folder, file_id)
-
-    # Check if the output file exists
-    if not os.path.isfile(output_file):
-        raise BadRequest("File not found for export")
-    
-    # Copy the file to the destination path
     try:
-        shutil.copy(output_file, destination_path)
-    except Exception as e:
-        raise BadRequest(f"Error exporting file: {e}")
+        file_manager.copy_file(source_path, destination_path)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
 
     return jsonify({"message": f"File exported successfully"}), 200
 
