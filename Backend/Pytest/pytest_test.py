@@ -13,35 +13,38 @@ sys.path.insert(0, str(repo_root))
 # now import the module
 from Backend.FileManager import FileManager
 
-def test_copy_file_success(tmp_path):
+@pytest.mark.parametrize("extension", [".geojson", ".tif", ".shp", ".gpkg"])
+def test_copy_file_success(tmp_path, extension):
     src_dir = tmp_path / "src"
     dest_dir = tmp_path / "dest"
     src_dir.mkdir()
     dest_dir.mkdir()
 
-    src_file = src_dir / "test.txt"
+    src_file = src_dir / f"test{extension}"
+
     src_file.write_text("hello world")
 
     fm = FileManager(input_dir=str(src_dir), output_dir=str(dest_dir))
     assert fm.copy_file(str(src_file), str(dest_dir)) is True
 
-    dest_file = dest_dir / "test.txt"
+    dest_file = dest_dir / f"test{extension}"
     assert dest_file.exists()
     assert dest_file.read_text() == "hello world"
 
-def test_move_file_success(tmp_path):
+@pytest.mark.parametrize("extension", [".geojson", ".tif", ".shp", ".gpkg"])
+def test_move_file_success(tmp_path, extension):
     src_dir = tmp_path / "src_move"
     dest_dir = tmp_path / "dest_move"
     src_dir.mkdir()
     dest_dir.mkdir()
 
-    src_file = src_dir / "move_me.txt"
+    src_file = src_dir / f"test{extension}"
     src_file.write_text("move")
 
     fm = FileManager(input_dir=str(src_dir), output_dir=str(dest_dir))
     assert fm.move_file(str(src_file), str(dest_dir)) is True
 
-    dest_file = dest_dir / "move_me.txt"
+    dest_file = dest_dir / f"test{extension}"
     assert dest_file.exists()
     assert dest_file.read_text() == "move"
     assert not src_file.exists()
