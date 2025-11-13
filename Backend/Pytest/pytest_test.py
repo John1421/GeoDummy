@@ -22,14 +22,27 @@ def test_copy_file_success(tmp_path, extension):
 
     src_file = src_dir / f"test{extension}"
 
-    src_file.write_text("hello world")
+    # create valid file content
+    if extension in [".geojson", ".shp", ".gpkg"]:
+        gdf = gpd.GeoDataFrame({"id": [1]}, geometry=[Point(0, 0)], crs="EPSG:4326")
+        gdf.to_file(src_file)
+    else:
+        src_file.write_text("hello world")
 
     fm = FileManager(input_dir=str(src_dir), output_dir=str(dest_dir))
     assert fm.copy_file(str(src_file), str(dest_dir)) is True
 
     dest_file = dest_dir / f"test{extension}"
     assert dest_file.exists()
-    assert dest_file.read_text() == "hello world"
+
+    # optionally check contents for vector formats
+    if extension in [".geojson", ".shp", ".gpkg"]:
+        gdf_dest = gpd.read_file(dest_file)
+        assert gdf_dest.shape[0] == 1
+        assert "id" in gdf_dest.columns
+    else:
+        assert dest_file.read_text() == "hello world"
+
 
 @pytest.mark.parametrize("extension", [".geojson", ".tif", ".shp", ".gpkg"])
 def test_move_file_success(tmp_path, extension):
@@ -39,15 +52,31 @@ def test_move_file_success(tmp_path, extension):
     dest_dir.mkdir()
 
     src_file = src_dir / f"test{extension}"
-    src_file.write_text("move")
+
+    # create valid file content
+    if extension in [".geojson", ".shp", ".gpkg"]:
+        gdf = gpd.GeoDataFrame({"id": [1]}, geometry=[Point(0, 0)], crs="EPSG:4326")
+        gdf.to_file(src_file)
+    else:
+        src_file.write_text("move")
 
     fm = FileManager(input_dir=str(src_dir), output_dir=str(dest_dir))
     assert fm.move_file(str(src_file), str(dest_dir)) is True
 
     dest_file = dest_dir / f"test{extension}"
     assert dest_file.exists()
-    assert dest_file.read_text() == "move"
+
+    # optionally check contents for vector formats
+    if extension in [".geojson", ".shp", ".gpkg"]:
+        gdf_dest = gpd.read_file(dest_file)
+        assert gdf_dest.shape[0] == 1
+        assert "id" in gdf_dest.columns
+    else:
+        assert dest_file.read_text() == "move"
+
+    # source file must be removed
     assert not src_file.exists()
+
 
 def test_copy_existing_destination_raises(tmp_path):
     src_dir = tmp_path / "src_conflict"
