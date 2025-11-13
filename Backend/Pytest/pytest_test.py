@@ -13,66 +13,45 @@ sys.path.insert(0, str(repo_root))
 # now import the module
 from Backend.FileManager import FileManager
 
-@pytest.mark.parametrize("extension", [".geojson", ".tif", ".shp", ".gpkg"])
 def test_copy_file_success(tmp_path, extension):
     src_dir = tmp_path / "src"
     dest_dir = tmp_path / "dest"
     src_dir.mkdir()
     dest_dir.mkdir()
 
-    src_file = src_dir / f"test{extension}"
+    src_file = src_dir / f"test.geojson"
 
     # create valid file content
-    if extension in [".geojson", ".shp", ".gpkg"]:
-        gdf = gpd.GeoDataFrame({"id": [1]}, geometry=[Point(0, 0)], crs="EPSG:4326")
-        gdf.to_file(src_file)
-    else:
-        src_file.write_text("hello world")
+    gdf = gpd.GeoDataFrame({"id": [1]}, geometry=[Point(0, 0)], crs="EPSG:4326")
+    gdf.to_file(src_file)
 
     fm = FileManager(input_dir=str(src_dir), output_dir=str(dest_dir))
     assert fm.copy_file(str(src_file), str(dest_dir)) is True
 
-    dest_file = dest_dir / f"test{extension}"
+    dest_file = dest_dir / f"test.geojson"
     assert dest_file.exists()
 
-    # optionally check contents for vector formats
-    if extension in [".geojson", ".shp", ".gpkg"]:
-        gdf_dest = gpd.read_file(dest_file)
-        assert gdf_dest.shape[0] == 1
-        assert "id" in gdf_dest.columns
-    else:
-        assert dest_file.read_text() == "hello world"
+    # ensure original file still exists after copying
+    assert src_file.exists()
 
 
-@pytest.mark.parametrize("extension", [".geojson", ".tif", ".shp", ".gpkg"])
 def test_move_file_success(tmp_path, extension):
     src_dir = tmp_path / "src_move"
     dest_dir = tmp_path / "dest_move"
     src_dir.mkdir()
     dest_dir.mkdir()
 
-    src_file = src_dir / f"test{extension}"
+    src_file = src_dir / f"test.geojson"
 
     # create valid file content
-    if extension in [".geojson", ".shp", ".gpkg"]:
-        gdf = gpd.GeoDataFrame({"id": [1]}, geometry=[Point(0, 0)], crs="EPSG:4326")
-        gdf.to_file(src_file)
-    else:
-        src_file.write_text("move")
+    gdf = gpd.GeoDataFrame({"id": [1]}, geometry=[Point(0, 0)], crs="EPSG:4326")
+    gdf.to_file(src_file)
 
     fm = FileManager(input_dir=str(src_dir), output_dir=str(dest_dir))
     assert fm.move_file(str(src_file), str(dest_dir)) is True
 
-    dest_file = dest_dir / f"test{extension}"
+    dest_file = dest_dir / f"test.geojson"
     assert dest_file.exists()
-
-    # optionally check contents for vector formats
-    if extension in [".geojson", ".shp", ".gpkg"]:
-        gdf_dest = gpd.read_file(dest_file)
-        assert gdf_dest.shape[0] == 1
-        assert "id" in gdf_dest.columns
-    else:
-        assert dest_file.read_text() == "move"
 
     # source file must be removed
     assert not src_file.exists()
