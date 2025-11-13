@@ -13,7 +13,7 @@ sys.path.insert(0, str(repo_root))
 # now import the module
 from Backend.FileManager import FileManager
 
-def test_copy_file_success(tmp_path, extension):
+def test_copy_file_success(tmp_path):
     src_dir = tmp_path / "src"
     dest_dir = tmp_path / "dest"
     src_dir.mkdir()
@@ -35,7 +35,7 @@ def test_copy_file_success(tmp_path, extension):
     assert src_file.exists()
 
 
-def test_move_file_success(tmp_path, extension):
+def test_move_file_success(tmp_path):
     src_dir = tmp_path / "src_move"
     dest_dir = tmp_path / "dest_move"
     src_dir.mkdir()
