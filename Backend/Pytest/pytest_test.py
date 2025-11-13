@@ -3,6 +3,14 @@ import json
 import pytest
 import geopandas as gpd
 from shapely.geometry import Point
+import sys
+import pathlib
+
+# Ensure repo root is on sys.path so `import Backend...` works when cwd is Backend/Pytest
+repo_root = pathlib.Path(__file__).resolve().parents[2]  # two levels up -> repo root
+sys.path.insert(0, str(repo_root))
+
+# now import the module
 from Backend.FileManager import FileManager
 
 def test_copy_file_success(tmp_path):
