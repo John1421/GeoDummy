@@ -31,8 +31,8 @@ jobs:
         run: |
           cd Backend/Pytest
           source venv/bin/activate
-          coverage run -m pytest -v
-          coverage report -m --branch
+          coverage run --branch -m pytest -v
+          coverage report -m
           coverage html -d ./coverage_report
       
       - name: Upload coverage report artifact
