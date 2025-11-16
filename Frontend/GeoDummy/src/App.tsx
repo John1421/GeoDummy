@@ -1,6 +1,7 @@
 import Header from "./Header";
 import BaseMap from "./BaseMap";
 import AttributeTable from "./AttributeTable";
+import ScriptList from "./ScriptList";
 import { sampleFeatures } from "./data";
 
 function App() {
@@ -33,7 +34,7 @@ function App() {
 
         {/* RIGHT PANEL – Tools */}
         <div className="w-72 border-l bg-white flex-shrink-0">
-          
+          <ScriptList />
         </div>
 
       </div>
