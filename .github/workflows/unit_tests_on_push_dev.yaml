@@ -1,4 +1,4 @@
-name: Test and Push Docker Images
+name: Unit tests on push branch dev
 
 on:
   push:
