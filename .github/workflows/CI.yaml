@@ -59,10 +59,10 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd Frontend
+          cd Frontend/GeoDummy
           npm ci
 
       - name: Run unit tests
         run: |
-          cd Frontend
+          cd Frontend/geoDummy
           npm test -- --watchAll=false
