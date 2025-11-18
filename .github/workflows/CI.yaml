@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - dev
-on:
   pull-request:
     branches:
       - main
@@ -44,9 +43,6 @@ jobs:
         with:
           name: coverage-html
           path: Backend/Pytest/coverage_report
-
-
-
 
 
   test_frontend:
