@@ -65,4 +65,5 @@ jobs:
       - name: Run unit tests
         run: |
           cd Frontend/GeoDummy
-          npm test -- --watchAll=false
+          npm lint
+          npm test
