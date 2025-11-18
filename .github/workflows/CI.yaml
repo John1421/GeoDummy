@@ -64,5 +64,5 @@ jobs:
 
       - name: Run unit tests
         run: |
-          cd Frontend/geoDummy
+          cd Frontend/GeoDummy
           npm test -- --watchAll=false
