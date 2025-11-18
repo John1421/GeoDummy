@@ -3,3 +3,4 @@ pytest
 geopandas
 shapely
 werkzeug
+coverage
