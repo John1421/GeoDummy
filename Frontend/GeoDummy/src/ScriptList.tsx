@@ -1,5 +1,7 @@
 import ToolCategoryToggle from "./ToolCategoryToggle";
+import ScriptCard from "./ScriptCard";
 
+/* The main component displaying a list of available scripts/tools */
 function ScriptList() {
     return (
         <div className="h-full w-full flex flex-col">
@@ -12,14 +14,27 @@ function ScriptList() {
 
             {/* TOGGLE BAR */}
             <ToolCategoryToggle title="Category 1">
-                <button className="w-full text-left px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded">Tool 1</button>
-                <button className="w-full text-left px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded">Tool 2</button>
-            </ToolCategoryToggle>
+                <ScriptCard
+                    name="Tree Height Analysis"
+                    description="Analysis of tree heights on a selected layer."
+                />
+                <ScriptCard
+                    name="Simplify Geometry"
+                    description="Reduces geometry complexity."
+                />
 
-            <ToolCategoryToggle title="Category 2">
-                <button className="w-full text-left px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded">Tool 3</button>
-                <button className="w-full text-left px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded">Tool 4</button>
             </ToolCategoryToggle>
+            <ToolCategoryToggle title="Category 2">
+                <ScriptCard
+                    name="Buffer Zones"
+                    description="Creates buffer zones around features."
+                />
+                <ScriptCard
+                    name="Spatial Join"
+                    description="Joins attributes based on spatial relationships."
+                />
+            </ToolCategoryToggle>
+            
         </div>
     );
 }
