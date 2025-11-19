@@ -1,8 +1,8 @@
-import Header from "./Header";
-import BaseMap from "./BaseMap";
-import AttributeTable from "./AttributeTable";
-import ScriptList from "./ScriptList";
-import { sampleFeatures } from "./data";
+import Header from "./Header/Header";
+import BaseMap from "./Central column/BaseMap";
+import AttributeTable from "./Central column/AttributeTable";
+import ScriptList from "./Right column/ScriptList";
+import { sampleFeatures } from "./Central column/data";
 
 function App() {
   return (
@@ -14,7 +14,7 @@ function App() {
       <div className="flex flex-1 min-h-0">
         
         {/* LEFT PANEL – Layers */}
-        <div className="w-64 border-r bg-white flex-shrink-0">
+        <div className="w-64 border-r bg-white shrink-0">
           
         </div>
 
@@ -33,7 +33,7 @@ function App() {
         </div>
 
         {/* RIGHT PANEL – Tools */}
-        <div className="w-72 border-l bg-white flex-shrink-0">
+        <div className="w-72 border-l bg-white shrink-0">
           <ScriptList />
         </div>
 
