@@ -33,8 +33,8 @@ jobs:
         run: |
           cd Backend/Pytest
           source venv/bin/activate
-          bandit -r ../ -f html -o bandit_report.html
-          bandit -r ../ -f json -o bandit_report.json
+          bandit -r ../ -x venv -f html -o bandit_report.html
+          bandit -r ../ -x venv -f json -o bandit_report.json
 
       - name: Upload Bandit report
         uses: actions/upload-artifact@v4
