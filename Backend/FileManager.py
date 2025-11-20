@@ -8,7 +8,7 @@ class FileManager:
     # Allowed file extensions for processing
     allowed_extensions = {'.geojson', '.shp', '.gpkg', '.tif'}
 
-    def __init__(self, input_dir='./input_layers', output_dir='./output'):
+    def __init__(self, input_dir='./input_layers', output_dir='./output', temp_dir='./temporary'):
         """
         Constructor to initialize input and output directories.
         Creates directories if they do not already exist.
@@ -19,10 +19,12 @@ class FileManager:
         """
         self.input_dir = input_dir
         self.output_dir = output_dir
+        self.temp_dir = temp_dir
 
         # Create directories if they don't exist
         os.makedirs(self.input_dir, exist_ok=True)
         os.makedirs(self.output_dir, exist_ok=True)
+        os.makedirs(self.temp_dir, exist_ok=True)
 
 
     def move_file(self, source_path, destination_path):
