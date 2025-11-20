@@ -34,8 +34,8 @@ jobs:
           cd Backend/Pytest
           source venv/bin/activate
           coverage run --branch -m pytest -v
-          coverage report -m --omit="**/pytest_test.py"
-          coverage html -d ./coverage_report --omit="**/pytest_test.py"
+          coverage report -m --omit="**/**_test.py"
+          coverage html -d ./coverage_report --omit="**/**_test.py"
       
       - name: Upload coverage report artifact
         uses: actions/upload-artifact@v4
