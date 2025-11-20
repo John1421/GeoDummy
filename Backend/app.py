@@ -59,7 +59,7 @@ def add_file():
     # If the file is already in GeoJSON or TIFF format, copy it directly to output directory
     if file_extension.lower() in ['.geojson', '.tif']:
         try:
-            file_manager.copy_file(source_path, file_manager.output_dir)
+            file_manager.copy_file(source_path, file_manager.input_dir)
         except ValueError as e:
             return jsonify({"error": str(e)}), 400
     
@@ -68,7 +68,7 @@ def add_file():
         converted_file_path = file_manager.convert_to_geojson(source_path)
 
         try:
-            file_manager.move_file(converted_file_path, file_manager.output_dir)
+            file_manager.move_file(converted_file_path, file_manager.input_dir)
         except ValueError as e:
             return jsonify({"error": str(e)}), 400
 
@@ -87,7 +87,9 @@ def export_file():
     # Get destination path and source file path
     destination_path = data['destination_path']
     file_name = os.path.basename(data['file_id'])
-    source_path = os.path.join(file_manager.output_dir, file_name)
+    source_path = os.path.join(file_manager.temp_dir, file_name)
+
+
 
     # Export the file to the specified destination
     try:
