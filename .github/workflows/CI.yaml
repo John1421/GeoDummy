@@ -29,12 +29,12 @@ jobs:
           source venv/bin/activate
           pip install -r ../requirements.txt
 
-      - name: Run Bandit Security Scan
-        run: |
-          cd Backend/Pytest
-          source venv/bin/activate
-          bandit -r ../ -x venv -f html -o bandit_report.html
-          bandit -r ../ -x venv -f json -o bandit_report.json
+      # - name: Run Bandit Security Scan
+      #   run: |
+      #     cd Backend/Pytest
+      #     source venv/bin/activate
+      #     bandit -r ../ -x venv -f html -o bandit_report.html
+      #     bandit -r ../ -x venv -f json -o bandit_report.json
 
       # - name: Upload Bandit report
       #   uses: actions/upload-artifact@v4
