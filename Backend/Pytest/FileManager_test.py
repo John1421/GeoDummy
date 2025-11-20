@@ -34,6 +34,21 @@ def test_copy_file_success(tmp_path):
     # ensure original file still exists after copying
     assert src_file.exists()
 
+def test_copy_file_failure(tmp_path):
+    src_dir = tmp_path / "src"
+    dest_dir = tmp_path / "dest"
+    src_dir.mkdir()
+    dest_dir.mkdir()
+
+    src_file = src_dir / f"test.txt"
+    src_file.write_text("Hello World!")
+
+    fm = FileManager(input_dir=str(src_dir), output_dir=str(dest_dir))
+    assert fm.copy_file(str(src_file), str(dest_dir)) is True
+
+    dest_file = dest_dir / f"test.txt"
+    assert dest_file.exists() == False
+
 
 def test_move_file_success(tmp_path):
     src_dir = tmp_path / "src_move"
