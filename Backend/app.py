@@ -5,9 +5,11 @@ import geopandas as gpd
 import shutil
 import os
 import FileManager
+from BasemapManager import BasemapManager
 
 app = Flask(__name__)
 file_manager = FileManager.FileManager()
+basemap_manager = BasemapManager()
 
 @app.errorhandler(HTTPException)
 def handle_http_exception(e):
@@ -184,59 +186,16 @@ def get_script_output(script_id):
 
 @app.route('/basemaps/<basemap_id>', methods=['GET'])
 def load_basemap(basemap_id):
-    if not basemap_id:
-        raise BadRequest("basemap_id parameter is required")
+    basemap = basemap_manager.get_basemap(basemap_id)
 
-    # TODO: fetch default basemap from config
+    if basemap is None:
+        return jsonify({"error": f"Basemap with id {basemap_id} not found"}), 404
 
-    return jsonify({"message": "Loaded basemap {basemap_id}"}), 200 
+    return jsonify(basemap), 200 
 
 @app.route('/basemaps', methods=['GET'])
 def list_basemaps():
-    basemaps = [
-        {
-            "id": "osm_standard",
-            "name": "OpenStreetMap",
-            "url": "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-            "attribution": "&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors"
-        },
-        {
-            "id": "esri_satellite",
-            "name": "Satélite (Esri)",
-            "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-            "attribution": "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
-        },
-        {
-            "id": "open_topo",
-            "name": "Topográfico (OpenTopo)",
-            "url": "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
-            "attribution": "Map data: &copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors, <a href='http://viewfinderpanoramas.org'>SRTM</a> | Map style: &copy; <a href='https://opentopomap.org'>OpenTopoMap</a> (<a href='https://creativecommons.org/licenses/by-sa/3.0/'>CC-BY-SA</a>)"
-        },
-        {
-            "id": "carto_light",
-            "name": "Cinza (Carto Light)",
-            "url": "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-            "attribution": "&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors &copy; <a href='https://carto.com/attributions'>CARTO</a>"
-        },
-        {
-            "id": "carto_dark",
-            "name": "Escuro (Carto Dark)",
-            "url": "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-            "attribution": "&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors &copy; <a href='https://carto.com/attributions'>CARTO</a>"
-        }
-    ]
-
-    return jsonify({"basemaps": basemaps}), 200
-
-@app.route('/basemaps/<basemap_id>', methods=['POST'])
-def change_basemap(basemap_id):
-    if not basemap_id:
-        raise BadRequest("basemap_id is required")
-
-    # TODO: change basemap
-
-    return jsonify({"message": f"Basemap changed to {basemap_id}"}), 200
-
+    return jsonify(basemap_manager.list_basemaps()), 200
 
 # Layer Management Endpoints
 
