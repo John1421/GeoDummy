@@ -32,7 +32,6 @@ jobs:
       - name: Run Bandit Security Scan
         run: |
           cd Backend/Pytest
-          python -m venv venv
           source venv/bin/activate
           bandit -r ../ -f html -o bandit_report.html
           bandit -r ../ -f json -o bandit_report.json

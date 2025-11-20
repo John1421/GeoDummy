@@ -4,3 +4,4 @@ geopandas
 shapely
 werkzeug
 coverage
+bandit
