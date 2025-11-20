@@ -14,7 +14,7 @@ function App() {
       <div className="flex flex-1 min-h-0">
         
         {/* LEFT PANEL – Layers */}
-        <div className="w-64 border-r bg-white shrink-0">
+        <div className="w-1/5 lg:w-64 border-r bg-white shrink-0">
           
         </div>
 
@@ -33,7 +33,7 @@ function App() {
         </div>
 
         {/* RIGHT PANEL – Tools */}
-        <div className="w-72 border-l bg-white shrink-0">
+        <div className="w-1/4 lg:w-72 border-l bg-white shrink-0">
           <ScriptList />
         </div>
 
