@@ -53,7 +53,6 @@ jobs:
 
       - name: Run Bandit Security Scan
         run: |
-          # Analisar apenas o código backend, ignorar Pytest e ignorar venv
           bandit -r Backend -x Backend/Pytest -f html -o bandit_report.html || true
           bandit -r Backend -x Backend/Pytest -f json -o bandit_report.json || true
 
