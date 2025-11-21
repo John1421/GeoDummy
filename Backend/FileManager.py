@@ -100,6 +100,70 @@ class FileManager:
 
         # Unsupported file types raise an error
         raise ValueError("Unsupported file format for conversion to GeoJSON.")
+    
+
+    def check_file_system_coordinates(self, file_path, target_crs="EPSG:4326"):
+        """
+        Checks if the GeoJSON file is in the target coordinate reference system (CRS).
+
+        Parameters:
+            file_path (str): Path to the GeoJSON file to check. (e.g., ./input_layers/file.geojson)
+            target_crs (str): Target CRS in EPSG format. Default is "EPSG:4326".
+
+        Returns:
+            bool: True if the file is in the target CRS, False otherwise.
+
+        Raises:
+            ValueError: If the file format is unsupported or reading fails.
+        """
+        file_name, file_name_ext = os.path.splitext(file_path)
+
+        # Ensure the file is a GeoJSON
+        if file_name_ext.lower() != '.geojson':
+            raise ValueError("CRS check is only supported for GeoJSON files.")
+
+        try:
+            # Read the GeoJSON file
+            gdf = gpd.read_file(file_path)
+
+            # Check if the CRS matches the target CRS
+            return gdf.crs.to_string() == target_crs
+        except Exception as e:
+            raise ValueError(f"Error checking CRS: {e}")
+    
+    def convert_file_system_coordinates(self, file_path, target_crs="EPSG:4326"):
+        """
+        Converts the coordinate reference system (CRS) of a GeoJSON file to the target CRS.
+
+        Parameters:
+            file_path (str): Path to the GeoJSON file to convert. (e.g., ./input_layers/file.geojson)
+            target_crs (str): Target CRS in EPSG format. Default is "EPSG:4326".
+
+        Returns:
+            str: Path to the converted GeoJSON file with the new CRS (The path stays the same). (e.g., ./input_layers/file.geojson)
+
+        Raises:
+            ValueError: If the file format is unsupported or conversion fails.
+        """
+        file_name, file_name_ext = os.path.splitext(file_path)
+
+        # Ensure the file is a GeoJSON
+        if file_name_ext.lower() != '.geojson':
+            raise ValueError("CRS conversion is only supported for GeoJSON files.")
+
+        try:
+            # Read the GeoJSON file
+            gdf = gpd.read_file(file_path)
+
+            # Convert to target CRS
+            gdf = gdf.to_crs(target_crs)
+
+            # Save the converted file back to the same path
+            gdf.to_file(file_path, driver='GeoJSON')
+
+            return file_path
+        except Exception as e:
+            raise ValueError(f"Error converting CRS: {e}")
 
 
     #=====================================================================================
