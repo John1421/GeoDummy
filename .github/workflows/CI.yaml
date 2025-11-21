@@ -1,4 +1,4 @@
-name: Unit tests on push branch dev
+name: CI / Lint / Tests / Security
 
 on:
   push:
@@ -9,20 +9,23 @@ on:
       - main
 
 jobs:
-#verificação estática do código frontend e backend (analisa todos os ficheiros)
+
   sast-scan:
     runs-on: ubuntu-latest
     permissions:
       security-events: write
       contents: read
       actions: read
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install Semgrep
+        run: pip install semgrep
+
       - name: Run Semgrep SAST Scan
         run: |
-          pip install semgrep
           semgrep scan --config auto --sarif --output semgrep.sarif || true
 
       - name: Upload SARIF to GitHub Security Tab
@@ -43,37 +46,32 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
+      - name: Install backend dependencies
+        working-directory: Backend
         run: |
-          cd Backend/Pytest
-          python -m venv venv
-          source venv/bin/activate
-          pip install -r ../requirements.txt
+          pip install -r requirements.txt
 
       - name: Run Bandit Security Scan
         run: |
-          cd Backend/Pytest
-          source venv/bin/activate
-          cd ..
-          bandit -r ../ -x Pytest -f html -o bandit_report.html
-          bandit -r ../ -x Pytest -f json -o bandit_report.json
+          # Analisar apenas o código backend, ignorar Pytest e ignorar venv
+          bandit -r Backend -x Backend/Pytest -f html -o bandit_report.html
+          bandit -r Backend -x Backend/Pytest -f json -o bandit_report.json
 
       - name: Upload Bandit report
         uses: actions/upload-artifact@v4
         with:
           name: bandit-security-report
           path: |
-            Backend/Pytest/bandit_report.html
-            Backend/Pytest/bandit_report.json
+            bandit_report.html
+            bandit_report.json
 
-      - name: Run tests
+      - name: Run backend tests with coverage
+        working-directory: Backend/Pytest
         run: |
-          cd Backend/Pytest
-          source venv/bin/activate
           coverage run --branch -m pytest -v
           coverage report -m
           coverage html -d ./coverage_report
-      
+
       - name: Upload coverage report artifact
         uses: actions/upload-artifact@v4
         with:
@@ -94,13 +92,14 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install dependencies
-        run: |
-          cd Frontend/GeoDummy
-          npm ci
+      - name: Install frontend dependencies
+        working-directory: Frontend/GeoDummy
+        run: npm ci
 
-      - name: Run unit tests
-        run: |
-          cd Frontend/GeoDummy
-          npm run lint
-          npm run test
+      - name: Run ESLint
+        working-directory: Frontend/GeoDummy
+        run: npm run lint
+
+      - name: Run frontend unit tests
+        working-directory: Frontend/GeoDummy
+        run: npm run test
