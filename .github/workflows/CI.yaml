@@ -9,7 +9,7 @@ on:
       - main
 
 jobs:
-
+#verificação estática do código frontend e backend (analisa todos os ficheiros)
   sast-scan:
     runs-on: ubuntu-latest
     permissions:
@@ -29,7 +29,7 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: "semgrep.sarif"
-          
+
   test_backend:
     name: Run Backend Unit Tests
     runs-on: ubuntu-latest
@@ -50,20 +50,21 @@ jobs:
           source venv/bin/activate
           pip install -r ../requirements.txt
 
-      # - name: Run Bandit Security Scan
-      #   run: |
-      #     cd Backend/Pytest
-      #     source venv/bin/activate
-      #     bandit -r ../ -x venv -f html -o bandit_report.html
-      #     bandit -r ../ -x venv -f json -o bandit_report.json
+      - name: Run Bandit Security Scan
+        run: |
+          cd Backend/Pytest
+          source venv/bin/activate
+          cd ..
+          bandit -r ../ -x Pytest -f html -o bandit_report.html
+          bandit -r ../ -x Pytest -f json -o bandit_report.json
 
-      # - name: Upload Bandit report
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: bandit-security-report
-      #     path: |
-      #       Backend/Pytest/bandit_report.html
-      #       Backend/Pytest/bandit_report.json
+      - name: Upload Bandit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-security-report
+          path: |
+            Backend/Pytest/bandit_report.html
+            Backend/Pytest/bandit_report.json
 
       - name: Run tests
         run: |
