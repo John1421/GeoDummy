@@ -1,4 +1,5 @@
 import geopandas as gpd
+import rioxarray
 import shutil
 import os
 
@@ -6,7 +7,7 @@ import os
 class FileManager:
 
     # Allowed file extensions for processing
-    allowed_extensions = {'.geojson', '.shp', '.gpkg', '.tif'}
+    allowed_extensions = {'.geojson', '.shp', '.gpkg', '.tif', '.tiff'}
 
     def __init__(self, input_dir='./input_layers', output_dir='./output', temp_dir='./temporary'):
         """
@@ -74,7 +75,7 @@ class FileManager:
     def convert_to_geojson(self, file_path):
         """
         Converts supported file types (.shp, .gpkg) to GeoJSON format.
-        If the file is already .geojson or .tif, returns the original path.
+        If the file is already .geojson or .tif or .tiff, returns the original path.
 
         Parameters:
             file_path (str): Path to the file to convert. (e.g., ./input_layers/file.shp)
@@ -88,7 +89,7 @@ class FileManager:
         file_name, file_name_ext = os.path.splitext(file_path)
 
         # If already GeoJSON or GeoTIFF, no conversion needed
-        if file_name_ext.lower() in ['.geojson', '.tif']:
+        if file_name_ext.lower() in ['.geojson', '.tif', '.tiff']:
             return file_path
 
         # Convert Shapefile or GeoPackage to GeoJSON
@@ -104,10 +105,10 @@ class FileManager:
 
     def check_file_system_coordinates(self, file_path, target_crs="EPSG:4326"):
         """
-        Checks if the GeoJSON file is in the target coordinate reference system (CRS).
+        Checks if the GeoJSON/tif file is in the target coordinate reference system (CRS).
 
         Parameters:
-            file_path (str): Path to the GeoJSON file to check. (e.g., ./input_layers/file.geojson)
+            file_path (str): Path to the GeoJSON/tif file to check. (e.g., ./input_layers/file.geojson)
             target_crs (str): Target CRS in EPSG format. Default is "EPSG:4326".
 
         Returns:
@@ -118,25 +119,37 @@ class FileManager:
         """
         file_name, file_name_ext = os.path.splitext(file_path)
 
-        # Ensure the file is a GeoJSON
-        if file_name_ext.lower() != '.geojson':
-            raise ValueError("CRS check is only supported for GeoJSON files.")
+        if file_name_ext.lower() == '.geojson':
+            try:
+                # Read the GeoJSON file
+                gdf = gpd.read_file(file_path)
 
-        try:
-            # Read the GeoJSON file
-            gdf = gpd.read_file(file_path)
+                # Check if the CRS matches the target CRS
+                return gdf.crs.to_string() == target_crs
+            except Exception as e:
+                raise ValueError(f"Error checking GeoJSON CRS: {e}")
+            
+        elif file_name_ext.lower() == '.tif' or file_name_ext.lower() == '.tiff':
+            try:
+                # Read the GeoTIFF file
+                with rioxarray.open_rasterio(file_path) as raster:
+                    if raster.rio.crs is None:
+                        raise ValueError("Raster has no CRS information.")
+                    else:
+                        return raster.rio.crs.to_string() == target_crs
+            except Exception as e:
+                raise ValueError(f"Error checking tif CRS: {e}")    
 
-            # Check if the CRS matches the target CRS
-            return gdf.crs.to_string() == target_crs
-        except Exception as e:
-            raise ValueError(f"Error checking CRS: {e}")
+            
+        else:
+            raise ValueError("CRS conversion is only supported for GeoJSON or tif files.")
     
     def convert_file_system_coordinates(self, file_path, target_crs="EPSG:4326"):
         """
-        Converts the coordinate reference system (CRS) of a GeoJSON file to the target CRS.
+        Converts the coordinate reference system (CRS) of a GeoJSON/tif file to the target CRS.
 
         Parameters:
-            file_path (str): Path to the GeoJSON file to convert. (e.g., ./input_layers/file.geojson)
+            file_path (str): Path to the GeoJSON/tif file to convert. (e.g., ./input_layers/file.geojson)
             target_crs (str): Target CRS in EPSG format. Default is "EPSG:4326".
 
         Returns:
@@ -148,22 +161,40 @@ class FileManager:
         file_name, file_name_ext = os.path.splitext(file_path)
 
         # Ensure the file is a GeoJSON
-        if file_name_ext.lower() != '.geojson':
-            raise ValueError("CRS conversion is only supported for GeoJSON files.")
+        if file_name_ext.lower() == '.geojson':
+            try:
+                # Read the GeoJSON file
+                gdf = gpd.read_file(file_path)
 
-        try:
-            # Read the GeoJSON file
-            gdf = gpd.read_file(file_path)
+                # Convert to target CRS
+                gdf = gdf.to_crs(target_crs)
 
-            # Convert to target CRS
-            gdf = gdf.to_crs(target_crs)
+                # Save the converted file back to the same path
+                gdf.to_file(file_path, driver='GeoJSON')
 
-            # Save the converted file back to the same path
-            gdf.to_file(file_path, driver='GeoJSON')
+                return file_path
+            except Exception as e:
+                raise ValueError(f"Error converting GeoJSON CRS: {e}")
+            
+        elif file_name_ext.lower() == '.tif' or file_name_ext.lower() == '.tiff':
+            temp_path = f"{file_name}_temp{file_name_ext}"
+            shutil.copy(file_path, temp_path)
+            try:
+                with rioxarray.open_rasterio(temp_path) as raster:
+                    # Convert to target CRS
+                    raster_converted = raster.rio.reproject(target_crs)
 
-            return file_path
-        except Exception as e:
-            raise ValueError(f"Error converting CRS: {e}")
+                    # Save the converted file back to the same path
+                    raster_converted.rio.to_raster(file_path)
+
+                os.remove(temp_path)    
+
+                return file_path
+            except Exception as e:
+                raise ValueError(f"Error converting tif CRS: {e}")    
+            
+        else:
+            raise ValueError("CRS conversion is only supported for GeoJSON or tif files.")
 
 
     #=====================================================================================
