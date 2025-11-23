@@ -1,4 +1,3 @@
-// LeftColumn/NewLayerWindow.tsx
 import { useEffect, useState } from "react";
 import { FolderOpen } from "lucide-react";
 import Modal from "../TemplateModals/PopUpWindowModal";
@@ -8,42 +7,87 @@ interface NewLayerWindowProps {
   isOpen: boolean;
   onClose: () => void;
   onSelect: (layerName: string) => void;
+  existingLayerNames: string[];
 }
 
 export default function NewLayerWindow({
   isOpen,
   onClose,
   onSelect,
+  existingLayerNames,
 }: NewLayerWindowProps) {
   const [layerName, setLayerName] = useState("");
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Reset fields every time modal opens
   useEffect(() => {
     if (isOpen) {
       setLayerName("");
       setSelectedFileName(null);
+      setError(null);
     }
   }, [isOpen]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Validate duplicate name whenever the layer name changes
+  useEffect(() => {
+    const trimmed = layerName.trim();
 
-    setSelectedFileName(file.name);
-
-    // Suggest file name as layer name if field is empty
-    if (!layerName.trim()) {
-      const baseName = file.name.replace(/\.[^/.]+$/, "");
-      setLayerName(baseName);
+    if (!trimmed) {
+      // No error for empty name here, that is handled on submit / disabled button
+      setError(null);
+      return;
     }
-  };
+
+    const duplicate = existingLayerNames.some(
+      (name) => name.toLowerCase() === trimmed.toLowerCase()
+    );
+
+    if (duplicate) {
+      setError("A layer with that name already exists.");
+    } else {
+      setError(null);
+    }
+  }, [layerName, existingLayerNames]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  setSelectedFileName(file.name);
+};
+
 
   const handleCreate = () => {
-    if (!layerName.trim()) return;
-    onSelect(layerName.trim());
+    const trimmedName = layerName.trim();
+
+    // Basic checks
+    if (!selectedFileName) {
+      setError("Please choose a file for this layer.");
+      return;
+    }
+
+    if (!trimmedName) {
+      setError("Please enter a name for the layer.");
+      return;
+    }
+
+    // Duplicate check (safety in case effect is not enough)
+    const duplicate = existingLayerNames.some(
+      (name) => name.toLowerCase() === trimmedName.toLowerCase()
+    );
+
+    if (duplicate) {
+      setError("A layer with that name already exists.");
+      return;
+    }
+
+    // All good
+    onSelect(trimmedName);
     onClose();
   };
+
+  const isCreateDisabled =
+    !layerName.trim() || !selectedFileName || !!error;
 
   return (
     <Modal
@@ -54,7 +98,7 @@ export default function NewLayerWindow({
         <div className="flex justify-end">
           <button
             onClick={handleCreate}
-            disabled={!layerName.trim()}
+            disabled={isCreateDisabled}
             className="px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               backgroundColor: colors.primary,
@@ -94,9 +138,7 @@ export default function NewLayerWindow({
                 fontFamily: typography.normalFont,
               }}
             >
-              <span>
-                {selectedFileName ?? "Browse Files"}
-              </span>
+              <span>{selectedFileName ?? "Browse Files"}</span>
               <FolderOpen size={18} />
 
               <input
@@ -143,6 +185,19 @@ export default function NewLayerWindow({
             </div>
           </div>
         </div>
+
+        {/* Error message */}
+        {error && (
+          <p
+            className="text-sm"
+            style={{
+              color: "#dc2626", // red-600-like
+              fontFamily: typography.normalFont,
+            }}
+          >
+            {error}
+          </p>
+        )}
       </div>
     </Modal>
   );

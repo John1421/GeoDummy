@@ -65,6 +65,7 @@ export const radii = {
 };
 
 export const shadows = {
+  none: "none",
   subtle: "0 2px 4px rgba(0, 0, 0, 0.08)",
   medium: "0 4px 10px rgba(0, 0, 0, 0.12)",
 };

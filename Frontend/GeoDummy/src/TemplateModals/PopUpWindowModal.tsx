@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { X } from "lucide-react";
-import { colors, typography, radii, shadows } from "../Design/DesignTokens";
+import { colors, typography, radii } from "../Design/DesignTokens";
 
 interface ModalProps {
   isOpen: boolean;
@@ -61,8 +61,7 @@ export default function Modal({
         onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside the modal
         style={{
           backgroundColor: colors.cardBackground,
-          borderRadius: radii.lg,
-          boxShadow: shadows.medium,
+          borderRadius: radii.md,
         }}
       >
         {/* Header with gradient */}

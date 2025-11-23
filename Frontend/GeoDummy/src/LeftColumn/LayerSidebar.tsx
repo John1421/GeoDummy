@@ -1,4 +1,3 @@
-// LeftColumn/LayerSidebar.tsx
 import { useCallback, useState } from "react";
 import { Layers as LayersIcon } from "lucide-react";
 import LayerCardList from "./LayerCardList";
@@ -45,7 +44,6 @@ export default function LayerSidebar() {
         collapsedWidthClassName="w-12"
         onAdd={() => setIsWindowOpen(true)}
       >
-        {/* Inner content: the cards list */}
         <LayerCardList
           layers={layers}
           setLayers={setLayers}
@@ -53,11 +51,11 @@ export default function LayerSidebar() {
         />
       </SidebarPanel>
 
-      {/* Full-screen modal for adding a new layer */}
       <NewLayerWindow
         isOpen={isWindowOpen}
         onClose={() => setIsWindowOpen(false)}
         onSelect={handleAddLayer}
+        existingLayerNames={layers.map((layer) => layer.title)}
       />
     </>
   );

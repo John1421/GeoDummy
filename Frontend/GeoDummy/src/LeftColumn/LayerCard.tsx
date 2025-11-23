@@ -34,10 +34,10 @@ function LayerCardComponent({ layer, onSettings }: LayerCardProps) {
 
   const cardStyle: React.CSSProperties = {
     ...transformStyle,
-    backgroundColor: colors.sidebarBackground,
+    backgroundColor: colors.cardBackground,
     color: colors.sidebarForeground,
     borderColor: colors.borderStroke,
-    boxShadow: shadows.subtle,
+    boxShadow: shadows.none,
     borderRadius: radii.md,
     fontFamily: typography.normalFont,
   };
