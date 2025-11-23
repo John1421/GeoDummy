@@ -29,6 +29,22 @@ export default function NewLayerWindow({
     }
   }, [isOpen]);
 
+  // Allow pressing Enter to create the layer
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Enter") {
+        if (!isCreateDisabled) {
+          handleCreate();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, layerName, selectedFileName, error]);
+
   // Validate duplicate name whenever the layer name changes
   useEffect(() => {
     const trimmed = layerName.trim();
