@@ -3,6 +3,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Settings } from "lucide-react";
 import type { Layer } from "./LayerSidebar";
+import { colors, typography, radii, shadows } from "../Design/DesignTokens";
 
 interface LayerCardProps {
   layer: Layer;
@@ -22,7 +23,7 @@ function LayerCardComponent({ layer, onSettings }: LayerCardProps) {
     animateLayoutChanges: () => false,
   });
 
-  const style = useMemo(
+  const transformStyle = useMemo(
     () => ({
       transform: CSS.Transform.toString(transform),
       transition,
@@ -31,32 +32,54 @@ function LayerCardComponent({ layer, onSettings }: LayerCardProps) {
     [transform, transition, isDragging]
   );
 
+  const cardStyle: React.CSSProperties = {
+    ...transformStyle,
+    backgroundColor: colors.sidebarBackground,
+    color: colors.sidebarForeground,
+    borderColor: colors.borderStroke,
+    boxShadow: shadows.subtle,
+    borderRadius: radii.md,
+    fontFamily: typography.normalFont,
+  };
+
   return (
     <div
       ref={setNodeRef}
-      style={style}
+      style={cardStyle}
       {...attributes}
-      className="bg-white border rounded-lg p-3 mb-2 shadow-sm select-none"
+      className="border p-3 mb-2 select-none"
     >
       <div className="flex items-center gap-2">
         <button
           {...listeners}
           aria-label="Drag layer"
-          className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded"
+          className="cursor-grab active:cursor-grabbing p-1 rounded"
         >
-          <GripVertical size={18} className="text-gray-400" />
+          <GripVertical
+            size={18}
+            style={{ color: colors.dragIcon }}
+          />
         </button>
 
-        <span className="flex-1 text-sm font-medium truncate">
+        <span
+          className="flex-1 text-sm font-medium truncate"
+          style={{
+            fontFamily: typography.normalFont,
+            fontSize: typography.sizeSm,
+          }}
+        >
           {layer.title}
         </span>
 
         <button
           aria-label="Layer settings"
           onClick={() => onSettings(layer.id)}
-          className="p-1 hover:bg-gray-100 rounded"
+          className="p-1 rounded"
         >
-          <Settings size={16} className="text-gray-600" />
+          <Settings
+            size={16}
+            style={{ color: colors.sidebarForeground }}
+          />
         </button>
       </div>
     </div>

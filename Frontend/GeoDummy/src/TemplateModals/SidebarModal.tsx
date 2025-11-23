@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { colors, typography, radii } from "../Design/DesignTokens";
 
 /**
  * SidebarPanel Props
@@ -26,8 +27,8 @@ export default function SidebarPanel({
   title,
   icon,
   onAdd,
-  expandedWidthClassName = "w-64",   // default expanded width
-  collapsedWidthClassName = "w-14",  // default collapsed width
+  expandedWidthClassName = "w-64", // default expanded width
+  collapsedWidthClassName = "w-14", // default collapsed width
   children,
 }: SidebarPanelProps) {
   // Local state to control collapsed/expanded
@@ -43,7 +44,7 @@ export default function SidebarPanel({
    * - flex flex-col: vertical layout (header + content).
    */
   const containerBase =
-    "relative bg-slate-50 border-gray-200 overflow-hidden shrink-0 h-full flex flex-col z-20 transition-[width] duration-300";
+    "relative overflow-hidden shrink-0 h-full flex flex-col z-20 transition-[width] duration-300";
 
   // Border on the correct side, so it visually attaches to the map/content
   const borderClass = isLeft ? "border-r" : "border-l";
@@ -54,7 +55,15 @@ export default function SidebarPanel({
     : expandedWidthClassName;
 
   return (
-    <div className={`${containerBase} ${borderClass} ${widthClass}`}>
+    <div
+      className={`${containerBase} ${borderClass} ${widthClass}`}
+      style={{
+        backgroundColor: colors.sidebarBackground,
+        borderColor: colors.borderStroke,
+        color: colors.sidebarForeground,
+        fontFamily: typography.normalFont,
+      }}
+    >
       {/* ===================== HEADER ===================== */}
       <div className="flex items-center justify-between h-12 px-2">
         {/**
@@ -70,7 +79,12 @@ export default function SidebarPanel({
           aria-label={
             isCollapsed ? `Expand ${title} panel` : `Collapse ${title} panel`
           }
-          className="h-8 w-8 flex items-center justify-center rounded-md bg-sky-100 text-sky-700 hover:bg-sky-200 transition-colors shrink-0"
+          className="h-8 w-8 flex items-center justify-center rounded-md transition-colors shrink-0 hover:opacity-80"
+          style={{
+            backgroundColor: colors.sidebarBackground,
+            color: colors.sidebarForeground,
+            borderRadius: radii.md,
+          }}
         >
           {icon}
         </button>
@@ -84,7 +98,15 @@ export default function SidebarPanel({
          */}
         {!isCollapsed && (
           <div className="flex items-center gap-3 pr-1">
-            <h2 className="text-lg font-semibold text-slate-800 whitespace-nowrap">
+            <h2
+              className="text-lg font-semibold whitespace-nowrap"
+              style={{
+                fontFamily: typography.titlesFont,
+                fontWeight: Number(typography.titlesStyle),
+                fontSize: typography.sizeMd,
+                color: colors.sidebarForeground,
+              }}
+            >
               {title}
             </h2>
 
@@ -94,12 +116,17 @@ export default function SidebarPanel({
              * - Minimalistic (no border outline).
              * - Bigger plus sign.
              * - Only shown if onAdd is provided.
-             */}
-            {onAdd && (
+             */
+            onAdd && (
               <button
                 onClick={onAdd}
                 aria-label={`Add to ${title}`}
-                className="h-7 w-7 flex items-center justify-center rounded-md text-gray-700 text-xl leading-none hover:bg-gray-100 transition"
+                className="h-7 w-7 flex items-center justify-center rounded-md text-xl leading-none hover:opacity-80 transition"
+                style={{
+                  backgroundColor: colors.sidebarBackground,
+                  color: colors.sidebarForeground,
+                  borderRadius: radii.md,
+                }}
               >
                 +
               </button>
@@ -114,7 +141,12 @@ export default function SidebarPanel({
        * Thin horizontal line between header and content.
        * Only visible when expanded.
        */}
-      {!isCollapsed && <div className="h-px bg-gray-200 w-full" />}
+      {!isCollapsed && (
+        <div
+          className="h-px w-full"
+          style={{ backgroundColor: colors.borderStroke }}
+        />
+      )}
 
       {/* ===================== CONTENT ===================== */}
       <div
