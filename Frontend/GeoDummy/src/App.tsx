@@ -1,20 +1,32 @@
-// App.tsx
 import Header from "./Header/Header";
 import BaseMap from "./Central column/BaseMap";
 import AttributeTable from "./Central column/AttributeTable";
 import ScriptList from "./Right column/ScriptList";
 import LayerSidebar from "./LeftColumn/LayerSidebar";
 import { sampleFeatures } from "./Central column/data";
+import { colors } from "./Design/DesignTokens";
 
 function App() {
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div
+      className="h-screen flex flex-col overflow-hidden"
+      style={{
+        backgroundColor: colors.background,
+        color: colors.foreground,
+      }}
+    >
       <Header />
 
       {/* MAIN LAYOUT: 3 columns */}
       <div className="flex flex-1 min-h-0">
         {/* LEFT PANEL – Layers */}
-        <div className="border-r bg-white shrink-0 relative z-20 flex flex-col">
+        <div
+          className="shrink-0 relative z-20 flex flex-col"
+          style={{
+            backgroundColor: colors.sidebarBackground,
+            borderRight: `1px solid ${colors.borderStroke}`,
+          }}
+        >
           <LayerSidebar />
         </div>
 
@@ -30,7 +42,13 @@ function App() {
         </div>
 
         {/* RIGHT PANEL – Tools */}
-        <div className="w-1/4 lg:w-72 border-l bg-white shrink-0 relative z-10">
+        <div
+          className="w-1/4 lg:w-72 shrink-0 relative z-10"
+          style={{
+            backgroundColor: colors.sidebarBackground,
+            borderLeft: `1px solid ${colors.borderStroke}`,
+          }}
+        >
           <ScriptList />
         </div>
       </div>
