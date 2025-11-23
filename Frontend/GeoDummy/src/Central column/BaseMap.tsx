@@ -20,7 +20,7 @@ function BaseMap() {
  return (
     <div className="flex-1 flex items-start justify-center w-full h-full ">
      
-      <div id="map" className="h-full w-[1000px] rounded-sm" />
+      <div id="map" className="h-full w-full rounded-sm" />
     </div>
   );
 }

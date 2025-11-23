@@ -107,7 +107,7 @@ const AttributeTable: React.FC<AttributeTableProps> = ({
   if (!isOpen) {
     return (
       <div className="flex flex-col justify-end">
-        <div className="w-full max-w-[1000px] mx-auto">
+        <div className="w-full mx-auto">
           <div
             className="flex items-center justify-between p-3 bg-gray-50 cursor-pointer hover:bg-gray-100 border-t border-x border-gray-300 shadow-lg rounded-t-lg"
             onClick={() => setIsOpen(true)}
@@ -138,7 +138,7 @@ const AttributeTable: React.FC<AttributeTableProps> = ({
   // ---------- ABERTO: painel completo ----------
   return (
     <div className="flex justify-center">
-      <div className="w-full max-w-[1000px] h-full flex flex-col">
+      <div className="w-full h-full flex flex-col">
         <div className="border rounded-t-lg bg-white shadow-lg h-full flex flex-col max-h-72">
           {/* Header colapsável */}
           <div
