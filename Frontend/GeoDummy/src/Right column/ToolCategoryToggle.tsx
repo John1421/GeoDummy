@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { colors, typography } from "../Design/DesignTokens";
 
 interface ToolCategoryToggleProps {
     title: string;
@@ -9,16 +10,16 @@ function ToolCategoryToggle({ title, children }: ToolCategoryToggleProps) {
     const [open, setOpen] = useState(false);
 
     return (
-        <div className="border-b">
+        <div className="border-b" style={{ borderColor: colors.borderStroke }}>
             <button
                 onClick={() => setOpen(!open)}
-                className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-left font-medium text-gray-700"
+                className="w-full px-4 py-2 back hover:bg-gray-200 text-left" style={{fontFamily: typography.titlesFont}}
             >
                 {open ? `▼ ${title}` : `► ${title}`}
             </button>
 
             {open && (
-                <div className="px-4 py-2 space-y-2 bg-white">
+                <div className="px-4 py-2 space-y-2" style ={{ backgroundColor: colors.sidebarBackground }}> 
                     {children}
                 </div>
             )}
