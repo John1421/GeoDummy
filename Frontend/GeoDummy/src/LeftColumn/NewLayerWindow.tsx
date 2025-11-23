@@ -6,7 +6,7 @@ import { colors, typography, radii, spacing } from "../Design/DesignTokens";
 interface NewLayerWindowProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (layerName: string) => void;
+  onSelect: (layerName: string, fileName: string) => void;
   existingLayerNames: string[];
 }
 
@@ -70,6 +70,8 @@ export default function NewLayerWindow({
     const file = e.target.files?.[0];
     if (!file) return;
     setSelectedFileName(file.name);
+    // Notice: we DO NOT auto-fill the layer name from the file name here,
+    // to keep behavior consistent with your latest request.
   };
 
   const handleCreate = () => {
@@ -97,7 +99,7 @@ export default function NewLayerWindow({
     }
 
     // All good
-    onSelect(trimmedName);
+    onSelect(trimmedName, selectedFileName);
     onClose();
   };
 

@@ -1,4 +1,4 @@
-import { memo, useMemo } from "react";
+import { memo, useMemo, useRef } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Settings } from "lucide-react";
@@ -7,7 +7,7 @@ import { colors, typography, radii, shadows } from "../Design/DesignTokens";
 
 interface LayerCardProps {
   layer: Layer;
-  onSettings: (layerId: string) => void;
+  onSettings: (layerId: string, rect: DOMRect) => void;
 }
 
 function LayerCardComponent({ layer, onSettings }: LayerCardProps) {
@@ -22,6 +22,8 @@ function LayerCardComponent({ layer, onSettings }: LayerCardProps) {
     id: layer.id,
     animateLayoutChanges: () => false,
   });
+
+  const cardRef = useRef<HTMLDivElement | null>(null);
 
   const transformStyle = useMemo(
     () => ({
@@ -47,8 +49,22 @@ function LayerCardComponent({ layer, onSettings }: LayerCardProps) {
     userSelect: "none",
   };
 
+  const handleSettingsClick = () => {
+    if (!cardRef.current) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    onSettings(layer.id, rect);
+  };
+
   return (
-    <div ref={setNodeRef} style={cardStyle} {...attributes}>
+    <div
+      ref={(node) => {
+        // Attach both sortable ref and local ref to the same DOM node
+        setNodeRef(node);
+        cardRef.current = node;
+      }}
+      style={cardStyle}
+      {...attributes}
+    >
       <div
         style={{
           display: "flex",
@@ -89,7 +105,7 @@ function LayerCardComponent({ layer, onSettings }: LayerCardProps) {
 
         <button
           aria-label="Layer settings"
-          onClick={() => onSettings(layer.id)}
+          onClick={handleSettingsClick}
           style={{
             padding: 4,
             borderRadius: radii.sm,

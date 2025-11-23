@@ -1,3 +1,4 @@
+// LayerCardList.tsx
 import {
   DndContext,
   closestCenter,
@@ -22,7 +23,7 @@ import type { Layer } from "./LayerSidebar";
 interface Props {
   layers: Layer[];
   setLayers: React.Dispatch<React.SetStateAction<Layer[]>>;
-  onSettings: (layerId: string) => void;
+  onSettings: (layerId: string, rect: DOMRect) => void;
 }
 
 export default function LayerCardList({ layers, setLayers, onSettings }: Props) {
