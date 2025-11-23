@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { FolderOpen } from "lucide-react";
 import WindowTemplate from "../TemplateModals/PopUpWindowModal";
 import { colors, typography, radii, spacing } from "../Design/DesignTokens";
@@ -29,22 +29,6 @@ export default function NewLayerWindow({
     }
   }, [isOpen]);
 
-  // Allow pressing Enter to create the layer
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Enter") {
-        if (!isCreateDisabled) {
-          handleCreate();
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, layerName, selectedFileName, error]);
-
   // Validate duplicate name whenever the layer name changes
   useEffect(() => {
     const trimmed = layerName.trim();
@@ -74,7 +58,7 @@ export default function NewLayerWindow({
     // to keep behavior consistent with your latest request.
   };
 
-  const handleCreate = () => {
+  const handleCreate = useCallback(() => {
     const trimmedName = layerName.trim();
 
     // Basic checks
@@ -101,9 +85,25 @@ export default function NewLayerWindow({
     // All good
     onSelect(trimmedName, selectedFileName);
     onClose();
-  };
+  }, [layerName, selectedFileName, existingLayerNames, onSelect, onClose]);
 
   const isCreateDisabled = !layerName.trim() || !selectedFileName || !!error;
+
+  // Allow pressing Enter to create the layer (uses stable handleCreate/isCreateDisabled)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Enter") {
+        if (!isCreateDisabled) {
+          handleCreate();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, handleCreate, isCreateDisabled]);
 
   return (
     <WindowTemplate

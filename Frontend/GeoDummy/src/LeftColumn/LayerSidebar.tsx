@@ -4,6 +4,7 @@ import LayerCardList from "./LayerCardList";
 import NewLayerWindow from "./NewLayerWindow";
 import SidebarPanel from "../TemplateModals/SidebarModal";
 import LayerSettingsWindow from "./LayerSettingsWindow";
+import { colors } from "../Design/DesignTokens";
 
 /**
  * Extended layer model with metadata needed for the settings window.
@@ -125,7 +126,7 @@ export default function LayerSidebar() {
       <SidebarPanel
         side="left"
         title="Layers"
-        icon={<LayersIcon size={18} />}
+        icon={<LayersIcon size={18} color={colors.primary} />}
         expandedWidthClassName="w-72"
         collapsedWidthClassName="w-12"
         onAdd={() => setIsWindowOpen(true)}

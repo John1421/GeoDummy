@@ -1,8 +1,8 @@
 // LayerSettingsWindow.tsx
 import { useEffect, useRef } from "react";
-import type { Layer } from "./LayerSidebar";
 import { X } from "lucide-react";
-import { colors, typography, radii, spacing } from "../Design/DesignTokens";
+import type { Layer } from "./LayerSidebar";
+import { colors, typography, radii, spacing, shadows } from "../Design/DesignTokens";
 
 /**
  * Small floating window for per-layer settings.
@@ -39,6 +39,20 @@ export default function LayerSettingsWindow({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
+  // Close when clicking outside the panel
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+
+    window.addEventListener("mousedown", handleClickOutside);
+    return () => window.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen, onClose]);
+
   // If closed or missing data, render nothing
   if (!isOpen || !layer || !position) return null;
 
@@ -59,9 +73,20 @@ export default function LayerSettingsWindow({
     onOpacityChange(layer.id, 1);
   };
 
+  // Inline style for CSS variable used in the slider gradient
+  const sliderStyle = {
+    width: "100%",
+    // Custom CSS variable consumed in the <style> block below
+    "--value": opacityPercent,
+  } as React.CSSProperties;
+
   return (
     <>
-      {/* Local styles for the opacity slider. */}
+      {/* Local styles for the opacity slider.
+          - Filled part: colors.primary
+          - Unfilled part: colors.dragIcon
+          - Thumb: darker solid color, no border
+      */}
       <style>
         {`
           .opacity-slider {
@@ -89,13 +114,13 @@ export default function LayerSettingsWindow({
             border-radius: 999px;
             background: #074766; /* darker than primary, no border */
             cursor: pointer;
-            margin-top: -4px; /* centers thumb vertically on the 6px track */
+            margin-top: -4px; /* center thumb on 6px track */
           }
 
           .opacity-slider::-webkit-slider-runnable-track {
             height: 6px;
             border-radius: 999px;
-            background: transparent; /* track drawing handled by background above */
+            background: transparent; /* track drawing comes from background above */
           }
 
           /* Firefox thumb */
@@ -130,9 +155,8 @@ export default function LayerSettingsWindow({
           zIndex: 1000000,
           backgroundColor: colors.cardBackground,
           borderRadius: radii.md,
-          // no border => no outline
-          border: "none",
-          boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+          border: "none", // no outline
+          boxShadow: shadows.subtle,
           minWidth: 260,
           maxWidth: 320,
           overflow: "hidden",
@@ -189,34 +213,37 @@ export default function LayerSettingsWindow({
           style={{
             padding: 12,
             fontFamily: typography.normalFont,
-            color: colors.foreground,
+            color: colors.sidebarForeground,
             fontSize: typography.sizeSm,
             display: "flex",
             flexDirection: "column",
             rowGap: spacing.sm,
           }}
         >
-          {/* Source file info */}
+          {/* Source file */}
           <div
             style={{
               display: "flex",
-              columnGap: 4,
+              justifyContent: "space-between",
               alignItems: "baseline",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
+              width: "100%",
+              gap: 12,
             }}
           >
             <span
               style={{
                 fontWeight: 600,
+                whiteSpace: "nowrap",
               }}
             >
               Source file:
             </span>
             <span
               style={{
+                flex: 1,
+                textAlign: "right",
                 overflow: "hidden",
+                whiteSpace: "nowrap",
                 textOverflow: "ellipsis",
               }}
               title={layer.fileName ?? "Unknown"}
@@ -229,29 +256,32 @@ export default function LayerSettingsWindow({
           <div
             style={{
               display: "flex",
-              columnGap: 4,
+              justifyContent: "space-between",
               alignItems: "baseline",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
+              width: "100%",
+              gap: 12,
             }}
           >
             <span
               style={{
                 fontWeight: 600,
+                whiteSpace: "nowrap",
               }}
             >
               Geometry type:
             </span>
             <span
               style={{
-                opacity: 0.8,
+                flex: 1,
+                textAlign: "right",
                 overflow: "hidden",
+                whiteSpace: "nowrap",
                 textOverflow: "ellipsis",
+                opacity: 0.8,
               }}
-              title={layer.geometryType ?? "Unknown (read-only placeholder)"}
+              title={layer.geometryType ?? "Unknown"}
             >
-              {layer.geometryType ?? "Unknown (read-only placeholder)"}
+              {layer.geometryType ?? "Unknown"}
             </span>
           </div>
 
@@ -276,12 +306,7 @@ export default function LayerSettingsWindow({
               value={opacityPercent}
               onChange={handleSliderChange}
               className="opacity-slider"
-              // Pass the current value into a CSS variable used in the gradient
-              style={
-                {
-                  "--value": opacityPercent,
-                } as any
-              }
+              style={sliderStyle}
             />
 
             <div
