@@ -5,7 +5,7 @@ import { colors } from "../Design/DesignTokens";
 
 import ToolCategoryToggle from "./ToolCategoryToggle";
 import ScriptCard from "./ScriptCard";
-import AddNewScript from "../Additional windows/AddNewScript";
+import AddNewScript from "./AddNewScript";
 
 export default function ScriptList() {
   const [showAddNew, setShowAddNew] = useState(false);
