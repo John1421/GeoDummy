@@ -1,56 +1,52 @@
+import { useState } from "react";
+import { Wrench as ToolsIcon } from "lucide-react";
+import SidebarPanel from "../TemplateModals/SidebarModal";
+import { colors } from "../Design/DesignTokens";
+
 import ToolCategoryToggle from "./ToolCategoryToggle";
 import ScriptCard from "./ScriptCard";
-import { useState } from "react";
 import AddNewScript from "../Additional windows/AddNewScript";
 
-/* The main component displaying a list of available scripts/tools */
-function ScriptList() {
-    const [showAddNew, setShowAddNew] = useState(false);
+export default function ScriptList() {
+  const [showAddNew, setShowAddNew] = useState(false);
 
-    return (
-        <div className="h-full w-full flex flex-col">
+  return (
+    <>
+      <SidebarPanel
+        side="right"
+        title="Tools"
+        icon={<ToolsIcon size={18} color={colors.primary} />}
+        expandedWidthClassName="w-72"
+        collapsedWidthClassName="w-12"
+        onAdd={() => setShowAddNew(true)}
+      >
+        {showAddNew && (
+          <AddNewScript onClose={() => setShowAddNew(false)} />
+        )}
 
-            {/* HEADER DA TOOLBAR */}
-            <div className="px-4 py-3 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-700">Tools</h2>
-                <button
-                    aria-label="Add new script"
-                    onClick={() => setShowAddNew(true)}
-                    className="ml-2 inline-flex items-center justify-center h-8 w-8 rounded-md bg-blue-500 text-white hover:bg-blue-600"
-                >
-                    +
-                </button>
-            </div>
+        {/* TOOL CATEGORIES */}
+        <ToolCategoryToggle title="Category 1">
+          <ScriptCard
+            name="Tree Height Analysis"
+            description="Analysis of tree heights on a selected layer."
+          />
+          <ScriptCard
+            name="Simplify Geometry"
+            description="Reduces geometry complexity."
+          />
+        </ToolCategoryToggle>
 
-            {showAddNew && <AddNewScript onClose={() => setShowAddNew(false)} />}
-
-            {/* TOGGLE BAR */}
-            <ToolCategoryToggle title="Category 1">
-                <ScriptCard
-                    name="Tree Height Analysis"
-                    description="Analysis of tree heights on a selected layer."
-                />
-                <ScriptCard
-                    name="Simplify Geometry"
-                    description="Reduces geometry complexity."
-                />
-
-            </ToolCategoryToggle>
-
-            <ToolCategoryToggle title="Category 2">
-                <ScriptCard
-                    name="Buffer Zones"
-                    description="Creates buffer zones around features."
-                />
-                <ScriptCard
-                    name="Spatial Join"
-                    description="Joins attributes based on spatial relationships."
-                />
-            </ToolCategoryToggle>
-
-            
-        </div>
-    );
+        <ToolCategoryToggle title="Category 2">
+          <ScriptCard
+            name="Buffer Zones"
+            description="Creates buffer zones around features."
+          />
+          <ScriptCard
+            name="Spatial Join"
+            description="Joins attributes based on spatial relationships."
+          />
+        </ToolCategoryToggle>
+      </SidebarPanel>
+    </>
+  );
 }
-
-export default ScriptList;
