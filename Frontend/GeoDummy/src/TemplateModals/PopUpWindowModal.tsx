@@ -3,20 +3,30 @@ import type { ReactNode } from "react";
 import { X } from "lucide-react";
 import { colors, typography, radii } from "../Design/DesignTokens";
 
-interface ModalProps {
+interface WindowTemplateProps {
+  /** Controls whether the modal is visible */
   isOpen: boolean;
+
+  /** Text displayed in the modal header */
   title: string;
+
+  /** Function executed when the modal is closed */
   onClose: () => void;
+
+  /** Main content of the modal */
   children: ReactNode;
-  /** Optional extra content at the bottom (buttons, etc.) */
+
+  /** Optional footer area (typically buttons) */
   footer?: ReactNode;
-  /** Optional width override (Tailwind classes) */
+
+  /** Override the modal width using Tailwind classes */
   widthClassName?: string;
-  /** If true, clicking the overlay does not close the modal */
+
+  /** If true, clicking the dark background will NOT close the modal */
   disableOverlayClose?: boolean;
 }
 
-export default function Modal({
+export default function WindowTemplate({
   isOpen,
   title,
   onClose,
@@ -24,8 +34,10 @@ export default function Modal({
   footer,
   widthClassName = "w-[520px] max-w-[95%]",
   disableOverlayClose = false,
-}: ModalProps) {
-  // Close on ESC key
+}: WindowTemplateProps) {
+  // ---------------------------------------------
+  // Close modal using the ESC key
+  // ---------------------------------------------
   useEffect(() => {
     if (!isOpen) return;
 
@@ -36,11 +48,15 @@ export default function Modal({
     };
 
     window.addEventListener("keydown", handleKeyDown);
+
+    // Cleanup to avoid leaking listeners
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
+  // If the modal is closed, do not render anything
   if (!isOpen) return null;
 
+  // Handles clicks on the overlay (darkened background)
   const handleOverlayClick = () => {
     if (!disableOverlayClose) {
       onClose();
@@ -49,52 +65,76 @@ export default function Modal({
 
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center"
-      style={{
-        backgroundColor: "rgba(0, 0, 0, 0.3)",
-        zIndex: 999999,
-      }}
       onClick={handleOverlayClick}
+      style={{
+        position: "fixed",
+        inset: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "rgba(0, 0, 0, 0.3)", // Dimmed overlay
+        zIndex: 999999, // Above all UI layers
+      }}
     >
       <div
-        className={`overflow-hidden ${widthClassName}`}
-        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside the modal
+        className={widthClassName}
+        onClick={(e) => e.stopPropagation()} // Prevent overlay close when clicking inside modal
         style={{
+          overflow: "hidden",
           backgroundColor: colors.cardBackground,
           borderRadius: radii.md,
         }}
       >
-        {/* Header with gradient */}
+        {/* ---------------------------------------------
+            Modal Header (title + close button)
+           --------------------------------------------- */}
         <div
-          className="px-5 py-3 flex items-center justify-between"
           style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingInline: 20,
+            paddingBlock: 12,
             backgroundImage: `linear-gradient(90deg, ${colors.gradientStart}, ${colors.gradientEnd})`,
             color: colors.primaryForeground,
             fontFamily: typography.titlesFont,
           }}
         >
           <h2
-            className="text-base font-semibold"
             style={{
               fontWeight: Number(typography.titlesStyle),
               fontSize: typography.sizeMd,
+              margin: 0,
             }}
           >
             {title}
           </h2>
+
+          {/* Close Button */}
           <button
             onClick={onClose}
             aria-label="Close"
-            className="p-1 rounded hover:opacity-80"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 4,
+              border: "none",
+              background: "transparent",
+              borderRadius: radii.sm,
+              cursor: "pointer",
+            }}
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* Body */}
+        {/* ---------------------------------------------
+            Modal Body
+           --------------------------------------------- */}
         <div
-          className="p-4"
           style={{
+            padding: 16,
             fontFamily: typography.normalFont,
             color: colors.foreground,
           }}
@@ -102,8 +142,19 @@ export default function Modal({
           {children}
         </div>
 
-        {/* Optional footer */}
-        {footer && <div className="px-4 pb-4">{footer}</div>}
+        {/* ---------------------------------------------
+            Optional Footer (buttons, extra UI, etc.)
+           --------------------------------------------- */}
+        {footer && (
+          <div
+            style={{
+              paddingInline: 16,
+              paddingBottom: 16,
+            }}
+          >
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );

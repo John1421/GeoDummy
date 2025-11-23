@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { FolderOpen } from "lucide-react";
-import Modal from "../TemplateModals/PopUpWindowModal";
+import WindowTemplate from "../TemplateModals/PopUpWindowModal";
 import { colors, typography, radii, spacing } from "../Design/DesignTokens";
 
 interface NewLayerWindowProps {
@@ -51,11 +51,10 @@ export default function NewLayerWindow({
   }, [layerName, existingLayerNames]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-  setSelectedFileName(file.name);
-};
-
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSelectedFileName(file.name);
+  };
 
   const handleCreate = () => {
     const trimmedName = layerName.trim();
@@ -86,20 +85,23 @@ export default function NewLayerWindow({
     onClose();
   };
 
-  const isCreateDisabled =
-    !layerName.trim() || !selectedFileName || !!error;
+  const isCreateDisabled = !layerName.trim() || !selectedFileName || !!error;
 
   return (
-    <Modal
+    <WindowTemplate
       isOpen={isOpen}
       onClose={onClose}
       title="Add New Layer"
       footer={
-        <div className="flex justify-end">
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+          }}
+        >
           <button
             onClick={handleCreate}
             disabled={isCreateDisabled}
-            className="px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               backgroundColor: colors.primary,
               color: colors.primaryForeground,
@@ -107,6 +109,11 @@ export default function NewLayerWindow({
               paddingInline: spacing.lg,
               paddingBlock: spacing.sm,
               borderRadius: radii.md,
+              border: "none",
+              fontSize: typography.sizeSm,
+              fontWeight: 500,
+              cursor: isCreateDisabled ? "not-allowed" : "pointer",
+              opacity: isCreateDisabled ? 0.5 : 1,
             }}
           >
             Add Layer
@@ -114,12 +121,26 @@ export default function NewLayerWindow({
         </div>
       }
     >
-      <div className="space-y-6">
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          rowGap: spacing.lg,
+        }}
+      >
         {/* Choose Layer File */}
-        <div className="flex items-center gap-4">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            columnGap: 16,
+          }}
+        >
           <label
-            className="w-40 text-sm font-semibold"
             style={{
+              width: 160,
+              fontSize: typography.sizeSm,
+              fontWeight: 600,
               color: colors.foreground,
               fontFamily: typography.normalFont,
             }}
@@ -127,14 +148,22 @@ export default function NewLayerWindow({
             Choose Layer File
           </label>
 
-          <div className="flex-1">
+          <div style={{ flex: 1 }}>
             <label
-              className="flex items-center justify-between px-3 py-2 rounded-lg text-sm cursor-pointer border"
               style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingInline: 12,
+                paddingBlock: 8,
+                borderRadius: radii.md,
+                fontSize: typography.sizeSm,
+                cursor: "pointer",
+                borderStyle: "solid",
+                borderWidth: 1,
                 backgroundColor: colors.cardBackground,
                 color: colors.foreground,
                 borderColor: colors.borderStroke,
-                borderRadius: radii.md,
                 fontFamily: typography.normalFont,
               }}
             >
@@ -143,18 +172,26 @@ export default function NewLayerWindow({
 
               <input
                 type="file"
-                className="hidden"
                 onChange={handleFileChange}
+                style={{ display: "none" }}
               />
             </label>
           </div>
         </div>
 
         {/* Layer Name */}
-        <div className="flex items-center gap-4">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            columnGap: 16,
+          }}
+        >
           <label
-            className="w-40 text-sm font-semibold"
             style={{
+              width: 160,
+              fontSize: typography.sizeSm,
+              fontWeight: 600,
               color: colors.foreground,
               fontFamily: typography.normalFont,
             }}
@@ -162,24 +199,31 @@ export default function NewLayerWindow({
             Layer Name
           </label>
 
-          <div className="flex-1">
+          <div style={{ flex: 1 }}>
             <div
-              className="px-3 py-2 rounded-lg border"
               style={{
+                paddingInline: 12,
+                paddingBlock: 8,
+                borderRadius: radii.md,
+                borderStyle: "solid",
+                borderWidth: 1,
                 backgroundColor: colors.cardBackground,
                 borderColor: colors.borderStroke,
-                borderRadius: radii.md,
               }}
             >
               <input
                 type="text"
                 value={layerName}
                 onChange={(e) => setLayerName(e.target.value)}
-                className="w-full bg-transparent text-sm focus:outline-none"
                 placeholder="Choose a name for the layer ..."
                 style={{
+                  width: "100%",
+                  backgroundColor: "transparent",
+                  border: "none",
+                  fontSize: typography.sizeSm,
                   color: colors.foreground,
                   fontFamily: typography.normalFont,
+                  outline: "none",
                 }}
               />
             </div>
@@ -189,16 +233,17 @@ export default function NewLayerWindow({
         {/* Error message */}
         {error && (
           <p
-            className="text-sm"
             style={{
-              color: "#dc2626", // red-600-like
+              fontSize: typography.sizeSm,
+              color: "#811717ff", // red-like
               fontFamily: typography.normalFont,
+              margin: 0,
             }}
           >
             {error}
           </p>
         )}
       </div>
-    </Modal>
+    </WindowTemplate>
   );
 }

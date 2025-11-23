@@ -31,101 +31,107 @@ export default function SidebarPanel({
   collapsedWidthClassName = "w-14", // default collapsed width
   children,
 }: SidebarPanelProps) {
-  // Local state to control collapsed/expanded
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  // Used only for border orientation
   const isLeft = side === "left";
 
-  /**
-   * Base container classes:
-   * - transition-[width]: smooth width animation when toggling.
-   * - overflow-hidden: prevents inner content from overflowing when collapsing.
-   * - flex flex-col: vertical layout (header + content).
-   */
-  const containerBase =
-    "relative overflow-hidden shrink-0 h-full flex flex-col z-20 transition-[width] duration-300";
-
-  // Border on the correct side, so it visually attaches to the map/content
-  const borderClass = isLeft ? "border-r" : "border-l";
-
-  // Select width depending on collapsed state
   const widthClass = isCollapsed
     ? collapsedWidthClassName
     : expandedWidthClassName;
 
   return (
     <div
-      className={`${containerBase} ${borderClass} ${widthClass}`}
+      className={widthClass}
       style={{
+        position: "relative",
+        overflow: "hidden",
+        flexShrink: 0,
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        zIndex: 20,
         backgroundColor: colors.sidebarBackground,
-        borderColor: colors.borderStroke,
         color: colors.sidebarForeground,
         fontFamily: typography.normalFont,
+        borderRight: isLeft ? `1px solid ${colors.borderStroke}` : undefined,
+        borderLeft: !isLeft ? `1px solid ${colors.borderStroke}` : undefined,
+        transition: "width 0.3s ease",
       }}
     >
       {/* ===================== HEADER ===================== */}
-      <div className="flex items-center justify-between h-12 px-2">
-        {/**
-         * ICON BUTTON
-         * -----------
-         * - Always visible.
-         * - Same size and position in both states.
-         * - Toggles between expanded and collapsed.
-         */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          height: 48,
+          paddingInline: 8,
+        }}
+      >
+        {/* ICON BUTTON (always visible) */}
         <button
           type="button"
           onClick={() => setIsCollapsed((v) => !v)}
           aria-label={
             isCollapsed ? `Expand ${title} panel` : `Collapse ${title} panel`
           }
-          className="h-8 w-8 flex items-center justify-center rounded-md transition-colors shrink-0 hover:opacity-80"
           style={{
+            height: 32,
+            width: 32,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: radii.md,
             backgroundColor: colors.sidebarBackground,
             color: colors.sidebarForeground,
-            borderRadius: radii.md,
+            border: "none",
+            cursor: "pointer",
           }}
         >
           {icon}
         </button>
 
-        {/**
-         * RIGHT HEADER AREA
-         * -----------------
-         * Only rendered when expanded:
-         * - Title text
-         * - Optional "+" button
-         */}
+        {/* RIGHT HEADER AREA - only when expanded */}
         {!isCollapsed && (
-          <div className="flex items-center gap-3 pr-1">
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              columnGap: 12,
+              paddingRight: 4,
+            }}
+          >
             <h2
-              className="text-lg font-semibold whitespace-nowrap"
               style={{
                 fontFamily: typography.titlesFont,
                 fontWeight: Number(typography.titlesStyle),
                 fontSize: typography.sizeMd,
                 color: colors.sidebarForeground,
+                whiteSpace: "nowrap",
+                margin: 0,
               }}
             >
               {title}
             </h2>
 
-            {/**
-             * "+" BUTTON
-             * ----------
-             * - Minimalistic (no border outline).
-             * - Bigger plus sign.
-             * - Only shown if onAdd is provided.
-             */
-            onAdd && (
+            {/* "+" BUTTON - only if onAdd provided */}
+            {onAdd && (
               <button
                 onClick={onAdd}
                 aria-label={`Add to ${title}`}
-                className="h-7 w-7 flex items-center justify-center rounded-md text-xl leading-none hover:opacity-80 transition"
                 style={{
+                  height: 28,
+                  width: 28,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: radii.md,
+                  fontSize: 20,
+                  lineHeight: 1,
                   backgroundColor: colors.sidebarBackground,
                   color: colors.sidebarForeground,
-                  borderRadius: radii.md,
+                  border: "none",
+                  cursor: "pointer",
                 }}
               >
                 +
@@ -135,31 +141,32 @@ export default function SidebarPanel({
         )}
       </div>
 
-      {/**
-       * DIVIDER
-       * -------
-       * Thin horizontal line between header and content.
-       * Only visible when expanded.
-       */}
+      {/* Divider between header and content (only when expanded) */}
       {!isCollapsed && (
         <div
-          className="h-px w-full"
-          style={{ backgroundColor: colors.borderStroke }}
+          style={{
+            height: 1,
+            width: "100%",
+            backgroundColor: colors.borderStroke,
+          }}
         />
       )}
 
       {/* ===================== CONTENT ===================== */}
-      <div
-        className={
-          isCollapsed
-            ? // When collapsed, the content area is completely hidden.
-              "hidden"
-            : // When expanded, this is a scrollable area.
-              "flex-1 overflow-y-auto min-h-0 px-3 py-3 pr-4"
-        }
-      >
-        {children}
-      </div>
+      {!isCollapsed && (
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            minHeight: 0,
+            paddingInline: 12,
+            paddingBlock: 12,
+            paddingRight: 16,
+          }}
+        >
+          {children}
+        </div>
+      )}
     </div>
   );
 }

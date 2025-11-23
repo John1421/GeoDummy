@@ -37,35 +37,51 @@ function LayerCardComponent({ layer, onSettings }: LayerCardProps) {
     backgroundColor: colors.cardBackground,
     color: colors.sidebarForeground,
     borderColor: colors.borderStroke,
+    borderStyle: "solid",
+    borderWidth: 1,
     boxShadow: shadows.none,
     borderRadius: radii.md,
     fontFamily: typography.normalFont,
+    padding: 12,
+    marginBottom: 8,
+    userSelect: "none",
   };
 
   return (
-    <div
-      ref={setNodeRef}
-      style={cardStyle}
-      {...attributes}
-      className="border p-3 mb-2 select-none"
-    >
-      <div className="flex items-center gap-2">
+    <div ref={setNodeRef} style={cardStyle} {...attributes}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          columnGap: 8,
+        }}
+      >
         <button
           {...listeners}
           aria-label="Drag layer"
-          className="cursor-grab active:cursor-grabbing p-1 rounded"
+          style={{
+            padding: 4,
+            borderRadius: radii.sm,
+            border: "none",
+            background: "transparent",
+            cursor: "grab",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
         >
-          <GripVertical
-            size={18}
-            style={{ color: colors.dragIcon }}
-          />
+          <GripVertical size={18} style={{ color: colors.dragIcon }} />
         </button>
 
         <span
-          className="flex-1 text-sm font-medium truncate"
           style={{
+            flex: 1,
             fontFamily: typography.normalFont,
             fontSize: typography.sizeSm,
+            fontWeight: 500,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
           }}
         >
           {layer.title}
@@ -74,12 +90,18 @@ function LayerCardComponent({ layer, onSettings }: LayerCardProps) {
         <button
           aria-label="Layer settings"
           onClick={() => onSettings(layer.id)}
-          className="p-1 rounded"
+          style={{
+            padding: 4,
+            borderRadius: radii.sm,
+            border: "none",
+            background: "transparent",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
         >
-          <Settings
-            size={16}
-            style={{ color: colors.sidebarForeground }}
-          />
+          <Settings size={16} style={{ color: colors.sidebarForeground }} />
         </button>
       </div>
     </div>
