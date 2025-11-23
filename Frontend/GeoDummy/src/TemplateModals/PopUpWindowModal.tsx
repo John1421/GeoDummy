@@ -125,7 +125,7 @@ export default function WindowTemplate({
               cursor: "pointer",
             }}
           >
-            <X size={18} />
+            <X size={20} strokeWidth={3}/>
           </button>
         </div>
 

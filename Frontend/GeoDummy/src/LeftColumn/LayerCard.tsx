@@ -1,7 +1,7 @@
 import { memo, useMemo, useRef } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Settings } from "lucide-react";
+import { GripVertical, Eye, EyeOff } from "lucide-react";
 import type { Layer } from "./LayerSidebar";
 import { colors, typography, radii, shadows } from "../Design/DesignTokens";
 
@@ -23,6 +23,7 @@ function LayerCardComponent({ layer, onSettings }: LayerCardProps) {
     animateLayoutChanges: () => false,
   });
 
+  // Local ref to measure the card position (used to place the settings window)
   const cardRef = useRef<HTMLDivElement | null>(null);
 
   const transformStyle = useMemo(
@@ -49,6 +50,9 @@ function LayerCardComponent({ layer, onSettings }: LayerCardProps) {
     userSelect: "none",
   };
 
+  // Consider the layer "hidden" when opacity is very low (you can tweak this threshold)
+  const isHidden = (layer.opacity ?? 1) <= 0.01;
+
   const handleSettingsClick = () => {
     if (!cardRef.current) return;
     const rect = cardRef.current.getBoundingClientRect();
@@ -72,6 +76,7 @@ function LayerCardComponent({ layer, onSettings }: LayerCardProps) {
           columnGap: 8,
         }}
       >
+        {/* Drag handle */}
         <button
           {...listeners}
           aria-label="Drag layer"
@@ -89,6 +94,7 @@ function LayerCardComponent({ layer, onSettings }: LayerCardProps) {
           <GripVertical size={18} style={{ color: colors.dragIcon }} />
         </button>
 
+        {/* Layer title */}
         <span
           style={{
             flex: 1,
@@ -103,6 +109,7 @@ function LayerCardComponent({ layer, onSettings }: LayerCardProps) {
           {layer.title}
         </span>
 
+        {/* Visibility / settings icon (eye or eye-off) */}
         <button
           aria-label="Layer settings"
           onClick={handleSettingsClick}
@@ -117,7 +124,11 @@ function LayerCardComponent({ layer, onSettings }: LayerCardProps) {
             justifyContent: "center",
           }}
         >
-          <Settings size={16} style={{ color: colors.sidebarForeground }} />
+          {isHidden ? (
+            <EyeOff size={16} style={{ color: colors.sidebarForeground }} />
+          ) : (
+            <Eye size={16} style={{ color: colors.sidebarForeground }} />
+          )}
         </button>
       </div>
     </div>
