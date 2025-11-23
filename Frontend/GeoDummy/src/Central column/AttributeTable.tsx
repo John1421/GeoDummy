@@ -6,7 +6,7 @@ interface GeoJSONProperties {
 
 interface GeoJSONFeature {
   type: string;
-  geometry: any;
+  geometry: unknown;
   properties: GeoJSONProperties;
 }
 
@@ -49,7 +49,7 @@ const AttributeTable: React.FC<AttributeTableProps> = ({
 
   // Ordenação
   const processedData = useMemo(() => {
-    let filtered = [...data];
+    const filtered = [...data];
 
     if (sortConfig?.key) {
       filtered.sort((a, b) => {
