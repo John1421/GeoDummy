@@ -1,64 +1,255 @@
+import { useEffect, useState } from "react";
+import { FolderOpen } from "lucide-react";
+import WindowTemplate from "../TemplateModals/PopUpWindowModal";
+import { colors, typography, radii, spacing } from "../Design/DesignTokens";
+
 type AddNewScriptProps = {
-	onClose: () => void;
+    onClose: () => void;
 };
 
-function AddNewScript({ onClose }: AddNewScriptProps) {
-	return (
-		<div
-			className="fixed inset-0 flex items-center justify-center"
-			style={{ zIndex: 999999 }}
-			onClick={onClose}
-		>
-			<div
-				className="bg-white w-130 h-90 rounded shadow-lg p-4"
-				onClick={(e) => e.stopPropagation()} /* Prevent closing when clicking inside the modal */
-			>
-				<div className="flex justify-between items-center mb-2">
-					<h3 className="text-lg font-semibold">New Script</h3>
-					<button
-						aria-label="Close"
-						onClick={onClose}
-						className="text-xl font-bold leading-none"
-					>
-						×
-					</button>
-				</div>
-                <div className="mt-4">
-                    <div className="flex items-center gap-3">
-                        <p>Choose script file</p>
-                        <input
-                            type="file"
-                            className="flex-1 px-1 py-2 bg-gray-200 border border-gray-300 rounded cursor-pointer"
-                        />
+export default function AddNewScript({ onClose }: AddNewScriptProps) {
+    const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+    const [category, setCategory] = useState("");
+    const [numberValue, setNumberValue] = useState("");
+    const [typeValue, setTypeValue] = useState("");
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        // reset when opened (component is mounted each time in current usage)
+        setSelectedFileName(null);
+        setCategory("");
+        setNumberValue("");
+        setTypeValue("");
+        setError(null);
+    }, []);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setSelectedFileName(file.name);
+    };
+
+    const handleUpload = () => {
+        // Basic validation
+        if (!selectedFileName) {
+            setError("Please choose a script file.");
+            return;
+        }
+
+        // For now just log the values and close
+        console.log("Uploading script:", {
+            file: selectedFileName,
+            category,
+            number: numberValue,
+            type: typeValue,
+        });
+
+        onClose();
+    };
+
+    return (
+        <WindowTemplate isOpen={true} onClose={onClose} title="Add New Script">
+            <div
+                style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    rowGap: spacing.lg,
+                }}
+            >
+                {/* Choose Script File */}
+                <div
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        columnGap: 16,
+                    }}
+                >
+                    <label
+                        style={{
+                            width: 120,
+                            fontSize: typography.sizeSm,
+                            fontWeight: 600,
+                            color: colors.foreground,
+                            fontFamily: typography.normalFont,
+                        }}
+                    >
+                        Choose Script File
+                    </label>
+
+                    <div style={{ flex: 1 }}>
+                        <label
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                paddingInline: 12,
+                                paddingBlock: 8,
+                                borderRadius: radii.md,
+                                fontSize: typography.sizeSm,
+                                cursor: "pointer",
+                                borderStyle: "solid",
+                                borderWidth: 1,
+                                backgroundColor: colors.cardBackground,
+                                color: colors.foreground,
+                                borderColor: colors.borderStroke,
+                                fontFamily: typography.normalFont,
+                            }}
+                        >
+                            <span>{selectedFileName ?? "Browse Files"}</span>
+                            <FolderOpen size={18} />
+
+                            <input
+                                type="file"
+                                onChange={handleFileChange}
+                                style={{ display: "none" }}
+                            />
+                        </label>
                     </div>
                 </div>
-                <div className="mt-4">
-                    <h4 className="text-md font-semibold mb-3">Parameters</h4>
-                    <div className="flex items-center gap-3 mb-2">
-                        <label className="text-sm font-medium w-20">Category</label>
-                        <input type="text" className="flex-1 px-2 py-1 bg-gray-200 border border-gray-300 rounded" />
+
+                {/* Parameters */}
+                <div
+                    style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        rowGap: spacing.sm,
+                    }}
+                >
+                    <h4 style={{ margin: 0, fontSize: typography.sizeMd, fontWeight: 600 }}>
+                        Parameters
+                    </h4>
+
+                    <div style={{ display: "flex", alignItems: "center", columnGap: 16 }}>
+                        <label
+                            style={{
+                                width: 120,
+                                fontSize: typography.sizeSm,
+                                fontWeight: 600,
+                                color: colors.foreground,
+                                fontFamily: typography.normalFont,
+                            }}
+                        >
+                            Category
+                        </label>
+                        <div style={{ flex: 1 }}>
+                            <input
+                                value={category}
+                                onChange={(e) => setCategory(e.target.value)}
+                                placeholder="e.g. Analysis"
+                                style={{
+                                    width: "100%",
+                                    paddingInline: 12,
+                                    paddingBlock: 8,
+                                    borderRadius: radii.md,
+                                    borderStyle: "solid",
+                                    borderWidth: 1,
+                                    backgroundColor: colors.cardBackground,
+                                    borderColor: colors.borderStroke,
+                                    outline: "none",
+                                    fontSize: typography.sizeSm,
+                                    fontFamily: typography.normalFont,
+                                }}
+                            />
+                        </div>
                     </div>
-                    <div className="flex items-center gap-3 mb-2">
-                        <label className="text-sm font-medium w-20">Number</label>
-                        <input type="text" className="flex-1 px-2 py-1 bg-gray-200 border border-gray-300 rounded" />
+
+                    <div style={{ display: "flex", alignItems: "center", columnGap: 16 }}>
+                        <label
+                            style={{
+                                width: 120,
+                                fontSize: typography.sizeSm,
+                                fontWeight: 600,
+                                color: colors.foreground,
+                                fontFamily: typography.normalFont,
+                            }}
+                        >
+                            Number
+                        </label>
+                        <div style={{ flex: 1 }}>
+                            <input
+                                value={numberValue}
+                                onChange={(e) => setNumberValue(e.target.value)}
+                                placeholder="e.g. 1"
+                                style={{
+                                    width: "100%",
+                                    paddingInline: 12,
+                                    paddingBlock: 8,
+                                    borderRadius: radii.md,
+                                    borderStyle: "solid",
+                                    borderWidth: 1,
+                                    backgroundColor: colors.cardBackground,
+                                    borderColor: colors.borderStroke,
+                                    outline: "none",
+                                    fontSize: typography.sizeSm,
+                                    fontFamily: typography.normalFont,
+                                }}
+                            />
+                        </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <label className="text-sm font-medium w-20">Type</label>
-                        <input type="text" className="flex-1 px-2 py-1 bg-gray-200 border border-gray-300 rounded" />
+
+                    <div style={{ display: "flex", alignItems: "center", columnGap: 16 }}>
+                        <label
+                            style={{
+                                width: 120,
+                                fontSize: typography.sizeSm,
+                                fontWeight: 600,
+                                color: colors.foreground,
+                                fontFamily: typography.normalFont,
+                            }}
+                        >
+                            Type
+                        </label>
+                        <div style={{ flex: 1 }}>
+                            <input
+                                value={typeValue}
+                                onChange={(e) => setTypeValue(e.target.value)}
+                                placeholder="e.g. Buffer"
+                                style={{
+                                    width: "100%",
+                                    paddingInline: 12,
+                                    paddingBlock: 8,
+                                    borderRadius: radii.md,
+                                    borderStyle: "solid",
+                                    borderWidth: 1,
+                                    backgroundColor: colors.cardBackground,
+                                    borderColor: colors.borderStroke,
+                                    outline: "none",
+                                    fontSize: typography.sizeSm,
+                                    fontFamily: typography.normalFont,
+                                }}
+                            />
+                        </div>
                     </div>
                 </div>
-                <div className="mt-6 flex justify-end">
+
+                {/* Error */}
+                {error && (
+                    <p style={{ margin: 0, color: "#811717ff", fontFamily: typography.normalFont }}>
+                        {error}
+                    </p>
+                )}
+
+                {/* Footer actions */}
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: spacing.md }}>
                     <button
-                        onClick={onClose}
-                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                        onClick={handleUpload}
+                        style={{
+                            backgroundColor: colors.primary,
+                            color: colors.primaryForeground,
+                            fontFamily: typography.normalFont,
+                            paddingInline: spacing.lg,
+                            paddingBlock: spacing.sm,
+                            borderRadius: radii.md,
+                            border: "none",
+                            fontSize: typography.sizeSm,
+                            fontWeight: 500,
+                            cursor: "pointer",
+                        }}
                     >
                         Upload
                     </button>
                 </div>
-
-			</div>
-		</div>
-	);
+            </div>
+        </WindowTemplate>
+    );
 }
-
-export default AddNewScript;
