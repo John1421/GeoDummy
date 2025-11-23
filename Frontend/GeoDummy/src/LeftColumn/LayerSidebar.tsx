@@ -76,7 +76,7 @@ export default function LayerSidebar() {
           id: crypto.randomUUID(),
           title: chosenTitle,
           fileName,
-          geometryType: "Unknown (to be detected)",
+          geometryType: undefined,
           opacity: 1,
         },
         ...prev,
