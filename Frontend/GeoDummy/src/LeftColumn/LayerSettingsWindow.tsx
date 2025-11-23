@@ -1,5 +1,5 @@
 // LayerSettingsWindow.tsx
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { Layer } from "./LayerSidebar";
 import { colors, typography, radii, spacing, shadows } from "../Design/DesignTokens";
@@ -24,6 +24,12 @@ export default function LayerSettingsWindow({
   onOpacityChange,
 }: LayerSettingsWindowProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
+
+  // Adjusted position that keeps the window inside the viewport
+  const [adjustedPosition, setAdjustedPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
 
   // Close with ESC key
   useEffect(() => {
@@ -53,6 +59,45 @@ export default function LayerSettingsWindow({
     return () => window.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen, onClose]);
 
+  // Clamp the window inside the viewport so it does not go out of view
+  useEffect(() => {
+    if (!isOpen || !position) {
+      setAdjustedPosition(null);
+      return;
+    }
+
+    const panel = panelRef.current;
+    if (!panel) {
+      // use raw position for the first paint; we'll adjust on the next effect
+      setAdjustedPosition(position);
+      return;
+    }
+
+    const rect = panel.getBoundingClientRect();
+    const padding = 8;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    let top = position.top;
+    let left = position.left;
+
+    // If the window would overflow below the viewport, move it up
+    if (top + rect.height + padding > viewportHeight) {
+      top = Math.max(padding, viewportHeight - rect.height - padding);
+    }
+
+    // If the window would overflow to the right, move it left
+    if (left + rect.width + padding > viewportWidth) {
+      left = Math.max(padding, viewportWidth - rect.width - padding);
+    }
+
+    // Guard against negative positions
+    top = Math.max(padding, top);
+    left = Math.max(padding, left);
+
+    setAdjustedPosition({ top, left });
+  }, [isOpen, position]);
+
   // If closed or missing data, render nothing
   if (!isOpen || !layer || !position) return null;
 
@@ -74,17 +119,19 @@ export default function LayerSettingsWindow({
   };
 
   // Inline style for CSS variable used in the slider gradient
-  const sliderStyle = {
+  const sliderStyle: React.CSSProperties = {
     width: "100%",
     // Custom CSS variable consumed in the <style> block below
     "--value": opacityPercent,
   } as React.CSSProperties;
 
+  const effectivePosition = adjustedPosition ?? position;
+
   return (
     <>
       {/* Local styles for the opacity slider.
           - Filled part: colors.primary
-          - Unfilled part: colors.dragIcon
+          - Unfilled part: colors.borderStroke
           - Thumb: darker solid color, no border
       */}
       <style>
@@ -150,8 +197,8 @@ export default function LayerSettingsWindow({
         ref={panelRef}
         style={{
           position: "fixed",
-          top: position.top,
-          left: position.left,
+          top: effectivePosition.top,
+          left: effectivePosition.left,
           zIndex: 1000000,
           backgroundColor: colors.cardBackground,
           borderRadius: radii.md,
