@@ -13,13 +13,13 @@ function ToolCategoryToggle({ title, children }: ToolCategoryToggleProps) {
         <div className="border-b" style={{ borderColor: colors.borderStroke }}>
             <button
                 onClick={() => setOpen(!open)}
-                className="w-full px-4 py-2 back hover:bg-gray-200 text-left" style={{fontFamily: typography.titlesFont}}
+                className="w-full py-2 back hover:bg-gray-200 text-left" style={{fontFamily: typography.titlesFont}}
             >
                 {open ? `▼ ${title}` : `► ${title}`}
             </button>
 
             {open && (
-                <div className="px-4 py-2 space-y-2" style ={{ backgroundColor: colors.sidebarBackground }}> 
+                <div className="py-2 space-y-2" style ={{ backgroundColor: colors.sidebarBackground }}> 
                     {children}
                 </div>
             )}
