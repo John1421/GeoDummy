@@ -1,11 +1,10 @@
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from werkzeug.exceptions import HTTPException, BadRequest
 import geopandas as gpd
 import shutil
 import os
 import zipfile
-
 import FileManager
 from BasemapManager import BasemapManager
 
@@ -60,6 +59,9 @@ def add_file():
 
 
     _, file_extension = os.path.splitext(added_file.filename)
+
+    if file_extension.lower() == ".shp":
+        raise BadRequest("Please upload shapefiles as a .zip containing all necessary components (.shp, .shx, .dbf, optional .prj).")
 
     # If its a .zip file, check if it has .shp info
     if file_extension.lower() == '.zip':
@@ -131,28 +133,24 @@ def add_file():
 
     
 
-@app.route('/files', methods=['PUT'])
-def export_file():
+@app.route('/files/<file_id>', methods=['GET'])
+def export_file(file_id):
 
-    # Parse JSON body
-    data = request.get_json()
-    if not data or 'destination_path' not in data or 'file_id' not in data:
-        raise BadRequest("Missing 'destination_path' or 'file_id' in request body")
+    if not file_id:
+        raise BadRequest("file_id was not provided.")
     
-    # Get destination path and source file path
-    destination_path = data['destination_path']
-    file_name = os.path.basename(data['file_id'])
-    source_path = os.path.join(file_manager.temp_dir, file_name)
+    source_path = os.path.join(file_manager.temp_dir, file_id)
 
+    # Check if file exists
+    if not os.path.isfile(source_path):
+        return jsonify({"error": "File not found"}), 404
 
-
-    # Export the file to the specified destination
-    try:
-        file_manager.copy_file(source_path, destination_path)
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-
-    return jsonify({"message": f"File exported successfully"}), 200
+    # Send file to browser for download
+    return send_file(
+        source_path,
+        as_attachment=True,        # Forces download instead of inline display
+        download_name=file_id      # Sets the filename for download
+    )
 
 
 # Script Management Endpoints
