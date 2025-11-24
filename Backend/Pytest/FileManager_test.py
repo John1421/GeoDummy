@@ -5,6 +5,9 @@ import geopandas as gpd
 from shapely.geometry import Point
 import sys
 import pathlib
+import rasterio
+from rasterio.transform import from_origin
+import numpy as np
 
 # Ensure repo root is on sys.path so `import Backend...` works when cwd is Backend/Pytest
 repo_root = pathlib.Path(__file__).resolve().parents[2]  # two levels up -> repo root
@@ -119,6 +122,28 @@ def test_check_file_system_coordinates_geojson(tmp_path):
     gd.to_file(str(geojson_path), driver="GeoJSON")
     fm = FileManager(input_dir=str(tmp_path), output_dir=str(tmp_path / "out"))
     assert fm.check_file_system_coordinates(str(geojson_path), "EPSG:4326") is True
+    
+def test_check_file_system_coordinates_geotiff(tmp_path):
+    tif_path = tmp_path / "test.tif"
+    data = np.zeros((1, 10, 10), dtype=rasterio.uint8)
+    transform = from_origin(0, 10, 1, 1)  # arbitrary transform
+
+    with rasterio.open(
+        tif_path,
+        "w",
+        driver="GTiff",
+        height=data.shape[1],
+        width=data.shape[2],
+        count=1,
+        dtype=data.dtype,
+        crs="EPSG:4326",
+        transform=transform,
+    ) as dst:
+        dst.write(data)
+
+    fm = FileManager(input_dir=str(tmp_path), output_dir=str(tmp_path / "out"))
+    assert fm.check_file_system_coordinates(str(tif_path), "EPSG:4326") is True
+
 
 def test_convert_file_system_coordinates_geojson(tmp_path):
     gd = gpd.GeoDataFrame({'id':[1]}, geometry=[Point(0,0)], crs="EPSG:3857")
