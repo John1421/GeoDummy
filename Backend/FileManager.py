@@ -40,10 +40,10 @@ class FileManager:
         Returns:
             True if the move was successful.
         """
-        full_source_path = self.__validate_paths_and_file(source_path, destination_path)
+        self.__validate_paths_and_file(source_path, destination_path)
 
         try:
-            shutil.move(full_source_path, destination_path)
+            shutil.move(source_path, destination_path)
         except Exception as e:
             raise ValueError(f"Error moving file: {e}")
         return True
@@ -61,12 +61,13 @@ class FileManager:
         Returns:
             True if the copy was successful.
         """
-        full_source_path = self.__validate_paths_and_file(source_path, destination_path)
+        self.__validate_paths_and_file(source_path, destination_path)
+
         file_name = os.path.basename(source_path)
         destination_file = os.path.join(destination_path, file_name)
 
         try:
-            shutil.copy(full_source_path, destination_file)
+            shutil.copy(source_path, destination_file)
         except Exception as e:
             raise ValueError(f"Error copying file: {e}")
         return True
@@ -231,6 +232,8 @@ class FileManager:
         if os.path.exists(hipothetical_destination_path):
             raise ValueError("A file with the same name already exists in the destination path")
 
+        return True
+        '''
         file_name, file_name_ext = os.path.splitext(source_path)
 
         # If the file is already a GeoJSON, return the path
@@ -246,4 +249,5 @@ class FileManager:
 
         # If the file is of any other unsupported format, raise an error
         raise ValueError("Unsupported file format for conversion to GeoJSON.")
+        '''
 
