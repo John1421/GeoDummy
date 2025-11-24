@@ -123,7 +123,7 @@ def test_check_file_system_coordinates_geojson(tmp_path):
     fm = FileManager(input_dir=str(tmp_path), output_dir=str(tmp_path / "out"))
     assert fm.check_file_system_coordinates(str(geojson_path), "EPSG:4326") is True
     
-def test_check_file_system_coordinates_geotiff(tmp_path):
+def test_check_file_system_coordinates_tiff(tmp_path):
     tif_path = tmp_path / "test.tif"
     data = np.zeros((1, 10, 10), dtype=rasterio.uint8)
     transform = from_origin(0, 10, 1, 1)  # arbitrary transform
@@ -153,3 +153,30 @@ def test_convert_file_system_coordinates_geojson(tmp_path):
     fm.convert_file_system_coordinates(str(geojson_path), "EPSG:4326")
     gdf = gpd.read_file(str(geojson_path))
     assert gdf.crs.to_string() == "EPSG:4326"
+    
+def test_convert_file_system_coordinates_tiff(tmp_path):
+    tif_path = tmp_path / "convert.tif"
+    data = np.zeros((1, 10, 10), dtype=rasterio.uint8)
+    transform = from_origin(0, 10, 1, 1)
+
+    # Create GeoTIFF with EPSG:3857
+    with rasterio.open(
+        tif_path,
+        "w",
+        driver="GTiff",
+        height=data.shape[1],
+        width=data.shape[2],
+        count=1,
+        dtype=data.dtype,
+        crs="EPSG:3857",
+        transform=transform,
+    ) as dst:
+        dst.write(data)
+
+    fm = FileManager(input_dir=str(tmp_path), output_dir=str(tmp_path / "out"))
+    fm.convert_file_system_coordinates(str(tif_path), "EPSG:4326")
+
+    # Re-open and check CRS
+    with rasterio.open(tif_path) as src:
+        assert src.crs.to_string() == "EPSG:4326"
+
