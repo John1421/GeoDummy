@@ -144,10 +144,19 @@ def export_file(file_id):
     # Check if file exists
     if not os.path.isfile(source_path):
         return jsonify({"error": "File not found"}), 404
+    
+    # Destination path in output folder
+    output_path = os.path.join(file_manager.output_dir, file_id)
+
+    # Copy to output folder (for later selection)
+    try:
+        file_manager.copy_file(source_path, file_manager.output_dir)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
 
     # Send file to browser for download
     return send_file(
-        source_path,
+        output_path,
         as_attachment=True,        # Forces download instead of inline display
         download_name=file_id      # Sets the filename for download
     )
