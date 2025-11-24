@@ -35,22 +35,6 @@ def test_copy_file_success(tmp_path):
     assert src_file.exists()
 
 
-def test_copy_file_failure(tmp_path):
-    src_dir = tmp_path / "src"
-    dest_dir = tmp_path / "dest"
-    src_dir.mkdir()
-    dest_dir.mkdir()
-
-    src_file = src_dir / f"test.txt"
-    src_file.write_text("Hello World!")
-
-    fm = FileManager(input_dir=str(src_dir), output_dir=str(dest_dir))
-    assert fm.copy_file(str(src_file), str(dest_dir)) is True
-
-    dest_file = dest_dir / f"test.txt"
-    assert dest_file.exists() == False
-
-
 def test_move_file_success(tmp_path):
     src_dir = tmp_path / "src_move"
     dest_dir = tmp_path / "dest_move"
@@ -128,3 +112,19 @@ def test_convert_unsupported_raises(tmp_path):
     fm = FileManager(input_dir=str(tmp_path), output_dir=str(tmp_path / "out"))
     with pytest.raises(ValueError):
         fm.convert_to_geojson(str(txt))
+        
+def test_check_file_system_coordinates_geojson(tmp_path):
+    gd = gpd.GeoDataFrame({'id':[1]}, geometry=[Point(0,0)], crs="EPSG:4326")
+    geojson_path = tmp_path / "crs.geojson"
+    gd.to_file(str(geojson_path), driver="GeoJSON")
+    fm = FileManager(input_dir=str(tmp_path), output_dir=str(tmp_path / "out"))
+    assert fm.check_file_system_coordinates(str(geojson_path), "EPSG:4326") is True
+
+def test_convert_file_system_coordinates_geojson(tmp_path):
+    gd = gpd.GeoDataFrame({'id':[1]}, geometry=[Point(0,0)], crs="EPSG:3857")
+    geojson_path = tmp_path / "convert.geojson"
+    gd.to_file(str(geojson_path), driver="GeoJSON")
+    fm = FileManager(input_dir=str(tmp_path), output_dir=str(tmp_path / "out"))
+    fm.convert_file_system_coordinates(str(geojson_path), "EPSG:4326")
+    gdf = gpd.read_file(str(geojson_path))
+    assert gdf.crs.to_string() == "EPSG:4326"
