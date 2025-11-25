@@ -1,6 +1,7 @@
 import json
 import pytest
-from pathlib import Path
+import pathlib
+import sys
 
 # Ensure repo root is on sys.path so `import Backend...` works when cwd is Backend/Pytest
 repo_root = pathlib.Path(__file__).resolve().parents[2]  # two levels up -> repo root
