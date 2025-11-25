@@ -11,7 +11,7 @@ sys.path.insert(0, str(repo_root))
 from Backend.BasemapManager import BasemapManager
 
 # Path to basemaps config
-BASEMAPS_PATH = os.path.join("Backend", "basemaps.json")
+BASEMAPS_PATH = "basemaps.json"
 
 def load_real_basemaps():
     with open(BASEMAPS_PATH, "r", encoding="utf-8") as f:
