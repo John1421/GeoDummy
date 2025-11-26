@@ -5,8 +5,10 @@ import ScriptList from "./Right column/ScriptList";
 import LayerSidebar from "./LeftColumn/LayerSidebar";
 import { sampleFeatures } from "./Central column/data";
 import { colors } from "./Design/DesignTokens";
+import { useState } from "react";
 
 function App() {
+  const [baseMapUrl, setBaseMapUrl] = useState("https://tile.openstreetmap.org/{z}/{x}/{y}.png");
   return (
     <div
       className="h-screen flex flex-col overflow-hidden"
@@ -15,7 +17,7 @@ function App() {
         color: colors.foreground,
       }}
     >
-      <Header />
+      <Header setBaseMapUrl={setBaseMapUrl} />
 
       {/* MAIN LAYOUT: 3 columns */}
       <div className="flex flex-1 min-h-0">
@@ -33,7 +35,7 @@ function App() {
         {/* CENTER – Map + Attribute Table */}
         <div className="flex-1 flex flex-col min-h-0 relative z-0">
           <div className="flex-1 min-h-0">
-            <BaseMap />
+            <BaseMap initialUrl={baseMapUrl}/>
           </div>
 
           <div className="flex-none">
