@@ -50,6 +50,29 @@ jobs:
         working-directory: Backend
         run: |
           pip install -r requirements.txt
+      
+
+      - name: Run Xenon Complexity Check
+        working-directory: Backend
+        run: |
+          xenon . --max-absolute C --max-modules C --max-average C
+
+      - name: Generate Radon reports
+        working-directory: Backend
+        run: |
+          radon cc . -s -j > radon_report.json
+          radon cc . -s > radon_report.txt
+          radon mi . -s > radon_mi_report.txt
+
+      - name: Upload Radon reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: radon-complexity-reports
+          path: |
+            Backend/radon_report.json
+            Backend/radon_report.txt
+            Backend/radon_mi_report.txt
+
 
       - name: Run Bandit Security Scan
         run: |

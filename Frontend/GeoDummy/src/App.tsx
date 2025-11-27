@@ -8,10 +8,13 @@ import { colors } from "./Design/DesignTokens";
 import { useState } from "react";
 
 function App() {
-  const [baseMapUrl, setBaseMapUrl] = useState("https://tile.openstreetmap.org/{z}/{x}/{y}.png");
+  const [baseMapUrl, setBaseMapUrl] = useState(
+    "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+  );
+
   return (
     <div
-      className="h-screen flex flex-col overflow-hidden"
+      className="h-screen flex flex-col"
       style={{
         backgroundColor: colors.background,
         color: colors.foreground,
@@ -23,7 +26,7 @@ function App() {
       <div className="flex flex-1 min-h-0">
         {/* LEFT PANEL – Layers */}
         <div
-          className="shrink-0 relative z-20 flex flex-col"
+          className="relative z-20 flex flex-col"
           style={{
             backgroundColor: colors.sidebarBackground,
             borderRight: `1px solid ${colors.borderStroke}`,
@@ -33,9 +36,9 @@ function App() {
         </div>
 
         {/* CENTER – Map + Attribute Table */}
-        <div className="flex-1 flex flex-col min-h-0 relative z-0">
+        <div className="flex-1 flex flex-col min-h-0 min-w-0 relative z-0">
           <div className="flex-1 min-h-0">
-            <BaseMap initialUrl={baseMapUrl}/>
+            <BaseMap initialUrl={baseMapUrl} />
           </div>
 
           <div className="flex-none">
@@ -45,7 +48,7 @@ function App() {
 
         {/* RIGHT PANEL – Tools */}
         <div
-          className="shrink-0 relative z-10 flex flex-col"
+          className="relative z-20 flex flex-col"
           style={{
             backgroundColor: colors.sidebarBackground,
             borderLeft: `1px solid ${colors.borderStroke}`,
