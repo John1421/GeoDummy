@@ -51,10 +51,17 @@ jobs:
         run: |
           pip install -r requirements.txt
       
+      
       - name: Run Xenon Complexity Check
         working-directory: Backend
         run: |
           xenon . --max-absolute C --max-modules C --max-average C
+
+      - name: Generate Radon JSON report
+        working-directory: Backend
+        run: |
+          radon cc . -s -j > radon_report.json
+
 
 
       - name: Run Bandit Security Scan
