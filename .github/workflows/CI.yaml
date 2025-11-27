@@ -50,6 +50,12 @@ jobs:
         working-directory: Backend
         run: |
           pip install -r requirements.txt
+      
+      - name: Run Xenon Complexity Check
+        working-directory: Backend
+        run: |
+          xenon . --max-absolute B --max-modules B --max-average B
+
 
       - name: Run Bandit Security Scan
         run: |
