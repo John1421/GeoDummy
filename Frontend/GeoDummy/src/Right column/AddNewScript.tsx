@@ -5,9 +5,10 @@ import { colors, typography, radii, spacing } from "../Design/DesignTokens";
 
 type AddNewScriptProps = {
     onClose: () => void;
+    onAddScript: (fileName: string, category: string, number: string, type: string) => void;
 };
 
-export default function AddNewScript({ onClose }: AddNewScriptProps) {
+export default function AddNewScript({ onClose, onAddScript }: AddNewScriptProps) {
     const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
     const [category, setCategory] = useState("");
     const [numberValue, setNumberValue] = useState("");
@@ -36,14 +37,10 @@ export default function AddNewScript({ onClose }: AddNewScriptProps) {
             return;
         }
 
-        // For now just log the values and close
-        console.log("Uploading script:", {
-            file: selectedFileName,
-            category,
-            number: numberValue,
-            type: typeValue,
-        });
+        // Call parent handler with the form data
+        onAddScript(selectedFileName, category, numberValue, typeValue);
 
+        // Close the modal
         onClose();
     };
 
