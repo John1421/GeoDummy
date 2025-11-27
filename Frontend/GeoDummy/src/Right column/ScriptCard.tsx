@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { colors, typography, radii, shadows } from "../Design/DesignTokens";
 import { FileCode, Play } from "lucide-react";
+import { ThreeDot } from "react-loading-indicators"
 
 interface ScriptCardProps {
   name: string;
@@ -77,10 +78,16 @@ function ScriptCard({ name, description }: ScriptCardProps) {
             cursor: loading ? "default" : "pointer",
             opacity: loading ? 0.8 : 1,
             transition: "0.2s",
+            height: 32,
           }}
         >
           {loading ? (
-            "Loading..."
+            <ThreeDot
+              color="#ffffff"
+              size="small"
+              text=""
+              textColor=""
+            />
           ) : (
             <>
               <Play size={16} style={{ marginRight: 8 }} />
