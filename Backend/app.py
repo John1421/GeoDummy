@@ -7,8 +7,10 @@ import os
 import zipfile
 import FileManager
 from BasemapManager import BasemapManager
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app,origins=["http://localhost:5173"])
 file_manager = FileManager.FileManager()
 basemap_manager = BasemapManager()
 
