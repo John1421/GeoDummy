@@ -9,22 +9,19 @@ class FileManager:
     # Allowed file extensions for processing
     allowed_extensions = {'.geojson', '.shp', '.gpkg', '.tif', '.tiff'}
 
-    def __init__(self, input_dir='./input_layers', output_dir='./output', temp_dir='./temporary'):
+    def __init__(self, layers_dir='./input_layers', temp_dir='./temporary'):
         """
-        Constructor to initialize input and output directories.
+        Constructor to initialize layer and temporary directories.
         Creates directories if they do not already exist.
         
         Parameters:
-            input_dir (str): Path for input files.
-            output_dir (str): Path for output files.
+            layers_dir (str): Path for layer files.
         """
-        self.input_dir = input_dir
-        self.output_dir = output_dir
+        self.layers_dir = layers_dir
         self.temp_dir = temp_dir
 
         # Create directories if they don't exist
-        os.makedirs(self.input_dir, exist_ok=True)
-        os.makedirs(self.output_dir, exist_ok=True)
+        os.makedirs(self.layers_dir, exist_ok=True)
         os.makedirs(self.temp_dir, exist_ok=True)
 
 
@@ -55,8 +52,8 @@ class FileManager:
         Raises an error if the source/destination is invalid or if a file with the same name exists in the destination.
 
         Parameters:
-            source_path (str): Full path to the source file. (e.g., ./input_layers/file.shp)
-            destination_path (str): Directory where the file should be copied. (e.g., ./output)
+            source_path (str): Full path to the source file. (e.g., ./temp/file.shp)
+            destination_path (str): Directory where the file should be copied. (e.g., ./layers_dir)
 
         Returns:
             True if the copy was successful.
@@ -79,10 +76,10 @@ class FileManager:
         If the file is already .geojson or .tif or .tiff, returns the original path.
 
         Parameters:
-            file_path (str): Path to the file to convert. (e.g., ./input_layers/file.shp)
+            file_path (str): Path to the file to convert. (e.g., ./layers_dir/file.shp)
 
         Returns:
-            str: Path to the converted (or original) GeoJSON file. (e.g., ./input_layers/file.geojson)
+            str: Path to the converted (or original) GeoJSON file. (e.g., ./layers_dir/file.geojson)
 
         Raises:
             ValueError: If the file format is unsupported.
@@ -210,8 +207,8 @@ class FileManager:
         and that no file with the same name exists in the destination.
 
         Parameters:
-            source_path (str): Path to the source file. (e.g., ./input_layers/file.shp)
-            destination_path (str): Path to the destination directory. (e.g., ./output)
+            source_path (str): Path to the source file. (e.g., ./temp_dir/file.shp)
+            destination_path (str): Path to the destination directory. (e.g., ./layers_dir)
 
         Raises:
             ValueError: If the source or destination is invalid, or if a conflicting file exists.
@@ -233,21 +230,5 @@ class FileManager:
             raise ValueError("A file with the same name already exists in the destination path")
 
         return True
-        '''
-        file_name, file_name_ext = os.path.splitext(source_path)
 
-        # If the file is already a GeoJSON, return the path
-        if file_name_ext.lower() in ['.geojson', '.tif']:
-            return source_path
-
-        # Convert shapefile or geopackage to GeoJSON
-        if file_name_ext.lower() in ['.shp', '.gpkg']:
-            file_content = gpd.read_file(source_path)
-            geojpeg_path = f"{file_name}.geojson"
-            file_content.to_file(geojpeg_path, driver='GeoJSON')
-            return geojpeg_path
-
-        # If the file is of any other unsupported format, raise an error
-        raise ValueError("Unsupported file format for conversion to GeoJSON.")
-        '''
 

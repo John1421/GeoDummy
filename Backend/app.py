@@ -107,20 +107,20 @@ def add_file():
             app.logger.warning("The provided zip file has no .prj file. Proceeding with conversion and addition anyway.")
         
     
-    # If the file is already in GeoJSON or TIFF format, copy it directly to output directory
+    # If the file is already in GeoJSON or TIFF format, copy it directly to layers directory
     if file_extension.lower() in ['.geojson', '.tif']:
         try:
-            file_manager.copy_file(temp_path, file_manager.input_dir)
+            file_manager.copy_file(temp_path, file_manager.layers_dir)
         except ValueError as e:
             os.remove(temp_path)
             return jsonify({"error": str(e)}), 400
     
-    # Otherwise, convert it to GeoJSON first, then move to output directory
+    # Otherwise, convert it to GeoJSON first, then move to layers directory
     else:
         converted_file_path = file_manager.convert_to_geojson(temp_path)
 
         try:
-            file_manager.move_file(converted_file_path, file_manager.input_dir)
+            file_manager.move_file(converted_file_path, file_manager.layers_dir)
         except ValueError as e:
             os.remove(temp_path)
             return jsonify({"error": str(e)}), 400
@@ -147,12 +147,12 @@ def export_file(file_id):
     if not os.path.isfile(source_path):
         return jsonify({"error": "File not found"}), 404
     
-    # Destination path in output folder
-    output_path = os.path.join(file_manager.output_dir, file_id)
+    # Destination path in layers folder
+    output_path = os.path.join(file_manager.layers_dir, file_id)
 
-    # Copy to output folder (for later selection)
+    # Copy to layers folder (for later selection)
     try:
-        file_manager.copy_file(source_path, file_manager.output_dir)
+        file_manager.copy_file(source_path, file_manager.layers_dir)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
 

@@ -28,7 +28,7 @@ def test_copy_file_success(tmp_path):
     gdf = gpd.GeoDataFrame({"id": [1]}, geometry=[Point(0, 0)], crs="EPSG:4326")
     gdf.to_file(src_file)
 
-    fm = FileManager(input_dir=str(src_dir), output_dir=str(dest_dir))
+    fm = FileManager(layers_dir=str(src_dir), output_dir=str(dest_dir))
     assert fm.copy_file(str(src_file), str(dest_dir)) is True
 
     dest_file = dest_dir / f"test.geojson"
@@ -50,7 +50,7 @@ def test_move_file_success(tmp_path):
     gdf = gpd.GeoDataFrame({"id": [1]}, geometry=[Point(0, 0)], crs="EPSG:4326")
     gdf.to_file(src_file)
 
-    fm = FileManager(input_dir=str(src_dir), output_dir=str(dest_dir))
+    fm = FileManager(layers_dir=str(src_dir), output_dir=str(dest_dir))
     assert fm.move_file(str(src_file), str(dest_dir)) is True
 
     dest_file = dest_dir / f"test.geojson"
@@ -71,7 +71,7 @@ def test_copy_existing_destination_raises(tmp_path):
     existing = dest_dir / "conflict.txt"
     existing.write_text("already here")
 
-    fm = FileManager(input_dir=str(src_dir), output_dir=str(dest_dir))
+    fm = FileManager(layers_dir=str(src_dir), output_dir=str(dest_dir))
     with pytest.raises(ValueError):
         fm.copy_file(str(src_file), str(dest_dir))
 
@@ -80,7 +80,7 @@ def test_move_invalid_source_raises(tmp_path):
     dest_dir.mkdir()
     fake_source = tmp_path / "does_not_exist.txt"
 
-    fm = FileManager(input_dir=str(tmp_path / "in_invalid"), output_dir=str(dest_dir))
+    fm = FileManager(layers_dir=str(tmp_path / "in_invalid"), output_dir=str(dest_dir))
     with pytest.raises(ValueError):
         fm.move_file(str(fake_source), str(dest_dir))
 
@@ -89,7 +89,7 @@ def test_convert_geojson_returns_same_path(tmp_path):
     geojson_path = tmp_path / "p.geojson"
     gd.to_file(str(geojson_path), driver="GeoJSON")
 
-    fm = FileManager(input_dir=str(tmp_path), output_dir=str(tmp_path / "out"))
+    fm = FileManager(layers_dir=str(tmp_path), output_dir=str(tmp_path / "out"))
     returned = fm.convert_to_geojson(str(geojson_path))
     assert returned == str(geojson_path)
 
@@ -99,7 +99,7 @@ def test_convert_gpkg_to_geojson(tmp_path):
     # gravar GeoPackage
     gd.to_file(str(gpkg_path), driver="GPKG")
 
-    fm = FileManager(input_dir=str(tmp_path), output_dir=str(tmp_path / "out"))
+    fm = FileManager(layers_dir=str(tmp_path), output_dir=str(tmp_path / "out"))
     returned = fm.convert_to_geojson(str(gpkg_path))
 
     assert returned.lower().endswith(".geojson")
@@ -112,7 +112,7 @@ def test_convert_gpkg_to_geojson(tmp_path):
 def test_convert_unsupported_raises(tmp_path):
     txt = tmp_path / "file.txt"
     txt.write_text("not supported")
-    fm = FileManager(input_dir=str(tmp_path), output_dir=str(tmp_path / "out"))
+    fm = FileManager(layers_dir=str(tmp_path), output_dir=str(tmp_path / "out"))
     with pytest.raises(ValueError):
         fm.convert_to_geojson(str(txt))
         
