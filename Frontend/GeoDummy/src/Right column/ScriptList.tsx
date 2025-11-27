@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { Wrench as ToolsIcon } from "lucide-react";
 import SidebarPanel from "../TemplateModals/SidebarModal";
 import { colors } from "../Design/DesignTokens";
