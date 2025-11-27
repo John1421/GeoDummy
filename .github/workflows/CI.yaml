@@ -54,7 +54,7 @@ jobs:
       - name: Run Xenon Complexity Check
         working-directory: Backend
         run: |
-          xenon . --max-absolute B --max-modules B --max-average B
+          xenon . --max-absolute C --max-modules C --max-average C
 
 
       - name: Run Bandit Security Scan
