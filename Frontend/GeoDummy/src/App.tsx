@@ -45,7 +45,7 @@ function App() {
 
         {/* RIGHT PANEL – Tools */}
         <div
-          className="shrink-0 relative z-10 flex flex-col"
+          className="shrink-0 relative z-20 flex flex-col"
           style={{
             backgroundColor: colors.sidebarBackground,
             borderLeft: `1px solid ${colors.borderStroke}`,
