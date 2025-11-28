@@ -81,7 +81,6 @@ export default function WindowTemplate({
         className={widthClassName}
         onClick={(e) => e.stopPropagation()} // Prevent overlay close when clicking inside modal
         style={{
-          overflow: "hidden",
           backgroundColor: colors.cardBackground,
           borderRadius: radii.md,
         }}
@@ -128,7 +127,7 @@ export default function WindowTemplate({
               cursor: "pointer",
             }}
           >
-            <X size={20} strokeWidth={3}/>
+            <X size={20} strokeWidth={3} />
           </button>
         </div>
 
