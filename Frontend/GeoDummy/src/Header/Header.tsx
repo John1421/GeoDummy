@@ -15,7 +15,7 @@ function Header({ setBaseMapUrl }: { setBaseMapUrl: (url: string) => void }) {
           Edit
         </button>
 
-        <EditMenu open={open} setBaseMapUrl={setBaseMapUrl} />
+        <EditMenu open={open} setBaseMapUrl={setBaseMapUrl} setOpen={setOpen} />
       </div>
 
       <img

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import WindowTemplate from "../TemplateModals/PopUpWindowModal";
 
 const BASEMAPS = [
     { id: "OSM Standard", url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" },
@@ -17,10 +18,7 @@ function BaseMapSettings({
     setBaseMapUrl: (url: string) => void;
 }) {
     const [selectedBasemap, setSelectedBasemap] = useState(BASEMAPS[0].url);
-
-    function handleChange(event: React.ChangeEvent<HTMLSelectElement>) {
-        setSelectedBasemap(event.target.value);
-    }
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
     async function save_basemap() {
         setBaseMapUrl(selectedBasemap);
@@ -28,42 +26,51 @@ function BaseMapSettings({
 
     }
 
-    if (!openBaseMapSet) return null;
-
 
     return (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/20 z-9999">
-            <div className="bg-white border border-gray-200 rounded-lg shadow-lg w-1/3 h-1/5 p-4">
+        <WindowTemplate
+            isOpen={openBaseMapSet}
+            title="BaseMap Settings"
+            onClose={onClose}
+        >
+            <label className="text-black font-bold">
+                Choose BaseMap
+            </label>
 
-
-                <label htmlFor="basemap" className="text-black font-bold">
-                    Choose BaseMap
-                </label>
-
-                <select
-                    id="basemap"
-                    onChange={handleChange}
-                    value={selectedBasemap} // make it controlled
-                    className="text-black w-full mt-2 bg-[#DADFE7] rounded-lg py-1"
-                    name="basemap"
-                >
-                    {BASEMAPS.map((map) => (
-                        <option key={map.id} value={map.url}>
-                            {map.id}
-                        </option>
-                    ))}
-                </select>
-
+            <div className="relative mt-2 z-[9999999]">
                 <button
-                    onClick={save_basemap}
-                    className="ml-auto mt-5 block rounded-lg bg-[#0D73A5] text-white hover:bg-[#39AC73] w-1/5 py-1 "
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    className="w-full text-left p-2 rounded-lg bg-[#DADFE7] text-black hover:bg-[#39AC73] hover:text-white flex justify-between items-center"
                 >
-                    Save
+                    {BASEMAPS.find(map => map.url === selectedBasemap)?.id}
+                    <span className="ml-2">{isDropdownOpen ? '▲' : '▼'}</span>
                 </button>
 
-
+                {isDropdownOpen && (
+                    <div className="absolute w-1/2 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-50">
+                        {BASEMAPS.map((map) => (
+                            <button
+                                key={map.id}
+                                onClick={() => {
+                                    setSelectedBasemap(map.url);
+                                    setIsDropdownOpen(false);
+                                }}
+                                className={`w-full text-left p-2 ${selectedBasemap === map.url ? "bg-[#0D73A5] text-white" : "text-black"} hover:bg-[#39AC73] hover:text-white rounded-lg`}
+                            >
+                                {map.id}
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
-        </div>
+
+            <button
+                onClick={save_basemap}
+                className="ml-auto mt-5 block rounded-lg bg-[#0D73A5] text-white hover:bg-[#39AC73] w-1/5 py-1 "
+            >
+                Save
+            </button>
+        </WindowTemplate>
     );
 }
 

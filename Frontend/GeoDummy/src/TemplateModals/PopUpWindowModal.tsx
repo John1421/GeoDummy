@@ -80,7 +80,7 @@ export default function WindowTemplate({
         className={widthClassName}
         onClick={(e) => e.stopPropagation()} // Prevent overlay close when clicking inside modal
         style={{
-          overflow: "hidden",
+          // overflow: "hidden",
           backgroundColor: colors.cardBackground,
           borderRadius: radii.md,
         }}

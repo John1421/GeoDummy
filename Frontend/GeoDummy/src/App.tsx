@@ -14,7 +14,7 @@ function App() {
 
   return (
     <div
-      className="h-screen flex flex-col"
+      className="h-screen flex flex-col overflow-hidden"
       style={{
         backgroundColor: colors.background,
         color: colors.foreground,

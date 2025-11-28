@@ -1,14 +1,31 @@
-import {useState} from "react";
+import {useState, useRef, useEffect} from "react";
 import BaseMapSettings from "./BaseMapSettings";
 
-function EditMenu({ open, setBaseMapUrl }: { open: boolean; setBaseMapUrl: (url: string) => void }) {
+function EditMenu({ open, setBaseMapUrl, setOpen }: { open: boolean; setBaseMapUrl: (url: string) => void; setOpen: (open: boolean) => void }) {
   const [openBaseMapSet, setOpenBaseMapSet] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [setOpen]);
+
   if (!open){
     return null;
   }
   
   return (
-    <div className="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg w-40 z-9999">
+    <div
+      className="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg w-40 z-9999"
+      ref={menuRef}
+    >
       <button onClick={()=>setOpenBaseMapSet(!openBaseMapSet)}className="w-full text-black text-left px-4 py-2 hover:bg-gray-100">
         Edit Base Map
       </button>
