@@ -2,6 +2,7 @@ import { useState } from "react";
 import { colors, typography, radii, shadows } from "../Design/DesignTokens";
 import { FileCode, Play } from "lucide-react";
 import { ThreeDot } from "react-loading-indicators"
+import RunScriptWindow from "./RunScriptWindow";
 
 interface ScriptCardProps {
   name: string;
@@ -10,10 +11,14 @@ interface ScriptCardProps {
 
 function ScriptCard({ name, description }: ScriptCardProps) {
   const [loading, setLoading] = useState(false);
+  const [isRunScriptWindowOpen, setIsRunScriptWindowOpen] = useState(false);
 
   const handleRun = () => {
-    setLoading(true);
+    setIsRunScriptWindowOpen(true);
+  };
 
+  const handleRunScriptFromWindow = () => {
+    setLoading(true);
     // Simulação de tempo de execução (substituir com lógica real)
     setTimeout(() => {
       setLoading(false);
@@ -96,6 +101,11 @@ function ScriptCard({ name, description }: ScriptCardProps) {
           )}
         </button>
       </div>
+      <RunScriptWindow
+        isOpen={isRunScriptWindowOpen}
+        onClose={() => setIsRunScriptWindowOpen(false)}
+        onRunScript={handleRunScriptFromWindow}
+      />
     </div>
   );
 }
