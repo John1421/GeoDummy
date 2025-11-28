@@ -97,6 +97,10 @@ jobs:
 
       - name: Build and Push Frontend Image
         run: |
+          cd Frontend/GeoDummy
+          npm ci
+          npm run build
+          cd ../../
           docker build -t $DOCKERHUB_USERNAME/frontend:${{ steps.version.outputs.version }} ./Frontend
           docker push $DOCKERHUB_USERNAME/frontend:${{ steps.version.outputs.version }}
           docker tag $DOCKERHUB_USERNAME/frontend:${{ steps.version.outputs.version }} $DOCKERHUB_USERNAME/frontend:latest
