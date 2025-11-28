@@ -97,6 +97,7 @@ export default function AddNewScript({ onClose, onAddScript }: AddNewScriptProps
 
                             <input
                                 type="file"
+                                accept=".py"
                                 onChange={handleFileChange}
                                 style={{ display: "none" }}
                             />
