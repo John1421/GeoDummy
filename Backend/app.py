@@ -1,5 +1,5 @@
 
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, after_this_request, jsonify, send_file
 from werkzeug.exceptions import HTTPException, BadRequest
 import geopandas as gpd
 import shutil
@@ -7,12 +7,14 @@ import os
 import zipfile
 import FileManager
 from BasemapManager import BasemapManager
+from LayerManager import LayerManager
 from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app,origins=["http://localhost:5173"])
 file_manager = FileManager.FileManager()
 basemap_manager = BasemapManager()
+layer_manager = LayerManager()
 
 @app.errorhandler(HTTPException)
 def handle_http_exception(e):
@@ -263,14 +265,65 @@ def list_basemaps():
 
 @app.route('/layers', methods=['POST'])
 def add_layer():    
-    layer_file = request.files['layer_file']
-    if not layer_file:
-        raise BadRequest("No layer file provided")
-    name = request.form.get('layer_name', layer_file.filename)
+    # Accept file from the browser via multipart/form-data
+    added_file = request.files.get('file')
+    if not added_file:
+        raise BadRequest("You must upload a file under the 'file' field.")
+    
+    # File is temporarily stored in tmp_dir folder for handling
+    temp_path = os.path.join(file_manager.temp_dir, added_file.filename)
+    added_file.save(temp_path)
 
-    # TODO: process and add layer
-    layer_id = "layer123"
-    return jsonify({"message": f"Layer '{name}' added successfully", "layer_id": layer_id}), 200
+    layer_id, file_extension = os.path.splitext(added_file.filename)
+
+    if layer_manager.check_layer_name_exists(layer_id):
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        raise BadRequest("A Layer with the same name already exists")
+
+
+    match file_extension.lower():
+        case ".shp":
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            raise BadRequest("Please upload shapefiles as a .zip containing all necessary components (.shp, .shx, .dbf, optional .prj).")
+        
+        case ".zip":
+            layer_manager.add_shapefile_zip(temp_path,layer_id)
+            export_file = layer_manager.export_geopackage_layer_to_geojson(layer_id)
+            return send_file(export_file, as_attachment=True, download_name=f"{layer_id}.geojson")
+        
+        case ".geojson":        
+            layer_manager.add_geojson(temp_path,layer_id)
+            os.remove(temp_path)
+            export_file = layer_manager.export_geopackage_layer_to_geojson(layer_id)
+            return send_file(export_file, as_attachment=True, download_name=f"{layer_id}.geojson")
+        
+        case ".tif" | ".tiff":
+            layer_manager.add_raster(temp_path,layer_id)
+            export_file = layer_manager.export_raster_layer(layer_id)
+            return send_file(export_file, as_attachment=True, download_name=f"{layer_id}.tiff")
+        
+        case ".gpkg":
+            new_layers = layer_manager.add_gpkg_layers(temp_path)
+            os.remove(temp_path)
+            zip_path = os.path.join(file_manager.temp_dir, f"{layer_id}_export.zip")
+
+            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+                for layer in new_layers:
+                    # Export each layer from the default gpkg
+                    exported_geojson = layer_manager.export_geopackage_layer_to_geojson(layer)
+                    # Add it into zip
+                    zipf.write(exported_geojson, arcname=f"{layer}.geojson")
+                    # Optional cleanup
+                    os.remove(exported_geojson)
+
+            return send_file(zip_path, as_attachment=True, download_name=f"{layer_id}_layers.zip")
+            
+        case _: 
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            raise BadRequest("Fle extension not supported")
 
 @app.route('/layers/<layer_id>', methods=['PUT'])
 def export_layer(layer_id):    
