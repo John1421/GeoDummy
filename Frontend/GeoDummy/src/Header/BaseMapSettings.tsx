@@ -23,9 +23,7 @@ function BaseMapSettings({
     async function save_basemap() {
         setBaseMapUrl(selectedBasemap);
         onClose();
-
     }
-
 
     return (
         <WindowTemplate
@@ -37,17 +35,17 @@ function BaseMapSettings({
                 Choose BaseMap
             </label>
 
-            <div className="relative mt-2 z-[9999999]">
+            <div className="relative mt-2">
                 <button
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                     className="w-full text-left p-2 rounded-lg bg-[#DADFE7] text-black hover:bg-[#39AC73] hover:text-white flex justify-between items-center"
                 >
                     {BASEMAPS.find(map => map.url === selectedBasemap)?.id}
-                    <span className="ml-2">{isDropdownOpen ? '▲' : '▼'}</span>
+                    <span className="ml-2">{isDropdownOpen ? "▲" : "▼"}</span>
                 </button>
 
                 {isDropdownOpen && (
-                    <div className="absolute w-1/2 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-50">
+                    <div className="absolute left-0 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto z-20">
                         {BASEMAPS.map((map) => (
                             <button
                                 key={map.id}

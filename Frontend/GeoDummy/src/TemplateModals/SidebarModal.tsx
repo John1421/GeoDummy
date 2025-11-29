@@ -58,8 +58,8 @@ export default function SidebarPanel({
         color: colors.sidebarForeground,
         fontFamily: typography.normalFont,
 
-        borderRight: isLeft ? `1px solid ${colors.borderStroke}` : undefined,
-        borderLeft: !isLeft ? `1px solid ${colors.borderStroke}` : undefined,
+        borderRight: isLeft ? `0.1px solid ${colors.borderStroke}` : undefined,
+        borderLeft: !isLeft ? `0.1px solid ${colors.borderStroke}` : undefined,
 
         transition: "width 0.3s ease",
       }}

@@ -109,12 +109,12 @@ const AttributeTable: React.FC<AttributeTableProps> = ({
       <div className="flex flex-col justify-end">
         <div className="w-full mx-auto">
           <div
-            className="flex items-center justify-between p-3 bg-gray-50 cursor-pointer hover:bg-gray-100 border-t border-x border-gray-300 shadow-lg rounded-t-lg"
+            className="flex items-center justify-between p-3 bg-gray-50 cursor-pointer hover:bg-gray-100 border-t border-x border-[#DADFE7] shadow-lg"
             onClick={() => setIsOpen(true)}
           >
             <h3 className="text-sm font-semibold text-gray-800">
-              Tabela de Atributos
-              {selectedRows.size > 0 && ` (${selectedRows.size} selecionados)`}
+              Attribute Table
+              {selectedRows.size > 0 && ` (${selectedRows.size} selected)`}
             </h3>
             <svg
               className="w-4 h-4"
@@ -139,15 +139,15 @@ const AttributeTable: React.FC<AttributeTableProps> = ({
   return (
     <div className="flex justify-center">
       <div className="w-full h-full flex flex-col">
-        <div className="border rounded-t-lg bg-white shadow-lg h-full flex flex-col max-h-72">
+        <div className="border bg-white shadow-lg h-full flex flex-col max-h-72 border-[#DADFE7]">
           {/* Header colapsável */}
           <div
-            className="flex items-center justify-between px-3 py-2 bg-gray-50 cursor-pointer hover:bg-gray-100 border-b"
+            className="flex items-center justify-between px-3 py-2 bg-gray-50 cursor-pointer hover:bg-gray-100 border-b border-[#DADFE7]"
             onClick={() => setIsOpen(false)}
           >
             <h3 className="text-sm font-semibold text-gray-800">
-              Tabela de Atributos
-              {selectedRows.size > 0 && ` (${selectedRows.size} selecionados)`}
+              Attribute Table
+              {selectedRows.size > 0 && ` (${selectedRows.size} selected)`}
             </h3>
             <svg
               className="w-4 h-4 transform rotate-180"
@@ -165,19 +165,19 @@ const AttributeTable: React.FC<AttributeTableProps> = ({
           </div>
 
           {/* Contador */}
-          <div className="px-3 py-1 bg-gray-50 border-b">
+          <div className="px-3 py-1 bg-gray-50 border-b border-[#DADFE7]">
             <span className="text-xs text-gray-600">
-              {processedData.length} de {data.length} elementos
-              {selectedRows.size > 0 && ` | ${selectedRows.size} selecionados`}
+              {processedData.length} of {data.length} elements
+              {selectedRows.size > 0 && ` | ${selectedRows.size} selected`}
             </span>
           </div>
 
-          {/* TABELA */}
+          {/* TABLE */}
           <div className="flex-1 overflow-auto">
             <table className="w-full">
               <thead className="bg-gray-100 sticky top-0">
                 <tr>
-                  <th className="p-2 text-left text-sm font-medium border-b w-12">
+                  <th className="p-2 text-left text-sm font-medium border-b border-[#DADFE7] w-12">
                     <input
                       type="checkbox"
                       checked={
@@ -193,7 +193,7 @@ const AttributeTable: React.FC<AttributeTableProps> = ({
                     <th
                       key={col}
                       onClick={() => handleSort(col)}
-                      className="p-2 text-left text-sm font-medium cursor-pointer hover:bg-gray-200 border-b"
+                      className="p-2 text-left text-sm font-medium cursor-pointer hover:bg-gray-200 border-b border-[#DADFE7]"
                     >
                       <div className="flex items-center">
                         {col}
@@ -217,7 +217,7 @@ const AttributeTable: React.FC<AttributeTableProps> = ({
                     }`}
                     onClick={() => onRowSelect?.(feature)}
                   >
-                    <td className="p-2 text-sm">
+                    <td className="p-2 text-sm border-b border-[#DADFE7]">
                       <input
                         type="checkbox"
                         checked={selectedRows.has(idx)}
@@ -230,7 +230,7 @@ const AttributeTable: React.FC<AttributeTableProps> = ({
                     </td>
 
                     {columns.map((col) => (
-                      <td key={col} className="p-2 text-sm">
+                      <td key={col} className="p-2 text-sm border-b border-[#DADFE7]">
                         {String(feature.properties[col] ?? "")}
                       </td>
                     ))}

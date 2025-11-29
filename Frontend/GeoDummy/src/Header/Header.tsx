@@ -9,7 +9,8 @@ function Header({ setBaseMapUrl }: { setBaseMapUrl: (url: string) => void }) {
 
       <div className="relative">
         <button
-          onClick={()=>setOpen(!open)}
+          onClick={() => setOpen(!open)}
+          onMouseDown={(e) => e.stopPropagation()}
           className={BUTTON_STYLE}
         >
           Edit

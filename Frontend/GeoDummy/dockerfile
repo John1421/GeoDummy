@@ -1,0 +1,23 @@
+FROM node:20
+
+WORKDIR /app
+
+# Copiar ficheiros de dependências
+COPY package.json package-lock.json ./
+
+RUN npm ci
+
+# Copiar o restante projeto
+COPY . .
+
+# Build Vite
+RUN npm run build
+
+# Instalar o http-server globalmente
+RUN npm install -g http-server
+
+# Expor porta
+EXPOSE 80
+
+# Servir a pasta dist
+CMD ["http-server", "dist", "-p", "80"]

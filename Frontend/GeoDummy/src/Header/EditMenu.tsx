@@ -7,6 +7,11 @@ function EditMenu({ open, setBaseMapUrl, setOpen }: { open: boolean; setBaseMapU
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
+      // Prevent closing the menu if the BaseMapSettings window is open
+      if (openBaseMapSet) {
+        return;
+      }
+
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setOpen(false);
       }
@@ -15,12 +20,12 @@ function EditMenu({ open, setBaseMapUrl, setOpen }: { open: boolean; setBaseMapU
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [setOpen]);
+  }, [setOpen, openBaseMapSet]); // add openBaseMapSet to the dependency list
 
   if (!open){
     return null;
   }
-  
+
   return (
     <div
       className="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg w-40 z-9999"

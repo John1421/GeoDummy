@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { colors, typography, radii } from "../Design/DesignTokens";
 
@@ -63,7 +64,7 @@ export default function WindowTemplate({
     }
   };
 
-  return (
+  const modal = (
     <div
       onClick={handleOverlayClick}
       style={{
@@ -80,7 +81,6 @@ export default function WindowTemplate({
         className={widthClassName}
         onClick={(e) => e.stopPropagation()} // Prevent overlay close when clicking inside modal
         style={{
-          // overflow: "hidden",
           backgroundColor: colors.cardBackground,
           borderRadius: radii.md,
         }}
@@ -96,6 +96,8 @@ export default function WindowTemplate({
             paddingInline: 20,
             paddingBlock: 12,
             backgroundImage: `linear-gradient(90deg, ${colors.gradientStart}, ${colors.gradientEnd})`,
+            borderTopLeftRadius: radii.md,
+            borderTopRightRadius: radii.md,
             color: colors.primaryForeground,
             fontFamily: typography.titlesFont,
           }}
@@ -125,7 +127,7 @@ export default function WindowTemplate({
               cursor: "pointer",
             }}
           >
-            <X size={20} strokeWidth={3}/>
+            <X size={20} strokeWidth={3} />
           </button>
         </div>
 
@@ -158,4 +160,7 @@ export default function WindowTemplate({
       </div>
     </div>
   );
+
+  // Render the modal into document.body so it isn't trapped by ancestor stacking contexts
+  return createPortal(modal, document.body);
 }
