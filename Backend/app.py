@@ -263,6 +263,7 @@ def list_basemaps():
 
 # Layer Management Endpoints
 
+#Requirement FR_028
 @app.route('/layers', methods=['POST'])
 def add_layer():    
     # Accept file from the browser via multipart/form-data
