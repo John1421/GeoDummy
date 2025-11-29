@@ -18,9 +18,9 @@ from Backend.FileManager import FileManager
 
 def test_copy_file_success(tmp_path):
     src_dir = tmp_path / "src"
-    dest_dir = tmp_path / "dest"
+    temp_dir = tmp_path / "dest"
     src_dir.mkdir()
-    dest_dir.mkdir()
+    temp_dir.mkdir()
 
     src_file = src_dir / f"test.geojson"
 
@@ -28,10 +28,10 @@ def test_copy_file_success(tmp_path):
     gdf = gpd.GeoDataFrame({"id": [1]}, geometry=[Point(0, 0)], crs="EPSG:4326")
     gdf.to_file(src_file)
 
-    fm = FileManager(layers_dir=str(src_dir), output_dir=str(dest_dir))
-    assert fm.copy_file(str(src_file), str(dest_dir)) is True
+    fm = FileManager(layers_dir=str(src_dir), temp_dir=str(temp_dir))
+    assert fm.copy_file(str(src_file), str(temp_dir)) is True
 
-    dest_file = dest_dir / f"test.geojson"
+    dest_file = temp_dir / f"test.geojson"
     assert dest_file.exists()
 
     # ensure original file still exists after copying
@@ -40,9 +40,9 @@ def test_copy_file_success(tmp_path):
 
 def test_move_file_success(tmp_path):
     src_dir = tmp_path / "src_move"
-    dest_dir = tmp_path / "dest_move"
+    temp_dir = tmp_path / "dest_move"
     src_dir.mkdir()
-    dest_dir.mkdir()
+    temp_dir.mkdir()
 
     src_file = src_dir / f"test.geojson"
 
@@ -50,10 +50,10 @@ def test_move_file_success(tmp_path):
     gdf = gpd.GeoDataFrame({"id": [1]}, geometry=[Point(0, 0)], crs="EPSG:4326")
     gdf.to_file(src_file)
 
-    fm = FileManager(layers_dir=str(src_dir), output_dir=str(dest_dir))
-    assert fm.move_file(str(src_file), str(dest_dir)) is True
+    fm = FileManager(layers_dir=str(src_dir), temp_dir=str(temp_dir))
+    assert fm.move_file(str(src_file), str(temp_dir)) is True
 
-    dest_file = dest_dir / f"test.geojson"
+    dest_file = temp_dir / f"test.geojson"
     assert dest_file.exists()
 
     # source file must be removed
@@ -62,34 +62,34 @@ def test_move_file_success(tmp_path):
 
 def test_copy_existing_destination_raises(tmp_path):
     src_dir = tmp_path / "src_conflict"
-    dest_dir = tmp_path / "dest_conflict"
+    temp_dir = tmp_path / "dest_conflict"
     src_dir.mkdir()
-    dest_dir.mkdir()
+    temp_dir.mkdir()
 
     src_file = src_dir / "conflict.txt"
     src_file.write_text("one")
-    existing = dest_dir / "conflict.txt"
+    existing = temp_dir / "conflict.txt"
     existing.write_text("already here")
 
-    fm = FileManager(layers_dir=str(src_dir), output_dir=str(dest_dir))
+    fm = FileManager(layers_dir=str(src_dir), temp_dir=str(temp_dir))
     with pytest.raises(ValueError):
-        fm.copy_file(str(src_file), str(dest_dir))
+        fm.copy_file(str(src_file), str(temp_dir))
 
 def test_move_invalid_source_raises(tmp_path):
-    dest_dir = tmp_path / "dest_invalid"
-    dest_dir.mkdir()
+    temp_dir = tmp_path / "dest_invalid"
+    temp_dir.mkdir()
     fake_source = tmp_path / "does_not_exist.txt"
 
-    fm = FileManager(layers_dir=str(tmp_path / "in_invalid"), output_dir=str(dest_dir))
+    fm = FileManager(layers_dir=str(tmp_path / "in_invalid"), temp_dir=str(temp_dir))
     with pytest.raises(ValueError):
-        fm.move_file(str(fake_source), str(dest_dir))
+        fm.move_file(str(fake_source), str(temp_dir))
 
 def test_convert_geojson_returns_same_path(tmp_path):
     gd = gpd.GeoDataFrame({'id':[1]}, geometry=[Point(0,0)], crs="EPSG:4326")
     geojson_path = tmp_path / "p.geojson"
     gd.to_file(str(geojson_path), driver="GeoJSON")
 
-    fm = FileManager(layers_dir=str(tmp_path), output_dir=str(tmp_path / "out"))
+    fm = FileManager(layers_dir=str(tmp_path), temp_dir=str(tmp_path / "out"))
     returned = fm.convert_to_geojson(str(geojson_path))
     assert returned == str(geojson_path)
 
@@ -99,7 +99,7 @@ def test_convert_gpkg_to_geojson(tmp_path):
     # gravar GeoPackage
     gd.to_file(str(gpkg_path), driver="GPKG")
 
-    fm = FileManager(layers_dir=str(tmp_path), output_dir=str(tmp_path / "out"))
+    fm = FileManager(layers_dir=str(tmp_path), temp_dir=str(tmp_path / "out"))
     returned = fm.convert_to_geojson(str(gpkg_path))
 
     assert returned.lower().endswith(".geojson")
@@ -112,7 +112,7 @@ def test_convert_gpkg_to_geojson(tmp_path):
 def test_convert_unsupported_raises(tmp_path):
     txt = tmp_path / "file.txt"
     txt.write_text("not supported")
-    fm = FileManager(layers_dir=str(tmp_path), output_dir=str(tmp_path / "out"))
+    fm = FileManager(layers_dir=str(tmp_path), temp_dir=str(tmp_path / "out"))
     with pytest.raises(ValueError):
         fm.convert_to_geojson(str(txt))
         
@@ -120,7 +120,7 @@ def test_check_file_system_coordinates_geojson(tmp_path):
     gd = gpd.GeoDataFrame({'id':[1]}, geometry=[Point(0,0)], crs="EPSG:4326")
     geojson_path = tmp_path / "crs.geojson"
     gd.to_file(str(geojson_path), driver="GeoJSON")
-    fm = FileManager(input_dir=str(tmp_path), output_dir=str(tmp_path / "out"))
+    fm = FileManager(layers_dir=str(tmp_path), temp_dir=str(tmp_path / "out"))
     assert fm.check_file_system_coordinates(str(geojson_path), "EPSG:4326") is True
     
 def test_check_file_system_coordinates_tiff(tmp_path):
@@ -141,7 +141,7 @@ def test_check_file_system_coordinates_tiff(tmp_path):
     ) as dst:
         dst.write(data)
 
-    fm = FileManager(input_dir=str(tmp_path), output_dir=str(tmp_path / "out"))
+    fm = FileManager(layers_dir=str(tmp_path), temp_dir=str(tmp_path / "out"))
     assert fm.check_file_system_coordinates(str(tif_path), "EPSG:4326") is True
 
 
@@ -149,7 +149,7 @@ def test_convert_file_system_coordinates_geojson(tmp_path):
     gd = gpd.GeoDataFrame({'id':[1]}, geometry=[Point(0,0)], crs="EPSG:3857")
     geojson_path = tmp_path / "convert.geojson"
     gd.to_file(str(geojson_path), driver="GeoJSON")
-    fm = FileManager(input_dir=str(tmp_path), output_dir=str(tmp_path / "out"))
+    fm = FileManager(layers_dir=str(tmp_path), temp_dir=str(tmp_path / "out"))
     fm.convert_file_system_coordinates(str(geojson_path), "EPSG:4326")
     gdf = gpd.read_file(str(geojson_path))
     assert gdf.crs.to_string() == "EPSG:4326"
@@ -173,7 +173,7 @@ def test_convert_file_system_coordinates_tiff(tmp_path):
     ) as dst:
         dst.write(data)
 
-    fm = FileManager(input_dir=str(tmp_path), output_dir=str(tmp_path / "out"))
+    fm = FileManager(layers_dir=str(tmp_path), temp_dir=str(tmp_path / "out"))
     fm.convert_file_system_coordinates(str(tif_path), "EPSG:4326")
 
     # Re-open and check CRS
