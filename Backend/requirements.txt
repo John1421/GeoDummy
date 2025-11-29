@@ -8,3 +8,4 @@ bandit
 rioxarray
 xenon
 radon
+fiona
