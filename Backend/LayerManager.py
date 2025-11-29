@@ -85,33 +85,36 @@ class LayerManager:
             shutil.rmtree(temp_dir)
             raise ValueError(f"Error reading shapefile with GeoPandas: {e}")
 
-        # 5. Check CRS
-        if gdf.crs is None:
+        try:
+            # 5. Check CRS
+            if gdf.crs is None:
+                shutil.rmtree(temp_dir)
+                raise ValueError("Shapefile has no CRS defined (.prj missing or unreadable).")
+
+            # 6. Reproject if needed
+            if gdf.crs.to_string() != target_crs:
+                gdf = gdf.to_crs(target_crs)
+
+            # 7. Determine layer name
+            if layer_name is None:
+                layer_name = os.path.splitext(shp_files[0])[0]
+
+            # 8. Check for existing layer
+            if self.check_layer_name_exists(layer_name):
+                shutil.rmtree(temp_dir)
+                raise ValueError(f"A layer with the name '{layer_name}' already exists.")
+
+            # 9. Write to default GeoPackage
+            gdf.to_file(
+                self.default_gpkg_path,
+                layer=layer_name,
+                driver="GPKG"
+            )
+
+            # 10. Cleanup extracted files
             shutil.rmtree(temp_dir)
-            raise ValueError("Shapefile has no CRS defined (.prj missing or unreadable).")
-
-        # 6. Reproject if needed
-        if gdf.crs.to_string() != target_crs:
-            gdf = gdf.to_crs(target_crs)
-
-        # 7. Determine layer name
-        if layer_name is None:
-            layer_name = os.path.splitext(shp_files[0])[0]
-
-        # 8. Check for existing layer
-        if self.check_layer_name_exists(layer_name):
-            shutil.rmtree(temp_dir)
-            raise ValueError(f"A layer with the name '{layer_name}' already exists.")
-
-        # 9. Write to default GeoPackage
-        gdf.to_file(
-            self.default_gpkg_path,
-            layer=layer_name,
-            driver="GPKG"
-        )
-
-        # 10. Cleanup extracted files
-        shutil.rmtree(temp_dir)
+        except Exception as e:
+            raise ValueError(f"Error writing shapefile into GeoPackage: {e}")    
 
         return layer_name
 
@@ -362,23 +365,6 @@ class LayerManager:
     #=====================================================================================
     #                               HELPER METHODS
     #=====================================================================================    
-
-    @staticmethod
-    def __cleanup_temp_files(temp_dir, file_list):
-        """
-        Deletes files from the temporary directory.
-
-        Parameters:
-            file_list (list): List of filenames to delete.
-            temp_dir (str): Path to the temporary directory.
-        """
-        for f in file_list:
-            f_path = os.path.join(temp_dir, f)
-            if os.path.exists(f_path):
-                try:
-                    os.remove(f_path)
-                except Exception:
-                    pass
 
     @staticmethod
     def __check_raster_system_coordinates(raster_path, target_crs="EPSG:4326"):
