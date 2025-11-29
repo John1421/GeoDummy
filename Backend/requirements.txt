@@ -1,0 +1,11 @@
+flask
+pytest
+geopandas
+shapely
+werkzeug
+coverage
+bandit
+rioxarray
+xenon
+radon
+fiona

@@ -1,0 +1,127 @@
+name: CI / Lint / Tests / Security
+
+on:
+  push:
+    branches:
+      - dev
+  pull_request:
+    branches:
+      - main
+
+jobs:
+
+  sast-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Semgrep
+        run: pip install semgrep
+
+      - name: Run Semgrep SAST Scan
+        run: |
+          semgrep scan --config auto --sarif --output semgrep.sarif || true
+
+      - name: Upload SARIF to GitHub Security Tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: "semgrep.sarif"
+
+  test_backend:
+    name: Run Backend Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install backend dependencies
+        working-directory: Backend
+        run: |
+          pip install -r requirements.txt
+      
+
+      - name: Run Xenon Complexity Check
+        working-directory: Backend
+        run: |
+          xenon . --max-absolute C --max-modules C --max-average C
+
+      - name: Generate Radon reports
+        working-directory: Backend
+        run: |
+          radon cc . -s -j > radon_report.json
+          radon cc . -s > radon_report.txt
+          radon mi . -s > radon_mi_report.txt
+
+      - name: Upload Radon reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: radon-complexity-reports
+          path: |
+            Backend/radon_report.json
+            Backend/radon_report.txt
+            Backend/radon_mi_report.txt
+
+
+      - name: Run Bandit Security Scan
+        run: |
+          bandit -r Backend -x Backend/Pytest -f html -o bandit_report.html || true
+          bandit -r Backend -x Backend/Pytest -f json -o bandit_report.json || true
+
+      - name: Upload Bandit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-security-report
+          path: |
+            bandit_report.html
+            bandit_report.json
+
+      - name: Run backend tests with coverage
+        working-directory: Backend/Pytest
+        run: |
+          coverage run --branch -m pytest -v
+          coverage report -m
+          coverage html -d ./coverage_report
+
+      - name: Upload coverage report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: Backend/Pytest/coverage_report
+
+
+  test_frontend:
+    name: Run Frontend Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install frontend dependencies
+        working-directory: Frontend/GeoDummy
+        run: npm ci
+
+      - name: Run ESLint
+        working-directory: Frontend/GeoDummy
+        run: npm run lint
+
+      - name: Run frontend unit tests
+        working-directory: Frontend/GeoDummy
+        run: npm run test
