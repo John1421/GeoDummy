@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 //Portugal center coordinates
 const INITIAL_LATITUDE = 39.557191;
 const INITIAL_LONGITUDE = -7.8536599;
