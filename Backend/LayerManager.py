@@ -24,10 +24,8 @@ class LayerManager:
             default_geopackage (str): File name for the default GeoPackage.
         """
 
-        self.file_manager = file_manager
-        
         # Full path to the GeoPackage inside layers directory
-        self.default_gpkg_path = os.path.join(self.file_manager.layers_dir, default_geopackage)
+        self.default_gpkg_path = os.path.join(file_manager.layers_dir, default_geopackage)
 
         # Ensure the default GeoPackage exists
         if not os.path.exists(self.default_gpkg_path):
@@ -270,12 +268,12 @@ class LayerManager:
                 try:
                     temp_path = self.__convert_raster_system_coordinates(raster_path)
                     file_manager.move_file(temp_path, file_manager.layers_dir)
-                except ValueError as e:
+                except Exception as e:
                     os.remove(raster_path)
-                    raise ValueError    
+                    raise ValueError(f"Failed convert raster system coordinates: {e}")    
             else:
                 file_manager.move_file(raster_path, file_manager.layers_dir)
-        except ValueError as e:
+        except Exception as e:
             os.remove(raster_path)
             raise ValueError(f"Failed to add raster layer: {e}")
 
@@ -294,9 +292,9 @@ class LayerManager:
             ValueError: If file does not exist, is invalid, or contains conflicting layer names.
         """
 
-        incoming_layers = self.__retrieve_spatial_layers_from_incomming_gpkg(geopackage_path) 
+        incoming_layers = self.__retrieve_spatial_layers_from_incoming_gpkg(geopackage_path) 
 
-        self.__check_incoming_gpkg_layers_for_names_conflicts(self, incoming_layers)
+        self.check_incoming_gpkg_layers_for_names_conflicts(incoming_layers)
 
         # Import each layer
         for layer_name in incoming_layers:
@@ -340,7 +338,7 @@ class LayerManager:
             output_name = layer_name
 
         geojson_path = os.path.join(
-            self.file_manager.temp_dir,
+            file_manager.temp_dir,
             f"{output_name}.geojson"
         )
 
@@ -386,7 +384,7 @@ class LayerManager:
         possible_exts = [".tif", ".tiff"]
 
         for ext in possible_exts:
-            candidate_path = os.path.join(self.file_manager.layers_dir, layer_name + ext)
+            candidate_path = os.path.join(file_manager.layers_dir, layer_name + ext)
             if os.path.isfile(candidate_path):
                 return candidate_path
 
@@ -416,12 +414,31 @@ class LayerManager:
         # 2. Check raster layers (.tif/.tiff)
         possible_exts = [".tif", ".tiff"]
         for ext in possible_exts:
-            raster_path = os.path.join(self.file_manager.layers_dir, new_name + ext)
+            raster_path = os.path.join(file_manager.layers_dir, new_name + ext)
             if os.path.isfile(raster_path):
                 exists = True
                 break
 
         return exists
+    
+    def check_incoming_gpkg_layers_for_names_conflicts(self, new_layers):
+        # Load existing GPkg layers + raster names
+        existing_layers = set(fiona.listlayers(self.default_gpkg_path))
+        existing_raster_layers = {
+            os.path.splitext(f)[0]
+            for f in os.listdir(file_manager.layers_dir)
+            if f.lower().endswith((".tif", ".tiff"))
+        }
+        all_existing = existing_layers | existing_raster_layers
+
+        # Check for name conflicts
+        conflicts = [name for name in new_layers if name in all_existing]
+
+        if conflicts:
+            raise ValueError(
+                "Cannot import GeoPackage. Conflicting layer names: "
+                + ", ".join(conflicts)
+            )     
 
     #=====================================================================================
     #                               HELPER METHODS
@@ -459,7 +476,7 @@ class LayerManager:
 
     @staticmethod
     def __convert_raster_system_coordinates(raster_path,target_crs="EPSG:4326"):
-        temp_path = f"agdhiugdaidha_raster_temp.tiff"
+        temp_path = f"very_complex_raster_name_temp.tiff"
         shutil.copy(raster_path, temp_path)
         try:
             with rioxarray.open_rasterio(temp_path) as raster:
@@ -476,7 +493,7 @@ class LayerManager:
             raise ValueError(f"Error converting tif CRS: {e}") 
 
     @staticmethod
-    def __retrieve_spatial_layers_from_incomming_gpkg(new_geopackage_path): 
+    def __retrieve_spatial_layers_from_incoming_gpkg(new_geopackage_path): 
         try:
             all_layers = fiona.listlayers(new_geopackage_path)
         except Exception as e:
@@ -506,23 +523,3 @@ class LayerManager:
             raise ValueError("No valid spatial layers found in GeoPackage.")
         
         return incoming_layers
-
-    @staticmethod
-    def __check_incoming_gpkg_layers_for_names_conflicts(self, new_layers):
-        # Load existing GPkg layers + raster names
-        existing_layers = set(fiona.listlayers(self.default_gpkg_path))
-        existing_raster_layers = {
-            os.path.splitext(f)[0]
-            for f in os.listdir(file_manager.layers_dir)
-            if f.lower().endswith((".tif", ".tiff"))
-        }
-        all_existing = existing_layers | existing_raster_layers
-
-        # Check for name conflicts
-        conflicts = [name for name in new_layers if name in all_existing]
-
-        if conflicts:
-            raise ValueError(
-                "Cannot import GeoPackage. Conflicting layer names: "
-                + ", ".join(conflicts)
-            )     
