@@ -53,110 +53,65 @@ class LayerManager:
             str: The layer name added to the GeoPackage.
         """
 
-        if not os.path.isfile(zip_path):
-            raise ValueError("Zip file does not exist.")
+         # 1. Extract ZIP
+        temp_dir = os.path.join(file_manager.temp_dir, "shp_extracted")
+        os.makedirs(temp_dir, exist_ok=True)
 
-        required_exts = {".shp", ".shx", ".dbf"}
-
-        extracted_files = []
-
-        # 1. Extract ZIP
         try:
             with zipfile.ZipFile(zip_path, 'r') as zf:
-                zf.extractall(file_manager.temp_dir)
-                extracted_files = zf.namelist()
+                zf.extractall(temp_dir)
         except Exception as e:
+            os.remove(zip_path)
             raise ValueError(f"Error unzipping shapefile: {e}")
-        
-        #2. Delete zip file
+
+        # 2. Delete zip file
         try:
             os.remove(zip_path)
         except Exception as e:
             raise ValueError(f"Failed to delete the zip file after extraction: {e}")
 
-        # Locate the .shp file
-        shp_files = [f for f in os.listdir(file_manager.temp_dir) if f.lower().endswith('.shp')]
+        # 3. Locate the .shp file
+        shp_files = [f for f in os.listdir(temp_dir) if f.lower().endswith('.shp')]
         if not shp_files:
+            shutil.rmtree(temp_dir)
             raise ValueError("No .shp file found inside the ZIP.")
 
-        shp_name = shp_files[0]
-        base_name = os.path.splitext(shp_name)[0]
+        shp_path = os.path.join(temp_dir, shp_files[0])
 
-        # 3. Validate required shapefile components
-        extracted_files = set(os.listdir(file_manager.temp_dir))
-        missing = [ext for ext in required_exts if f"{base_name}{ext}" not in extracted_files]
-
-        if missing:
-            raise ValueError(f"Missing shapefile component(s): {', '.join(missing)}")
-
-        shp_path = os.path.join(file_manager.temp_dir, shp_name)
-
-        # 4. Open with Fiona
+        # 4. Read shapefile with GeoPandas
         try:
-            src = fiona.open(shp_path, 'r')
+            gdf = gpd.read_file(shp_path)
         except Exception as e:
-            self.__cleanup_temp_files(file_manager.temp_dir, extracted_files)
-            raise ValueError(f"Error opening shapefile with Fiona: {e}")
+            shutil.rmtree(temp_dir)
+            raise ValueError(f"Error reading shapefile with GeoPandas: {e}")
 
-        # CRS from the shapefile
-        src_crs = src.crs
-        if not src_crs:
-            src.close()
+        # 5. Check CRS
+        if gdf.crs is None:
+            shutil.rmtree(temp_dir)
+            raise ValueError("Shapefile has no CRS defined (.prj missing or unreadable).")
 
-            # Cleanup extracted files
-            self.__cleanup_temp_files(file_manager.temp_dir, extracted_files)
+        # 6. Reproject if needed
+        if gdf.crs.to_string() != target_crs:
+            gdf = gdf.to_crs(target_crs)
 
-            raise ValueError("Shapefile CRS is missing (.prj not found or unreadable).")
-
-        # Determine layer name
+        # 7. Determine layer name
         if layer_name is None:
-            layer_name = base_name
+            layer_name = os.path.splitext(shp_files[0])[0]
 
-        # 4. Prepare GeoPackage layer schema
-        schema = src.schema.copy()
+        # 8. Check for existing layer
+        if self.check_layer_name_exists(layer_name):
+            shutil.rmtree(temp_dir)
+            raise ValueError(f"A layer with the name '{layer_name}' already exists.")
 
-        # 5. Reproject each feature if needed
-        target_crs_fiona = fiona.crs.from_string(target_crs)
-        needs_reproject = src_crs != target_crs_fiona
+        # 9. Write to default GeoPackage
+        gdf.to_file(
+            self.default_gpkg_path,
+            layer=layer_name,
+            driver="GPKG"
+        )
 
-        # 6. Write into GeoPackage using Fiona
-        try:
-            with fiona.open(
-                self.default_gpkg_path,
-                mode="w",
-                layer=layer_name,
-                driver="GPKG",
-                crs=target_crs_fiona,
-                schema=schema
-            ) as dst:
-
-                for feature in src:
-                    geom = feature["geometry"]
-
-                    # Reproject geometry if needed
-                    if needs_reproject:
-                        try:
-                            geom = fiona.transform.transform_geom(
-                                src_crs,
-                                target_crs_fiona,
-                                geom,
-                            )
-                        except Exception as e:
-                            raise ValueError(f"Geometry reprojection failed: {e}")
-
-                    new_feature = {
-                        "geometry": geom,
-                        "properties": feature["properties"],
-                    }
-
-                    dst.write(new_feature)
-
-        except Exception as e:
-            raise ValueError(f"Error writing layer to GeoPackage: {e}")
-
-        finally:
-            src.close()
-            self.__cleanup_temp_files(file_manager.temp_dir, extracted_files)
+        # 10. Cleanup extracted files
+        shutil.rmtree(temp_dir)
 
         return layer_name
 
@@ -176,67 +131,31 @@ class LayerManager:
 
         if not os.path.isfile(geojson_path):
             raise ValueError("GeoJSON file does not exist.")
-
-        # Open the GeoJSON
-        try:
-            src = fiona.open(geojson_path, "r")
-        except Exception as e:
-            raise ValueError(f"Error opening GeoJSON: {e}")
+        
+        # Check if layer already exists (optional)
+        if self.check_layer_name_exists(layer_name):
+            raise ValueError(f"A raster layer with the name '{layer_name}' already exists.")
 
         try:
-            # Get CRS
-            src_crs = src.crs
-            if not src_crs:
-                src.close()
-                raise ValueError("GeoJSON has no CRS defined.")
+            # Read source layer
+            gdf = gpd.read_file(geojson_path)  # can specify layer= if from a GeoPackage
 
-            # Set layer name
-            if layer_name is None:
-                layer_name = os.path.splitext(os.path.basename(geojson_path))[0]
+            # Check CRS
+            if gdf.crs is None:
+                raise ValueError("Source layer has no CRS")
 
-            # Determine target CRS
-            target_crs_fiona = fiona.crs.from_string(target_crs)
-            needs_reproject = src_crs != target_crs_fiona
+            # Reproject if needed
+            if gdf.crs.to_string() != target_crs:
+                gdf = gdf.to_crs(target_crs)
 
-            # Extract schema from GeoJSON
-            schema = src.schema.copy()
-
-            # Write to the GeoPackage
-            with fiona.open(
+            # Write to default GeoPackage
+            gdf.to_file(
                 self.default_gpkg_path,
-                mode="w",
                 layer=layer_name,
-                driver="GPKG",
-                crs=target_crs_fiona,
-                schema=schema
-            ) as dst:
-
-                for feature in src:
-                    geom = feature["geometry"]
-
-                    # Reproject if needed
-                    if needs_reproject:
-                        try:
-                            geom = fiona.transform.transform_geom(
-                                src_crs,
-                                target_crs_fiona,
-                                geom
-                            )
-                        except Exception as e:
-                            raise ValueError(f"Geometry reprojection failed: {e}")
-
-                    dst.write({
-                        "geometry": geom,
-                        "properties": feature["properties"]
-                    })
-
+                driver="GPKG"
+                )
         except Exception as e:
             raise ValueError(f"Error writing GeoJSON into GeoPackage: {e}")
-
-        finally:
-            # Ensure the source file is closed
-            if 'src' in locals() and not src.closed:
-                src.close()
 
         return layer_name
 
