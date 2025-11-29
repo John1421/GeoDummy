@@ -13,6 +13,12 @@ RUN if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.
 # Copiar o resto do código para dentro do container
 COPY . .
 
+# Change ownership of the dist folder (optional but recommended)
+RUN chown -R user:appgroup /app
+
+# Switch to the new user
+USER user
+
 # Expor a porta do backend
 EXPOSE 5000
 

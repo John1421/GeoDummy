@@ -16,6 +16,12 @@ RUN npm run build
 # Instalar o http-server globalmente
 RUN npm install -g http-server
 
+# Change ownership of the dist folder (optional but recommended)
+RUN chown -R user:appgroup /app
+
+# Switch to the new user
+USER user
+
 # Expor porta
 EXPOSE 80
 
