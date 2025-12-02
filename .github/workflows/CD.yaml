@@ -47,15 +47,17 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install dependencies
-        run: |
-          cd Frontend
-          npm ci
+      - name: Install frontend dependencies
+        working-directory: Frontend/GeoDummy
+        run: npm ci
 
-      - name: Run unit tests
-        run: |
-          cd Frontend
-          npm test -- --watchAll=false
+      - name: Run ESLint
+        working-directory: Frontend/GeoDummy
+        run: npm run lint
+
+      - name: Run frontend unit tests
+        working-directory: Frontend/GeoDummy
+        run: npm run test
 
 
   build_and_push:
