@@ -14,11 +14,12 @@ export interface Layer {
   geometryType?: string;
   opacity?: number; // 0..1
   previousOpacity?: number; // last non-zero opacity
+  order: number; // higher = closer to top
 }
 
 /** Example layers to test geometry ordering. */
 const EXAMPLE_LAYERS: Layer[] = [
-  // Raster
+  // Raster (bottom)
   {
     id: "r1",
     title: "Satellite Imagery",
@@ -26,6 +27,7 @@ const EXAMPLE_LAYERS: Layer[] = [
     geometryType: "Raster",
     opacity: 1,
     previousOpacity: 1,
+    order: 0,
   },
   {
     id: "r2",
@@ -34,6 +36,7 @@ const EXAMPLE_LAYERS: Layer[] = [
     geometryType: "Raster",
     opacity: 1,
     previousOpacity: 1,
+    order: 1,
   },
 
   // Polygons
@@ -44,6 +47,7 @@ const EXAMPLE_LAYERS: Layer[] = [
     geometryType: "Polygon",
     opacity: 1,
     previousOpacity: 1,
+    order: 2,
   },
   {
     id: "p2",
@@ -52,6 +56,7 @@ const EXAMPLE_LAYERS: Layer[] = [
     geometryType: "Polygon",
     opacity: 1,
     previousOpacity: 1,
+    order: 3,
   },
   {
     id: "p3",
@@ -60,6 +65,7 @@ const EXAMPLE_LAYERS: Layer[] = [
     geometryType: "Polygon",
     opacity: 1,
     previousOpacity: 1,
+    order: 4,
   },
 
   // Lines
@@ -70,6 +76,7 @@ const EXAMPLE_LAYERS: Layer[] = [
     geometryType: "Line",
     opacity: 1,
     previousOpacity: 1,
+    order: 5,
   },
   {
     id: "l2",
@@ -78,9 +85,10 @@ const EXAMPLE_LAYERS: Layer[] = [
     geometryType: "Line",
     opacity: 1,
     previousOpacity: 1,
+    order: 6,
   },
 
-  // Points
+  // Points (top)
   {
     id: "pt1",
     title: "Tree Locations",
@@ -88,6 +96,7 @@ const EXAMPLE_LAYERS: Layer[] = [
     geometryType: "Point",
     opacity: 1,
     previousOpacity: 1,
+    order: 7,
   },
   {
     id: "pt2",
@@ -96,6 +105,7 @@ const EXAMPLE_LAYERS: Layer[] = [
     geometryType: "Point",
     opacity: 1,
     previousOpacity: 1,
+    order: 8,
   },
 ];
 
@@ -132,17 +142,30 @@ export default function LayerSidebar() {
   /** Add a new layer from the NewLayerWindow. */
   const handleAddLayer = useCallback(
     (chosenTitle: string, fileName: string) => {
-      setLayers((prev) => [
-        {
-          id: crypto.randomUUID(),
-          title: chosenTitle,
-          fileName,
-          geometryType: undefined,
-          opacity: 1,
-          previousOpacity: 1,
-        },
-        ...prev,
-      ]);
+      setLayers((prev) => {
+        // Use explicit order; higher = closer to top
+        const maxOrder =
+          prev.length === 0
+            ? 0
+            : Math.max(
+                ...prev.map((l, index) =>
+                  typeof l.order === "number" ? l.order : index
+                )
+              );
+
+        return [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            title: chosenTitle,
+            fileName,
+            geometryType: undefined,
+            opacity: 1,
+            previousOpacity: 1,
+            order: maxOrder + 1,
+          },
+        ];
+      });
     },
     []
   );
@@ -257,22 +280,30 @@ export default function LayerSidebar() {
 
   /**
    * Reorder layers by geometry type.
-   * Order top → bottom: Points → Lines → Polygons → Raster → Others.
-   * Keeps relative order inside each group.
+   * Top → bottom: Points → Lines → Polygons → Raster → Others.
+   * Keeps relative order inside each group using current order.
    */
   const handleReorderByGeometry = useCallback(() => {
     setLayers((prev) => {
-      const withIndex = prev.map((layer, index) => ({ layer, index }));
-
-      withIndex.sort((a, b) => {
-        const rankA = getGeometryRank(a.layer.geometryType);
-        const rankB = getGeometryRank(b.layer.geometryType);
+      const sorted = [...prev].sort((a, b) => {
+        const rankA = getGeometryRank(a.geometryType);
+        const rankB = getGeometryRank(b.geometryType);
 
         if (rankA !== rankB) return rankA - rankB;
-        return a.index - b.index;
+
+        // If same geometry type, keep current relative order (higher order stays higher)
+        const orderA = typeof a.order === "number" ? a.order : 0;
+        const orderB = typeof b.order === "number" ? b.order : 0;
+        return orderB - orderA;
       });
 
-      return withIndex.map((item) => item.layer);
+      // Assign new explicit order so that top has highest order
+      const len = sorted.length;
+
+      return sorted.map((layer, index) => ({
+        ...layer,
+        order: len - 1 - index,
+      }));
     });
   }, []);
 
@@ -307,7 +338,13 @@ export default function LayerSidebar() {
       <SidebarPanel
         side="left"
         title="Layers"
-        icon={<LayersIcon size={icons.size} color={colors.primary} strokeWidth={icons.strokeWidth} />}
+        icon={
+          <LayersIcon
+            size={icons.size}
+            color={colors.primary}
+            strokeWidth={icons.strokeWidth}
+          />
+        }
         expandedWidthClassName="w-72"
         collapsedWidthClassName="w-12"
         onAdd={() => setIsWindowOpen(true)}

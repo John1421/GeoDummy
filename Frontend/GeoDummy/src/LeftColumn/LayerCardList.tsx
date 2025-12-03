@@ -38,17 +38,47 @@ export default function LayerCardList({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const layerIds = useMemo(() => layers.map((l) => l.id), [layers]);
+  // Sort by explicit order so top has highest order.
+  const sortedLayers = useMemo(() => {
+    return [...layers].sort((a, b) => {
+      const orderA = typeof a.order === "number" ? a.order : 0;
+      const orderB = typeof b.order === "number" ? b.order : 0;
+      return orderB - orderA; // descending
+    });
+  }, [layers]);
+
+  const layerIds = useMemo(
+    () => sortedLayers.map((l) => l.id),
+    [sortedLayers]
+  );
 
   const handleDragEnd = useCallback(
     ({ active, over }: DragEndEvent) => {
       if (!over || active.id === over.id) return;
 
       setLayers((prev) => {
-        const oldIndex = prev.findIndex((l) => l.id === active.id);
-        const newIndex = prev.findIndex((l) => l.id === over.id);
+        // Work on a sorted copy, then reassign explicit order.
+        const sorted = [...prev].sort((a, b) => {
+          const orderA = typeof a.order === "number" ? a.order : 0;
+          const orderB = typeof b.order === "number" ? b.order : 0;
+          return orderB - orderA; // descending
+        });
 
-        return arrayMove(prev, oldIndex, newIndex);
+        const oldIndex = sorted.findIndex((l) => l.id === active.id);
+        const newIndex = sorted.findIndex((l) => l.id === over.id);
+
+        if (oldIndex === -1 || newIndex === -1) return prev;
+
+        const reordered = arrayMove(sorted, oldIndex, newIndex);
+        const len = reordered.length;
+
+        // Assign explicit order so top card has highest order.
+        const withOrder = reordered.map((layer, index) => ({
+          ...layer,
+          order: len - 1 - index,
+        }));
+
+        return withOrder;
       });
     },
     [setLayers]
@@ -61,7 +91,7 @@ export default function LayerCardList({
       onDragEnd={handleDragEnd}
     >
       <SortableContext items={layerIds} strategy={verticalListSortingStrategy}>
-        {layers.map((layer) => (
+        {sortedLayers.map((layer) => (
           <LayerCard
             key={layer.id}
             layer={layer}
