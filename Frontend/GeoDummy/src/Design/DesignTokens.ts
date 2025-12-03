@@ -4,6 +4,8 @@
 // and transitions. Import anywhere for consistent styling across the project.
 // -----------------------------------------------------------------------------
 
+import { MarsStroke } from "lucide-react";
+
 export const colors = {
   // Base UI
   background: "#F9FAFB",
@@ -79,6 +81,11 @@ export const transitions = {
   fast: "120ms ease",
   normal: "180ms ease",
   slow: "250ms ease",
+};
+
+export const icons = {
+  size : 18,
+  strokeWidth: 2,
 };
 
 export const designTokens = {
