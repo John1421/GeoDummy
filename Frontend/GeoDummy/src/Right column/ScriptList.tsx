@@ -11,10 +11,7 @@ export interface Script {
   id: string;
   name: string;
   description?: string;
-  fileName?: string;
   category?: string;
-  number?: string;
-  type?: string;
 }
 
 const EXAMPLE_SCRIPTS: Script[] = [
@@ -49,18 +46,15 @@ export default function ScriptList() {
   const [scripts, setScripts] = useState<Script[]>(EXAMPLE_SCRIPTS);
 
   const handleAddScript = useCallback(
-    (fileName: string, category: string, number: string, type: string) => {
+    (name: string, category: string) => {
       // Extract name from filename (remove extension)
-      const scriptName = fileName.replace(/\.[^/.]+$/, "");
+      
 
       const newScript: Script = {
         id: crypto.randomUUID(),
-        name: scriptName,
-        description: `${category} - ${type}`,
-        fileName,
+        name,
+        description: `${category} script`,
         category,
-        number,
-        type,
       };
 
       setScripts((prev) => [newScript, ...prev]);
