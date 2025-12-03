@@ -364,12 +364,11 @@ def set_layer_priority(layer_id,priority):
 
 @app.route('/layers/<layer_id>/information', methods=['GET'])
 def identify_layer_information(layer_id):
-    if not layer_id:
-        raise BadRequest("layer_id parameter is required")
-
-    # TODO: extract information
-
-    return jsonify({"layer_id": layer_id, "info": {"geometry": "Polygon", "features": 124}}), 200
+    try:
+        info = layer_manager.get_layer_information(layer_id)
+        return jsonify({"layer_id": layer_id, "info": info}), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
 
 @app.route('/layers/<layer_id>/table', methods=['GET'])
 def extract_data_from_layer_for_table_view(layer_id):

@@ -8,6 +8,7 @@ import zipfile
 from shapely.geometry import shape, mapping
 import rioxarray
 import shutil
+import rasterio
 
 file_manager = FileManager()
 
@@ -428,3 +429,55 @@ class LayerManager:
             raise ValueError("No valid spatial layers found in GeoPackage.")
         
         return incoming_layers
+    
+    def get_layer_information(self, layer_id):
+        """
+        Retrieves basic information about a layer stored either in the default GeoPackage
+        or a raster file in the input_layers folder.
+        """
+
+        layers_dir = os.path.join(file_manager.layers_dir)
+        gpkg_path = os.path.join(layers_dir, "layers.gpkg")
+
+        # Checks if the layer_id matches a raster file
+        possible_exts = [".tif", ".tiff"]
+        raster_path = None
+        for ext in possible_exts:
+            candidate = os.path.join(layers_dir, layer_id + ext)
+            candidate_upper = os.path.join(layers_dir, layer_id + ext.upper())
+            if os.path.isfile(candidate):
+                raster_path = candidate
+                break
+            elif os.path.isfile(candidate_upper):
+                raster_path = candidate_upper
+                break
+
+        if raster_path:
+            with rasterio.open(raster_path) as src:
+                return {
+                    "type": "raster",
+                    "bands": src.count,
+                    "width": src.width,
+                    "height": src.height,
+                    "crs": src.crs.to_string() if src.crs else None,
+                    "resolution": src.res
+                }
+
+        # Check if the layer_id matches a vector layer in the GeoPackage
+        if os.path.isfile(gpkg_path):
+            try:
+                layers = fiona.listlayers(gpkg_path)
+                if layer_id in layers:
+                    gdf = gpd.read_file(gpkg_path, layer=layer_id)
+                    return {
+                        "type": "vector",
+                        "geometry_type": gdf.geom_type.mode()[0] if not gdf.empty else None,
+                        "crs": gdf.crs.to_string() if gdf.crs else None,
+                        "attributes": list(gdf.columns.drop("geometry")),
+                        "feature_count": len(gdf)
+                    }
+            except Exception as e:
+                raise ValueError(f"Error reading GeoPackage: {e}")
+
+        # If neither raster nor vector layer found, raise error
+        raise ValueError(f"Layer '{layer_id}' not found in rasters or GeoPackage")
