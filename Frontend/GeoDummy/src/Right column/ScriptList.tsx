@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { Wrench as ToolsIcon } from "lucide-react";
 import SidebarPanel from "../TemplateModals/SidebarModal";
-import { colors } from "../Design/DesignTokens";
+import { colors, icons } from "../Design/DesignTokens";
 
 import ToolCategoryToggle from "./ToolCategoryToggle";
 import ScriptCard from "./ScriptCard";
@@ -11,10 +11,7 @@ export interface Script {
   id: string;
   name: string;
   description?: string;
-  fileName?: string;
   category?: string;
-  number?: string;
-  type?: string;
 }
 
 const EXAMPLE_SCRIPTS: Script[] = [
@@ -49,18 +46,15 @@ export default function ScriptList() {
   const [scripts, setScripts] = useState<Script[]>(EXAMPLE_SCRIPTS);
 
   const handleAddScript = useCallback(
-    (fileName: string, category: string, number: string, type: string) => {
+    (name: string, category: string) => {
       // Extract name from filename (remove extension)
-      const scriptName = fileName.replace(/\.[^/.]+$/, "");
+      
 
       const newScript: Script = {
         id: crypto.randomUUID(),
-        name: scriptName,
-        description: `${category} - ${type}`,
-        fileName,
+        name,
+        description: `${category} script`,
         category,
-        number,
-        type,
       };
 
       setScripts((prev) => [newScript, ...prev]);
@@ -73,7 +67,7 @@ export default function ScriptList() {
       <SidebarPanel
         side="right"
         title="Tools"
-        icon={<ToolsIcon size={18} color={colors.primary} />}
+        icon={<ToolsIcon size={icons.size} color={colors.primary} strokeWidth={icons.strokeWidth} />}
         expandedWidthClassName="w-72"
         collapsedWidthClassName="w-12"
         onAdd={() => setShowAddNew(true)}

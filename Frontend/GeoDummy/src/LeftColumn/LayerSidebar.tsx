@@ -1,14 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
-import { Layers as LayersIcon } from "lucide-react";
+import { Layers as LayersIcon, ListFilter } from "lucide-react";
 import LayerCardList from "./LayerCardList";
 import NewLayerWindow from "./NewLayerWindow";
 import SidebarPanel from "../TemplateModals/SidebarModal";
 import LayerSettingsWindow from "./LayerSettingsWindow";
-import { colors } from "../Design/DesignTokens";
+import { colors, icons } from "../Design/DesignTokens";
 
-/**
- * Extended layer model with metadata needed for the settings window.
- */
+/** Layer model stored in state. */
 export interface Layer {
   id: string;
   title: string;
@@ -16,102 +14,174 @@ export interface Layer {
   geometryType?: string;
   opacity?: number; // 0..1
   previousOpacity?: number; // last non-zero opacity
+  order: number; // higher = closer to top
 }
 
+/** Example layers to test geometry ordering. */
 const EXAMPLE_LAYERS: Layer[] = [
+  // Raster (bottom)
   {
-    id: "1",
-    title: "Road Network",
-    fileName: "roads.geojson",
-    geometryType: "LineString",
+    id: "r1",
+    title: "Satellite Imagery",
+    fileName: "sentinel2.tif",
+    geometryType: "Raster",
     opacity: 1,
     previousOpacity: 1,
+    order: 0,
   },
   {
-    id: "2",
+    id: "r2",
+    title: "Elevation Model",
+    fileName: "dem_25m.tif",
+    geometryType: "Raster",
+    opacity: 1,
+    previousOpacity: 1,
+    order: 1,
+  },
+
+  // Polygons
+  {
+    id: "p1",
+    title: "Administrative Boundaries",
+    fileName: "admin_boundaries.geojson",
+    geometryType: "Polygon",
+    opacity: 1,
+    previousOpacity: 1,
+    order: 2,
+  },
+  {
+    id: "p2",
     title: "Building Footprints",
     fileName: "buildings.geojson",
     geometryType: "Polygon",
     opacity: 1,
     previousOpacity: 1,
+    order: 3,
   },
   {
-    id: "3",
+    id: "p3",
     title: "Land Parcels",
     fileName: "parcels.geojson",
     geometryType: "Polygon",
     opacity: 1,
     previousOpacity: 1,
+    order: 4,
   },
+
+  // Lines
   {
-    id: "4",
-    title: "Water Bodies",
-    fileName: "water.geojson",
-    geometryType: "Polygon",
+    id: "l1",
+    title: "Road Network",
+    fileName: "roads.geojson",
+    geometryType: "Line",
     opacity: 1,
     previousOpacity: 1,
+    order: 5,
+  },
+  {
+    id: "l2",
+    title: "Rivers",
+    fileName: "rivers.geojson",
+    geometryType: "Line",
+    opacity: 1,
+    previousOpacity: 1,
+    order: 6,
+  },
+
+  // Points (top)
+  {
+    id: "pt1",
+    title: "Tree Locations",
+    fileName: "trees.geojson",
+    geometryType: "Point",
+    opacity: 1,
+    previousOpacity: 1,
+    order: 7,
+  },
+  {
+    id: "pt2",
+    title: "Public Facilities",
+    fileName: "facilities.geojson",
+    geometryType: "Point",
+    opacity: 1,
+    previousOpacity: 1,
+    order: 8,
   },
 ];
+
+/** Geometry rank for ordering. */
+function getGeometryRank(geometryType?: string): number {
+  if (!geometryType) return 5;
+
+  const g = geometryType.toLowerCase();
+
+  if (g.includes("point")) return 1; // top
+  if (g.includes("line")) return 2;
+  if (g.includes("polygon")) return 3;
+  if (g.includes("raster")) return 4; // bottom of known types
+
+  return 5; // unknown
+}
 
 export default function LayerSidebar() {
   const [isWindowOpen, setIsWindowOpen] = useState(false);
   const [layers, setLayers] = useState<Layer[]>(EXAMPLE_LAYERS);
 
-  // Which layer is currently being configured in the small settings window
+  // Selected layer for settings window.
   const [settingsLayerId, setSettingsLayerId] = useState<string | null>(null);
   const [settingsPosition, setSettingsPosition] = useState<{
     top: number;
     left: number;
   } | null>(null);
 
-  // Derived selected layer for settings
   const selectedSettingsLayer = useMemo(
     () => layers.find((l) => l.id === settingsLayerId) ?? null,
     [layers, settingsLayerId]
   );
 
-  /**
-   * Called when a new layer is created from the NewLayerWindow.
-   * Receives the chosen title and the selected file name.
-   */
+  /** Add a new layer from the NewLayerWindow. */
   const handleAddLayer = useCallback(
     (chosenTitle: string, fileName: string) => {
-      setLayers((prev) => [
-        {
-          id: crypto.randomUUID(),
-          title: chosenTitle,
-          fileName,
-          geometryType: undefined,
-          opacity: 1,
-          previousOpacity: 1,
-        },
-        ...prev,
-      ]);
-    },
-    []
-  );
+      setLayers((prev) => {
+        // Use explicit order; higher = closer to top
+        const maxOrder =
+          prev.length === 0
+            ? 0
+            : Math.max(
+                ...prev.map((l, index) =>
+                  typeof l.order === "number" ? l.order : index
+                )
+              );
 
-  /**
-   * Called when the settings should open (now from double-click on the card).
-   * Receives both the layer id and the card's DOMRect to anchor the window.
-   */
-  const handleSettings = useCallback(
-    (layerId: string, rect: DOMRect) => {
-      setSettingsLayerId(layerId);
-
-      // Position the window to the right of the card with a small offset
-      setSettingsPosition({
-        top: rect.top,
-        left: rect.right + 8,
+        return [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            title: chosenTitle,
+            fileName,
+            geometryType: undefined,
+            opacity: 1,
+            previousOpacity: 1,
+            order: maxOrder + 1,
+          },
+        ];
       });
     },
     []
   );
 
+  /** Open settings window for a given layer. */
+  const handleSettings = useCallback((layerId: string, rect: DOMRect) => {
+    setSettingsLayerId(layerId);
+    setSettingsPosition({
+      top: rect.top,
+      left: rect.right + 8,
+    });
+  }, []);
+
   /**
-   * Update opacity for a given layer.
-   * - When opacity goes to 0, store the last non-zero value in previousOpacity.
-   * - When opacity is > 0, keep previousOpacity in sync with the last visible value.
+   * Change layer opacity.
+   * Stores last visible opacity in previousOpacity.
    */
   const handleOpacityChange = useCallback((layerId: string, opacity: number) => {
     setLayers((prev) =>
@@ -121,11 +191,9 @@ export default function LayerSidebar() {
         const oldOpacity = layer.opacity ?? 1;
         const normalized = Math.min(1, Math.max(0, opacity));
 
-        // Start with current data
         const next: Layer = { ...layer, opacity: normalized };
 
         if (normalized <= 0.01) {
-          // Store the last non-zero opacity so it can be restored later
           const lastVisible =
             layer.previousOpacity && layer.previousOpacity > 0.01
               ? layer.previousOpacity
@@ -134,7 +202,6 @@ export default function LayerSidebar() {
               : 1;
           next.previousOpacity = lastVisible;
         } else {
-          // Track last visible opacity
           next.previousOpacity = normalized;
         }
 
@@ -144,9 +211,9 @@ export default function LayerSidebar() {
   }, []);
 
   /**
-   * Toggle visibility when clicking the eye button:
-   * - If currently visible (opacity > 0), store opacity and set to 0.
-   * - If currently hidden (opacity ~ 0), restore previousOpacity or 1.
+   * Toggle layer visibility using opacity.
+   *  - Visible → opacity 0 and store previous.
+   *  - Hidden  → restore previousOpacity or 1.
    */
   const handleToggleVisibility = useCallback((layerId: string) => {
     setLayers((prev) =>
@@ -168,7 +235,6 @@ export default function LayerSidebar() {
           };
         }
 
-        // Going from visible to hidden: remember current opacity
         return {
           ...layer,
           previousOpacity:
@@ -179,10 +245,7 @@ export default function LayerSidebar() {
     );
   }, []);
 
-  /**
-   * Restore visibility from the settings "Show" button.
-   * Uses previousOpacity if available, otherwise falls back to 1.
-   */
+  /** Restore visibility from settings window shortcut. */
   const handleRestoreOpacity = useCallback((layerId: string) => {
     setLayers((prev) =>
       prev.map((layer) => {
@@ -202,29 +265,88 @@ export default function LayerSidebar() {
     );
   }, []);
 
-  /**
-   * Delete a given layer (from settings window).
-   */
+  /** Delete a layer from settings window. */
   const handleDeleteLayer = useCallback((layerId: string) => {
     setLayers((prev) => prev.filter((layer) => layer.id !== layerId));
     setSettingsLayerId(null);
     setSettingsPosition(null);
   }, []);
 
+  /** Close settings window. */
   const handleCloseSettings = useCallback(() => {
     setSettingsLayerId(null);
     setSettingsPosition(null);
   }, []);
+
+  /**
+   * Reorder layers by geometry type.
+   * Top → bottom: Points → Lines → Polygons → Raster → Others.
+   * Keeps relative order inside each group using current order.
+   */
+  const handleReorderByGeometry = useCallback(() => {
+    setLayers((prev) => {
+      const sorted = [...prev].sort((a, b) => {
+        const rankA = getGeometryRank(a.geometryType);
+        const rankB = getGeometryRank(b.geometryType);
+
+        if (rankA !== rankB) return rankA - rankB;
+
+        // Same geometry type → alphabetical by title
+        return a.title.localeCompare(b.title);
+      });
+
+      // Assign new explicit order so that top has highest order
+      const len = sorted.length;
+
+      return sorted.map((layer, index) => ({
+        ...layer,
+        order: len - 1 - index,
+      }));
+    });
+  }, []);
+
+  /** Header button for reordering by geometry type. */
+  const headerActions = (
+    <button
+      type="button"
+      onClick={handleReorderByGeometry}
+      title="Reorder layers by geometry type"
+      style={{
+        height: 28,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        paddingInline: 4,
+        borderRadius: 6,
+        border: "none",
+        backgroundColor: "transparent",
+        color: colors.sidebarForeground,
+        cursor: "pointer",
+        fontSize: 12,
+        gap: 6,
+        whiteSpace: "nowrap",
+      }}
+    >
+      <ListFilter size={icons.size} strokeWidth={icons.strokeWidth} />
+    </button>
+  );
 
   return (
     <>
       <SidebarPanel
         side="left"
         title="Layers"
-        icon={<LayersIcon size={18} color={colors.primary} />}
+        icon={
+          <LayersIcon
+            size={icons.size}
+            color={colors.primary}
+            strokeWidth={icons.strokeWidth}
+          />
+        }
         expandedWidthClassName="w-72"
         collapsedWidthClassName="w-12"
         onAdd={() => setIsWindowOpen(true)}
+        headerActions={headerActions}
       >
         <LayerCardList
           layers={layers}
@@ -234,7 +356,6 @@ export default function LayerSidebar() {
         />
       </SidebarPanel>
 
-      {/* New layer creation window */}
       <NewLayerWindow
         isOpen={isWindowOpen}
         onClose={() => setIsWindowOpen(false)}
@@ -242,7 +363,6 @@ export default function LayerSidebar() {
         existingLayerNames={layers.map((layer) => layer.title)}
       />
 
-      {/* Per-layer floating settings window, anchored to the clicked card */}
       <LayerSettingsWindow
         isOpen={!!settingsLayerId}
         layer={selectedSettingsLayer}

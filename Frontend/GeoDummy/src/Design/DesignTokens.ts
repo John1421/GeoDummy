@@ -81,6 +81,11 @@ export const transitions = {
   slow: "250ms ease",
 };
 
+export const icons = {
+  size : 18,
+  strokeWidth: 2,
+};
+
 export const designTokens = {
   colors,
   typography,

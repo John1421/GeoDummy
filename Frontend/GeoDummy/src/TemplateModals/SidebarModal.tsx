@@ -1,52 +1,49 @@
 import { useState, type ReactNode } from "react";
-import { colors, typography, radii } from "../Design/DesignTokens";
+import { colors, typography, radii, icons } from "../Design/DesignTokens";
+import { Plus as PlusIcon } from "lucide-react";
 
 interface SidebarPanelProps {
   side: "left" | "right";
   title: string;
   icon: ReactNode;
   onAdd?: () => void;
-  expandedWidthClassName?: string; // kept only for compatibility
-  collapsedWidthClassName?: string; // kept only for compatibility
+  expandedWidthClassName?: string; // compatibility only
+  collapsedWidthClassName?: string; // compatibility only
+  headerActions?: ReactNode; // extra buttons on header
   children: ReactNode;
 }
 
 /**
- * FINAL VERSION WITH MINIMUM EXPANDED WIDTH
- *
+ * Sidebar panel with collapsible behavior.
  * - Collapsed width: fixed 60px
- * - Expanded width: 22vw but never below 260px
- *   width = max(22vw, 260px)
- * - Borders included in width (box-sizing)
+ * - Expanded width: max(18vw, 260px)
  */
 export default function SidebarPanel({
   side,
   title,
   icon,
   onAdd,
-  //expandedWidthClassName,
-  //collapsedWidthClassName,
+  // expandedWidthClassName,
+  // collapsedWidthClassName,
+  headerActions,
   children,
 }: SidebarPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const isLeft = side === "left";
 
-  // CONFIGURABLE VALUES:
-  const EXPANDED_WIDTH_VW = "18vw";   // expanded percentage
-  const MIN_EXPANDED_PX = "260px";    // minimum expanded width
-  const COLLAPSED_WIDTH = "60px";     // fixed collapsed width
+  const EXPANDED_WIDTH_VW = "18vw";
+  const MIN_EXPANDED_PX = "260px";
+  const COLLAPSED_WIDTH = "60px";
 
-  // final width expression using CSS max()
   const expandedWidth = `max(${EXPANDED_WIDTH_VW}, ${MIN_EXPANDED_PX})`;
-
   const panelWidth = isCollapsed ? COLLAPSED_WIDTH : expandedWidth;
 
   return (
     <div
       style={{
         width: panelWidth,
-        boxSizing: "border-box", // ensures borders don't add extra width
+        boxSizing: "border-box",
         position: "relative",
         overflow: "hidden",
         flexShrink: 0,
@@ -57,14 +54,12 @@ export default function SidebarPanel({
         backgroundColor: colors.sidebarBackground,
         color: colors.sidebarForeground,
         fontFamily: typography.normalFont,
-
         borderRight: isLeft ? `0.1px solid ${colors.borderStroke}` : undefined,
         borderLeft: !isLeft ? `0.1px solid ${colors.borderStroke}` : undefined,
-
         transition: "width 0.3s ease",
       }}
     >
-      {/* ================= HEADER ================= */}
+      {/* Header with collapse icon, title and actions */}
       <div
         style={{
           display: "flex",
@@ -74,10 +69,10 @@ export default function SidebarPanel({
           paddingInline: 8,
         }}
       >
-        {/* COLLAPSE BUTTON (always visible) */}
+        {/* Collapse / expand toggle */}
         <button
           type="button"
-          onClick={() => setIsCollapsed(v => !v)}
+          onClick={() => setIsCollapsed((v) => !v)}
           aria-label={isCollapsed ? `Expand ${title}` : `Collapse ${title}`}
           style={{
             height: 32,
@@ -95,7 +90,7 @@ export default function SidebarPanel({
           {icon}
         </button>
 
-        {/* TITLE + ADD BUTTON (only when expanded) */}
+        {/* Title and header buttons (only when expanded) */}
         {!isCollapsed && (
           <div
             style={{
@@ -118,28 +113,38 @@ export default function SidebarPanel({
               {title}
             </h2>
 
-            {onAdd && (
-              <button
-                type="button"
-                onClick={onAdd}
-                aria-label={`Add ${title}`}
-                style={{
-                  height: 28,
-                  width: 28,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: radii.md,
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: 20,
-                  color: colors.sidebarForeground,
-                }}
-              >
-                +
-              </button>
-            )}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              {onAdd && (
+                <button
+                  type="button"
+                  onClick={onAdd}
+                  aria-label={`Add ${title}`}
+                  style={{
+                    height: 28,
+                    width: 28,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: radii.md,
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: 20,
+                    color: colors.sidebarForeground,
+                  }}
+                >
+                  <PlusIcon size={icons.size} strokeWidth={icons.strokeWidth}/>
+                </button>
+              )}
+
+              {headerActions}
+            </div>
           </div>
         )}
       </div>
@@ -154,7 +159,7 @@ export default function SidebarPanel({
         />
       )}
 
-      {/* ================= CONTENT ================= */}
+      {/* Content area */}
       {!isCollapsed && (
         <div
           style={{
