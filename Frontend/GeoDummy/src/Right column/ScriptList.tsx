@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { Wrench as ToolsIcon } from "lucide-react";
 import SidebarPanel from "../TemplateModals/SidebarModal";
-import { colors } from "../Design/DesignTokens";
+import { colors, icons } from "../Design/DesignTokens";
 
 import ToolCategoryToggle from "./ToolCategoryToggle";
 import ScriptCard from "./ScriptCard";
@@ -73,7 +73,7 @@ export default function ScriptList() {
       <SidebarPanel
         side="right"
         title="Tools"
-        icon={<ToolsIcon size={18} color={colors.primary} />}
+        icon={<ToolsIcon size={icons.size} color={colors.primary} strokeWidth={icons.strokeWidth} />}
         expandedWidthClassName="w-72"
         collapsedWidthClassName="w-12"
         onAdd={() => setShowAddNew(true)}
