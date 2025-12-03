@@ -291,10 +291,8 @@ export default function LayerSidebar() {
 
         if (rankA !== rankB) return rankA - rankB;
 
-        // If same geometry type, keep current relative order (higher order stays higher)
-        const orderA = typeof a.order === "number" ? a.order : 0;
-        const orderB = typeof b.order === "number" ? b.order : 0;
-        return orderB - orderA;
+        // Same geometry type → alphabetical by title
+        return a.title.localeCompare(b.title);
       });
 
       // Assign new explicit order so that top has highest order

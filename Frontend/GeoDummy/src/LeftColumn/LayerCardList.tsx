@@ -43,9 +43,14 @@ export default function LayerCardList({
     return [...layers].sort((a, b) => {
       const orderA = typeof a.order === "number" ? a.order : 0;
       const orderB = typeof b.order === "number" ? b.order : 0;
-      return orderB - orderA; // descending
+
+      if (orderA !== orderB) return orderB - orderA;
+
+      // Same order (rare but possible before normalization) → alphabetical
+      return a.title.localeCompare(b.title);
     });
   }, [layers]);
+
 
   const layerIds = useMemo(
     () => sortedLayers.map((l) => l.id),
