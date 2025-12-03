@@ -14,6 +14,8 @@ interface LayerSettingsWindowProps {
   position: { top: number; left: number } | null;
   onClose: () => void;
   onOpacityChange: (layerId: string, opacity: number) => void;
+  onRestoreOpacity: (layerId: string) => void;
+  onDeleteLayer: (layerId: string) => void;
 }
 
 export default function LayerSettingsWindow({
@@ -22,6 +24,8 @@ export default function LayerSettingsWindow({
   position,
   onClose,
   onOpacityChange,
+  onRestoreOpacity,
+  onDeleteLayer,
 }: LayerSettingsWindowProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
 
@@ -67,19 +71,19 @@ export default function LayerSettingsWindow({
     }
 
     const panel = panelRef.current;
+    const padding = 8;
+    let top = position.top;
+    let left = position.left;
+
+    // If we don't have the panel yet, use the raw position for the first paint
     if (!panel) {
-      // use raw position for the first paint; we'll adjust on the next effect
-      setAdjustedPosition(position);
+      setAdjustedPosition({ top, left });
       return;
     }
 
     const rect = panel.getBoundingClientRect();
-    const padding = 8;
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
-
-    let top = position.top;
-    let left = position.left;
 
     // If the window would overflow below the viewport, move it up
     if (top + rect.height + padding > viewportHeight) {
@@ -115,15 +119,20 @@ export default function LayerSettingsWindow({
   };
 
   const handleShow = () => {
-    onOpacityChange(layer.id, 1);
+    onRestoreOpacity(layer.id);
+  };
+
+  const handleDelete = () => {
+    onDeleteLayer(layer.id);
   };
 
   // Inline style for CSS variable used in the slider gradient
   const sliderStyle: React.CSSProperties = {
     width: "100%",
-    // Custom CSS variable consumed in the <style> block below
+    // CSS variable consumed in the <style> block below
+    // @ts-expect-error custom CSS variable
     "--value": opacityPercent,
-  } as React.CSSProperties;
+  };
 
   const effectivePosition = adjustedPosition ?? position;
 
@@ -152,31 +161,35 @@ export default function LayerSettingsWindow({
             );
           }
 
-          /* WebKit (Chrome, Edge, Safari) thumb */
           .opacity-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
             width: 14px;
             height: 14px;
             border-radius: 999px;
-            background: #074766; /* darker than primary, no border */
+            outline: none;
+            background: ${colors.selectedIcon};
             cursor: pointer;
-            margin-top: -4px; /* center thumb on 6px track */
+            margin-top: -4px;
+            border: none;
+            box-shadow: none;
           }
 
           .opacity-slider::-webkit-slider-runnable-track {
             height: 6px;
             border-radius: 999px;
-            background: transparent; /* track drawing comes from background above */
+            background: transparent;
           }
 
-          /* Firefox thumb */
           .opacity-slider::-moz-range-thumb {
             width: 14px;
             height: 14px;
             border-radius: 999px;
-            background: #074766; /* darker than primary, no border */
+            outline: none;
+            background: ${colors.selectedIcon};
             cursor: pointer;
+            border: none;
+            box-shadow: none;
           }
 
           .opacity-slider::-moz-range-track {
@@ -202,7 +215,7 @@ export default function LayerSettingsWindow({
           zIndex: 1000000,
           backgroundColor: colors.cardBackground,
           borderRadius: radii.md,
-          border: "none", // no outline
+          border: "none",
           boxShadow: shadows.subtle,
           minWidth: 260,
           maxWidth: 320,
@@ -360,40 +373,65 @@ export default function LayerSettingsWindow({
               style={{
                 marginTop: 8,
                 display: "flex",
-                justifyContent: "flex-end",
+                justifyContent: "space-between",
                 columnGap: 8,
               }}
             >
-              <button
-                type="button"
-                onClick={handleHide}
+              <div
                 style={{
-                  paddingInline: 10,
-                  paddingBlock: 4,
-                  borderRadius: radii.sm,
-                  border: `1px solid ${colors.borderStroke}`,
-                  backgroundColor: colors.cardBackground,
-                  cursor: "pointer",
-                  fontSize: typography.sizeSm,
+                  display: "flex",
+                  gap: 8,
                 }}
               >
-                Hide
-              </button>
+                <button
+                  type="button"
+                  onClick={handleHide}
+                  style={{
+                    paddingInline: 10,
+                    paddingBlock: 4,
+                    borderRadius: radii.sm,
+                    border: `1px solid ${colors.borderStroke}`,
+                    backgroundColor: colors.cardBackground,
+                    cursor: "pointer",
+                    fontSize: typography.sizeSm,
+                  }}
+                >
+                  Hide
+                </button>
+                <button
+                  type="button"
+                  onClick={handleShow}
+                  style={{
+                    paddingInline: 10,
+                    paddingBlock: 4,
+                    borderRadius: radii.sm,
+                    border: "none",
+                    backgroundColor: colors.primary,
+                    color: colors.primaryForeground,
+                    cursor: "pointer",
+                    fontSize: typography.sizeSm,
+                  }}
+                >
+                  Show
+                </button>
+              </div>
+
               <button
                 type="button"
-                onClick={handleShow}
+                onClick={handleDelete}
                 style={{
                   paddingInline: 10,
                   paddingBlock: 4,
                   borderRadius: radii.sm,
                   border: "none",
-                  backgroundColor: colors.primary,
-                  color: colors.primaryForeground,
+                  backgroundColor: colors.error,
+                  color: colors.errorForeground,
                   cursor: "pointer",
                   fontSize: typography.sizeSm,
+                  whiteSpace: "nowrap",
                 }}
               >
-                Show
+                Delete layer
               </button>
             </div>
           </div>

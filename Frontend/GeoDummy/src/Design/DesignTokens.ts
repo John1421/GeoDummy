@@ -19,6 +19,7 @@ export const colors = {
 
   // Icons
   dragIcon: "#627084",
+  selectedIcon: "#0d567aff",
 
   // Brand colors
   primary: "#0D73A5",
@@ -30,6 +31,10 @@ export const colors = {
   // Gradients
   gradientStart: "#0D73A5",
   gradientEnd: "#99E0B9",
+
+  // Errors
+  error: "#e02b1bff",
+  errorForeground: "#ffffffff",
 };
 
 export const typography = {

@@ -222,7 +222,7 @@ export default function AddNewScript({ onClose, onAddScript }: AddNewScriptProps
 
                 {/* Error */}
                 {error && (
-                    <p style={{ margin: 0, color: "#811717ff", fontFamily: typography.normalFont }}>
+                    <p style={{ margin: 0, color: colors.error, fontFamily: typography.normalFont }}>
                         {error}
                     </p>
                 )}

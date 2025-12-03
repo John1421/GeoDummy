@@ -253,7 +253,7 @@ export default function NewLayerWindow({
           <p
             style={{
               fontSize: typography.sizeSm,
-              color: "#811717ff", // red-like
+              color: colors.error,
               fontFamily: typography.normalFont,
               margin: 0,
             }}

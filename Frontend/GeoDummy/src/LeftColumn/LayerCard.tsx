@@ -8,9 +8,10 @@ import { colors, typography, radii, shadows } from "../Design/DesignTokens";
 interface LayerCardProps {
   layer: Layer;
   onSettings: (layerId: string, rect: DOMRect) => void;
+  onToggleVisibility: (layerId: string) => void;
 }
 
-function LayerCardComponent({ layer, onSettings }: LayerCardProps) {
+function LayerCardComponent({ layer, onSettings, onToggleVisibility }: LayerCardProps) {
   const {
     setNodeRef,
     attributes,
@@ -53,21 +54,28 @@ function LayerCardComponent({ layer, onSettings }: LayerCardProps) {
   // Consider the layer "hidden" when opacity is very low (you can tweak this threshold)
   const isHidden = (layer.opacity ?? 1) <= 0.01;
 
-  const handleSettingsClick = () => {
+  const handleSettingsOpen = () => {
     if (!cardRef.current) return;
     const rect = cardRef.current.getBoundingClientRect();
     onSettings(layer.id, rect);
   };
 
+  const handleToggleVisibilityClick = () => {
+    onToggleVisibility(layer.id);
+  };
+
   return (
     <div
       ref={(node) => {
-        // Attach both sortable ref and local ref to the same DOM node
         setNodeRef(node);
         cardRef.current = node;
       }}
       style={cardStyle}
       {...attributes}
+      onContextMenu={(e) => {
+        e.preventDefault();      // evita o menu do browser
+        handleSettingsOpen();    // abre as settings no right-click
+      }}
     >
       <div
         style={{
@@ -109,10 +117,10 @@ function LayerCardComponent({ layer, onSettings }: LayerCardProps) {
           {layer.title}
         </span>
 
-        {/* Visibility / settings icon (eye or eye-off) */}
+        {/* Visibility icon (eye or eye-off) */}
         <button
-          aria-label="Layer settings"
-          onClick={handleSettingsClick}
+          aria-label={isHidden ? "Show layer" : "Hide layer"}
+          onClick={handleToggleVisibilityClick}
           style={{
             padding: 4,
             borderRadius: radii.sm,

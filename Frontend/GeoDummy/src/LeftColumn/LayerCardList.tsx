@@ -24,9 +24,15 @@ interface Props {
   layers: Layer[];
   setLayers: React.Dispatch<React.SetStateAction<Layer[]>>;
   onSettings: (layerId: string, rect: DOMRect) => void;
+  onToggleVisibility: (layerId: string) => void;
 }
 
-export default function LayerCardList({ layers, setLayers, onSettings }: Props) {
+export default function LayerCardList({
+  layers,
+  setLayers,
+  onSettings,
+  onToggleVisibility,
+}: Props) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -56,7 +62,12 @@ export default function LayerCardList({ layers, setLayers, onSettings }: Props) 
     >
       <SortableContext items={layerIds} strategy={verticalListSortingStrategy}>
         {layers.map((layer) => (
-          <LayerCard key={layer.id} layer={layer} onSettings={onSettings} />
+          <LayerCard
+            key={layer.id}
+            layer={layer}
+            onSettings={onSettings}
+            onToggleVisibility={onToggleVisibility}
+          />
         ))}
       </SortableContext>
     </DndContext>
