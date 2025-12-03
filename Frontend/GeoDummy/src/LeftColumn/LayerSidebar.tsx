@@ -122,7 +122,7 @@ export default function LayerSidebar() {
         const normalized = Math.min(1, Math.max(0, opacity));
 
         // Start with current data
-        let next: Layer = { ...layer, opacity: normalized };
+        const next: Layer = { ...layer, opacity: normalized };
 
         if (normalized <= 0.01) {
           // Store the last non-zero opacity so it can be restored later
