@@ -4,8 +4,6 @@
 // and transitions. Import anywhere for consistent styling across the project.
 // -----------------------------------------------------------------------------
 
-import { MarsStroke } from "lucide-react";
-
 export const colors = {
   // Base UI
   background: "#F9FAFB",
