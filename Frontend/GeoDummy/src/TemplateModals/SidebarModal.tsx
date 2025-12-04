@@ -15,8 +15,7 @@ interface SidebarPanelProps {
 
 /**
  * Sidebar panel with collapsible behavior.
- * - Collapsed width: fixed 60px
- * - Expanded width: max(18vw, 260px)
+ * Widths are responsive and based on viewport width.
  */
 export default function SidebarPanel({
   side,
@@ -32,12 +31,13 @@ export default function SidebarPanel({
 
   const isLeft = side === "left";
 
-  const EXPANDED_WIDTH_VW = "18vw";
-  const MIN_EXPANDED_PX = "260px";
-  const COLLAPSED_WIDTH = "60px";
+// Expanded width scales with viewport but has min and max
+const EXPANDED_WIDTH = "clamp(200px, 22vw, 360px)";
 
-  const expandedWidth = `max(${EXPANDED_WIDTH_VW}, ${MIN_EXPANDED_PX})`;
-  const panelWidth = isCollapsed ? COLLAPSED_WIDTH : expandedWidth;
+// Collapsed width: icon rail, with clear min/max
+const COLLAPSED_WIDTH = "clamp(56px, 6vw, 72px)";
+
+  const panelWidth = isCollapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH;
 
   return (
     <div
@@ -59,7 +59,7 @@ export default function SidebarPanel({
         transition: "width 0.3s ease",
       }}
     >
-      {/* Header with collapse icon, title and actions */}
+      {/* Header with collapse toggle, title and actions */}
       <div
         style={{
           display: "flex",
@@ -67,6 +67,7 @@ export default function SidebarPanel({
           justifyContent: isCollapsed ? "center" : "space-between",
           height: 48,
           paddingInline: 8,
+          flexWrap: "nowrap", // do not allow header to wrap
         }}
       >
         {/* Collapse / expand toggle */}
@@ -85,6 +86,7 @@ export default function SidebarPanel({
             border: "none",
             color: colors.sidebarForeground,
             cursor: "pointer",
+            flexShrink: 0, // keep toggle button visible
           }}
         >
           {icon}
@@ -96,18 +98,24 @@ export default function SidebarPanel({
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 12,
+              gap: 0,
               paddingRight: 4,
+              minWidth: 0, // allow text area to shrink
+              flex: 1,
+              justifyContent: "flex-end", // group title and actions on the right
             }}
           >
             <h2
               style={{
                 margin: 0,
                 fontFamily: typography.titlesFont,
-                fontWeight: Number(typography.titlesStyle),
+                fontWeight: typography.titlesStyle,
                 fontSize: typography.sizeMd,
                 color: colors.sidebarForeground,
                 whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis", // keep title on one line
+                marginRight: 8, // small gap before the header icons
               }}
             >
               {title}
@@ -118,6 +126,7 @@ export default function SidebarPanel({
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
+                flexShrink: 0, // prevent icons from wrapping
               }}
             >
               {onAdd && (
@@ -139,7 +148,10 @@ export default function SidebarPanel({
                     color: colors.sidebarForeground,
                   }}
                 >
-                  <PlusIcon size={icons.size} strokeWidth={icons.strokeWidth}/>
+                  <PlusIcon
+                    size={icons.size}
+                    strokeWidth={icons.strokeWidth}
+                  />
                 </button>
               )}
 
