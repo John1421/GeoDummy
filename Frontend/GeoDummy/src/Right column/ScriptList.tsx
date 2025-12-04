@@ -47,9 +47,6 @@ export default function ScriptList() {
 
   const handleAddScript = useCallback(
     (name: string, category: string) => {
-      // Extract name from filename (remove extension)
-      
-
       const newScript: Script = {
         id: crypto.randomUUID(),
         name,
@@ -57,9 +54,14 @@ export default function ScriptList() {
         category,
       };
 
-      setScripts((prev) => [newScript, ...prev]);
+      setScripts(prev => [newScript, ...prev]);
     },
     []
+  );
+
+  // 🔥 Extrai categorias automaticamente
+  const categories = Array.from(
+    new Set(scripts.map((s) => s.category ?? "Uncategorized"))
   );
 
   return (
@@ -79,30 +81,20 @@ export default function ScriptList() {
           />
         )}
 
-        {/* TOOL CATEGORIES */}
-        <ToolCategoryToggle title="Category 1">
-          {scripts
-            .filter((s) => s.category === "Category 1" || !s.category)
-            .map((script) => (
-              <ScriptCard
-                key={script.id}
-                name={script.name}
-                description={script.description || ""}
-              />
-            ))}
-        </ToolCategoryToggle>
-
-        <ToolCategoryToggle title="Category 2">
-          {scripts
-            .filter((s) => s.category === "Category 2")
-            .map((script) => (
-              <ScriptCard
-                key={script.id}
-                name={script.name}
-                description={script.description || ""}
-              />
-            ))}
-        </ToolCategoryToggle>
+        {/* 🔥 Renderização automática das categorias */}
+        {categories.map((category) => (
+          <ToolCategoryToggle key={category} title={category}>
+            {scripts
+              .filter((script) => script.category === category)
+              .map((script) => (
+                <ScriptCard
+                  key={script.id}
+                  name={script.name}
+                  description={script.description || ""}
+                />
+              ))}
+          </ToolCategoryToggle>
+        ))}
       </SidebarPanel>
     </>
   );
