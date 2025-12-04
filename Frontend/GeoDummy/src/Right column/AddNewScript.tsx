@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { FolderOpen, Plus } from "lucide-react";
 import WindowTemplate from "../TemplateModals/PopUpWindowModal";
 import { colors, typography, radii, spacing, icons } from "../Design/DesignTokens";
-import ParamMenu from "./ParamMenu";
 
 type AddNewScriptProps = {
     onClose: () => void;
@@ -14,7 +13,8 @@ export default function AddNewScript({ onClose, onAddScript }: AddNewScriptProps
     const [category, setCategory] = useState("");
     const [name, setName] = useState("");
     const [error, setError] = useState<string | null>(null);
-    const[menuOpen, setMenuOpen]=useState(false);
+    const [paramsOpen, setParamsOpen] = useState(false);
+    const [selectedParams, setSelectedParams] = useState<string[]>([]);
 
     useEffect(() => {
         // reset when opened (component is mounted each time in current usage)
@@ -22,6 +22,8 @@ export default function AddNewScript({ onClose, onAddScript }: AddNewScriptProps
         setCategory("");
         setName("");
         setError(null);
+        setParamsOpen(false);
+        setSelectedParams([]);
     }, []);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -30,9 +32,12 @@ export default function AddNewScript({ onClose, onAddScript }: AddNewScriptProps
         setSelectedFileName(file.name);
     };
 
-    const handleSelectParam = (type: string) => {
-        console.log("Clicked param:", type);
-        setMenuOpen(false);
+    const handleParamToggle = (paramType: string) => {
+        setSelectedParams((prev) =>
+            prev.includes(paramType)
+                ? prev.filter((p) => p !== paramType)
+                : [...prev, paramType]
+        );
     };
 
     const handleUpload = () => {
@@ -177,25 +182,57 @@ export default function AddNewScript({ onClose, onAddScript }: AddNewScriptProps
                         </div>
                     </div>
 
-                {/* Parameters */}
-                <div className="relative w-full">
-                    <div className="flex items-center justify-between">
-                        <h4 className="text-md font-semibold">Parameters</h4>
+                {/* Parameters Toggle */}
+                <div style={{ borderBottom: `1px solid ${colors.borderStroke}` }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <h4 style={{ margin: 0, fontSize: typography.sizeMd, fontWeight: 600, color: colors.foreground, fontFamily: typography.normalFont }}>Parameters</h4>
 
                         <Plus
                             size={20}
-                            onClick={() => setMenuOpen((prev) => !prev)}
-                            className="cursor-pointer"
+                            onClick={() => setParamsOpen(!paramsOpen)}
+                            style={{ cursor: "pointer", color: colors.foreground }}
                         />
                     </div>
 
-                    {/** O dropdown aparece aqui */}
-                    <ParamMenu
-                        open={menuOpen}
-                        onSelect={handleSelectParam}
-                        onClose={() => setMenuOpen(false)}
-                    />
+                    {paramsOpen && (
+                        <div style={{ padding: `${spacing.md} 0`, display: "flex", flexDirection: "column", gap: spacing.sm }}>
+                            <button
+                                onClick={() => handleParamToggle("number")}
+                                style={{
+                                    padding: `${spacing.sm} ${spacing.md}`,
+                                    backgroundColor: selectedParams.includes("number") ? colors.primary : colors.cardBackground,
+                                    color: selectedParams.includes("number") ? colors.primaryForeground : colors.foreground,
+                                    border: `1px solid ${colors.borderStroke}`,
+                                    borderRadius: radii.md,
+                                    fontSize: typography.sizeSm,
+                                    fontFamily: typography.normalFont,
+                                    cursor: "pointer",
+                                    transition: "all 0.2s",
+                                }}
+                            >
+                                Number
+                            </button>
+
+                            <button
+                                onClick={() => handleParamToggle("type")}
+                                style={{
+                                    padding: `${spacing.sm} ${spacing.md}`,
+                                    backgroundColor: selectedParams.includes("type") ? colors.primary : colors.cardBackground,
+                                    color: selectedParams.includes("type") ? colors.primaryForeground : colors.foreground,
+                                    border: `1px solid ${colors.borderStroke}`,
+                                    borderRadius: radii.md,
+                                    fontSize: typography.sizeSm,
+                                    fontFamily: typography.normalFont,
+                                    cursor: "pointer",
+                                    transition: "all 0.2s",
+                                }}
+                            >
+                                Type
+                            </button>
+                        </div>
+                    )}
                 </div>
+
                 {/* Error */}
                 {error && (
                     <p style={{ margin: 0, color: colors.error, fontFamily: typography.normalFont }}>

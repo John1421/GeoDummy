@@ -1,4 +1,5 @@
 import { useRef, useEffect } from "react";
+import { colors, radii, spacing } from "../Design/DesignTokens";
 
 function ParamMenu({
     open,
@@ -31,17 +32,63 @@ function ParamMenu({
     return (
         <div
             ref={menuRef}
-            className="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg w-40 z-[9999]"
+            style={{
+                position: "absolute",
+                top: "100%",
+                left: 0,
+                marginTop: spacing.sm,
+                backgroundColor: colors.cardBackground,
+                border: `1px solid ${colors.borderStroke}`,
+                borderRadius: radii.md,
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
+                minWidth: 160,
+                zIndex: 9999,
+                overflow: "hidden",
+            }}
         >
             <button
-                className="w-full text-left px-4 py-2 hover:bg-gray-100"
+                style={{
+                    width: "100%",
+                    textAlign: "left",
+                    padding: `${spacing.sm} ${spacing.md}`,
+                    backgroundColor: colors.cardBackground,
+                    color: colors.foreground,
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    transition: "background-color 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = "rgba(0, 0, 0, 0.05)";
+                }}
+                onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = colors.cardBackground;
+                }}
                 onClick={() => onSelect("number")}
             >
                 Number
             </button>
 
+            <div style={{ borderBottom: `1px solid ${colors.borderStroke}` }} />
+
             <button
-                className="w-full text-left px-4 py-2 hover:bg-gray-100"
+                style={{
+                    width: "100%",
+                    textAlign: "left",
+                    padding: `${spacing.sm} ${spacing.md}`,
+                    backgroundColor: colors.cardBackground,
+                    color: colors.foreground,
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    transition: "background-color 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = "rgba(0, 0, 0, 0.05)";
+                }}
+                onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = colors.cardBackground;
+                }}
                 onClick={() => onSelect("type")}
             >
                 Type
