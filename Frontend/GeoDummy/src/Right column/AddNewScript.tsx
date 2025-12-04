@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { FolderOpen, Plus } from "lucide-react";
 import WindowTemplate from "../TemplateModals/PopUpWindowModal";
 import { colors, typography, radii, spacing, icons } from "../Design/DesignTokens";
+import ParamMenu from "./ParamMenu";
 
 type AddNewScriptProps = {
     onClose: () => void;
@@ -13,6 +14,7 @@ export default function AddNewScript({ onClose, onAddScript }: AddNewScriptProps
     const [category, setCategory] = useState("");
     const [name, setName] = useState("");
     const [error, setError] = useState<string | null>(null);
+    const[menuOpen, setMenuOpen]=useState(false);
 
     useEffect(() => {
         // reset when opened (component is mounted each time in current usage)
@@ -26,6 +28,11 @@ export default function AddNewScript({ onClose, onAddScript }: AddNewScriptProps
         const file = e.target.files?.[0];
         if (!file) return;
         setSelectedFileName(file.name);
+    };
+
+    const handleSelectParam = (type: string) => {
+        console.log("Clicked param:", type);
+        setMenuOpen(false);
     };
 
     const handleUpload = () => {
@@ -171,20 +178,24 @@ export default function AddNewScript({ onClose, onAddScript }: AddNewScriptProps
                     </div>
 
                 {/* Parameters */}
-                <div
-                    style={{
-                        display: "flex",
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                    }}
-                >
-                    <h4 style={{ margin: 0, fontSize: typography.sizeMd, fontWeight: 600 }}>
-                        Parameters
-                    </h4>
-                    <Plus size={icons.size} strokeWidth={icons.strokeWidth} style={{ color: colors.foreground, cursor: "pointer" }} />
-                </div>
+                <div className="relative w-full">
+                    <div className="flex items-center justify-between">
+                        <h4 className="text-md font-semibold">Parameters</h4>
 
+                        <Plus
+                            size={20}
+                            onClick={() => setMenuOpen((prev) => !prev)}
+                            className="cursor-pointer"
+                        />
+                    </div>
+
+                    {/** O dropdown aparece aqui */}
+                    <ParamMenu
+                        open={menuOpen}
+                        onSelect={handleSelectParam}
+                        onClose={() => setMenuOpen(false)}
+                    />
+                </div>
                 {/* Error */}
                 {error && (
                     <p style={{ margin: 0, color: colors.error, fontFamily: typography.normalFont }}>
