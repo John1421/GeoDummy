@@ -59,10 +59,9 @@ export default function ScriptList() {
     []
   );
 
-  // 🔥 Extrai categorias automaticamente
   const categories = Array.from(
     new Set(scripts.map((s) => s.category ?? "Uncategorized"))
-  );
+  ).sort();
 
   return (
     <>
@@ -81,7 +80,7 @@ export default function ScriptList() {
           />
         )}
 
-        {/* 🔥 Renderização automática das categorias */}
+        {/* Renderização automática das categorias */}
         {categories.map((category) => (
           <ToolCategoryToggle key={category} title={category}>
             {scripts
