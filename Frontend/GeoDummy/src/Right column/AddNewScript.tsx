@@ -34,9 +34,7 @@ export default function AddNewScript({ onClose, onAddScript }: AddNewScriptProps
 
     const handleParamToggle = (paramType: string) => {
         setSelectedParams((prev) =>
-            prev.includes(paramType)
-                ? prev.filter((p) => p !== paramType)
-                : [...prev, paramType]
+            prev.includes(paramType) ? [] : [paramType]
         );
     };
 
