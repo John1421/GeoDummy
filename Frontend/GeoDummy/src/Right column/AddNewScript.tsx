@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { FolderOpen, Plus } from "lucide-react";
 import WindowTemplate from "../TemplateModals/PopUpWindowModal";
 import { colors, typography, radii, spacing, icons } from "../Design/DesignTokens";
@@ -6,9 +6,10 @@ import { colors, typography, radii, spacing, icons } from "../Design/DesignToken
 type AddNewScriptProps = {
     onClose: () => void;
     onAddScript: (name: string, category: string, description: string) => void;
+    existingCategories: string[];
 };
 
-export default function AddNewScript({ onClose, onAddScript }: AddNewScriptProps) {
+export default function AddNewScript({ onClose, onAddScript, existingCategories }: AddNewScriptProps) {
     const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
     const [category, setCategory] = useState("");
     const [name, setName] = useState("");
@@ -53,6 +54,23 @@ export default function AddNewScript({ onClose, onAddScript }: AddNewScriptProps
         // Close the modal
         onClose();
     };
+    const [showDropdown, setShowDropdown] = useState(false);
+
+    const filteredCategories = existingCategories.filter((cat) =>
+        cat.toLowerCase().includes(category.toLowerCase())
+        );
+
+    const wrapperRef = useRef<HTMLDivElement | null>(null);
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+                setShowDropdown(false);
+            }
+        }
+
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     return (
         <WindowTemplate isOpen={true} onClose={onClose} title="Add New Script">
@@ -148,39 +166,77 @@ export default function AddNewScript({ onClose, onAddScript }: AddNewScriptProps
                     </div>
                 </div>
                 
-                    <div style={{ display: "flex", alignItems: "center", columnGap: 16 }}>
+                    <div style={{ display: "flex", alignItems: "center", columnGap: 16, position: "relative" }}>
                         <label
                             style={{
-                                width: 120,
-                                fontSize: typography.sizeSm,
-                                fontWeight: 600,
-                                color: colors.foreground,
-                                fontFamily: typography.normalFont,
+                            width: 120,
+                            fontSize: typography.sizeSm,
+                            fontWeight: 600,
+                            color: colors.foreground,
+                            fontFamily: typography.normalFont,
                             }}
                         >
                             Category
                         </label>
-                        <div style={{ flex: 1 }}>
+
+                        <div ref={wrapperRef} style={{ flex: 1, position: "relative" }}>
+
                             <input
-                                value={category}
-                                onChange={(e) => setCategory(e.target.value)}
-                                placeholder="e.g. Analysis"
-                                style={{
-                                    width: "100%",
-                                    paddingInline: 12,
-                                    paddingBlock: 8,
-                                    borderRadius: radii.md,
-                                    borderStyle: "solid",
-                                    borderWidth: 1,
-                                    backgroundColor: colors.cardBackground,
-                                    borderColor: colors.borderStroke,
-                                    outline: "none",
-                                    fontSize: typography.sizeSm,
-                                    fontFamily: typography.normalFont,
-                                }}
+                            value={category}
+                            onChange={(e) => setCategory(e.target.value)}
+                            placeholder="e.g. Analysis"
+                            onFocus={() => setShowDropdown(true)}
+                            style={{
+                                width: "100%",
+                                paddingInline: 12,
+                                paddingBlock: 8,
+                                borderRadius: radii.md,
+                                borderStyle: "solid",
+                                borderWidth: 1,
+                                backgroundColor: colors.cardBackground,
+                                borderColor: colors.borderStroke,
+                                outline: "none",
+                                fontSize: typography.sizeSm,
+                                fontFamily: typography.normalFont,
+                            }}
                             />
+
+                            {/* Dropdown */}
+                            {showDropdown && filteredCategories.length > 0 && (
+                            <div
+                                style={{
+                                position: "absolute",
+                                top: "100%",
+                                left: 120,
+                                right: 0,
+                                background: colors.cardBackground,
+                                border: `1px solid ${colors.borderStroke}`,
+                                borderRadius: radii.md,
+                                marginTop: 4,
+                                zIndex: 10,
+                                }}
+                            >
+                                {filteredCategories.map((cat) => (
+                                <div
+                                    key={cat}
+                                    onClick={() => {
+                                    setCategory(cat);
+                                    setShowDropdown(false);
+                                    }}
+                                    style={{
+                                    padding: "8px 12px",
+                                    cursor: "pointer",
+                                    fontFamily: typography.normalFont,
+                                    }}
+                                >
+                                    {cat}
+                                </div>
+                                ))}
+                            </div>
+                            )}
                         </div>
                     </div>
+
                     <div style={{ display: "flex", alignItems: "center", columnGap: 16 }}>
                         <label
                             style={{

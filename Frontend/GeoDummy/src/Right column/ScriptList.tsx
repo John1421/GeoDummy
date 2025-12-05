@@ -93,6 +93,7 @@ const categories = Array.from(
           <AddNewScript
             onClose={() => setShowAddNew(false)}
             onAddScript={handleAddScript}
+            existingCategories={categories}
           />
         )}
 
