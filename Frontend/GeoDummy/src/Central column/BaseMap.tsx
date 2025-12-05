@@ -40,8 +40,6 @@ function BaseMap({ initialUrl }: { initialUrl: string }) {
     }
   }, [currentBaseMapUrl]);
 
-  // This function is for demonstration and to fulfill the previous task's export.
-  // In a real application, you might use a context API or Redux for global state.
   useEffect(() => {
     setCurrentBaseMapUrl(initialUrl);
   }, [initialUrl]);
