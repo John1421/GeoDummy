@@ -5,7 +5,7 @@ import { colors, typography, radii, spacing, icons } from "../Design/DesignToken
 
 type AddNewScriptProps = {
     onClose: () => void;
-    onAddScript: (name: string, category: string) => void;
+    onAddScript: (name: string, category: string, description: string) => void;
 };
 
 export default function AddNewScript({ onClose, onAddScript }: AddNewScriptProps) {
@@ -15,6 +15,7 @@ export default function AddNewScript({ onClose, onAddScript }: AddNewScriptProps
     const [error, setError] = useState<string | null>(null);
     const [paramsOpen, setParamsOpen] = useState(false);
     const [selectedParams, setSelectedParams] = useState<string[]>([]);
+    const [description, setDescription] = useState("");
 
     useEffect(() => {
         // reset when opened (component is mounted each time in current usage)
@@ -24,6 +25,7 @@ export default function AddNewScript({ onClose, onAddScript }: AddNewScriptProps
         setError(null);
         setParamsOpen(false);
         setSelectedParams([]);
+        setDescription("");
     }, []);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,7 +48,7 @@ export default function AddNewScript({ onClose, onAddScript }: AddNewScriptProps
         }
 
         // Call parent handler with the form data
-        onAddScript(name, category);
+        onAddScript(name, category, description);
 
         // Close the modal
         onClose();
@@ -77,7 +79,7 @@ export default function AddNewScript({ onClose, onAddScript }: AddNewScriptProps
                             <input
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
-                                placeholder="e.g. 1"
+                                placeholder="e.g. Tree Height Analyzer"
                                 style={{
                                     width: "100%",
                                     paddingInline: 12,
@@ -179,7 +181,39 @@ export default function AddNewScript({ onClose, onAddScript }: AddNewScriptProps
                             />
                         </div>
                     </div>
-
+                    <div style={{ display: "flex", alignItems: "center", columnGap: 16 }}>
+                        <label
+                            style={{
+                                width: 120,
+                                fontSize: typography.sizeSm,
+                                fontWeight: 600,
+                                color: colors.foreground,
+                                fontFamily: typography.normalFont,
+                            }}
+                        >
+                            Description
+                        </label>
+                        <div style={{ flex: 1 }}>
+                            <input
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                placeholder="e.g. A tool to analyze tree heights"
+                                style={{
+                                    width: "100%",
+                                    paddingInline: 12,
+                                    paddingBlock: 8,
+                                    borderRadius: radii.md,
+                                    borderStyle: "solid",
+                                    borderWidth: 1,
+                                    backgroundColor: colors.cardBackground,
+                                    borderColor: colors.borderStroke,
+                                    outline: "none",
+                                    fontSize: typography.sizeSm,
+                                    fontFamily: typography.normalFont,
+                                }}
+                            />
+                        </div>
+                    </div>
                 {/* Parameters Toggle */}
                 <div style={{ borderBottom: `1px solid ${colors.borderStroke}` }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -205,7 +239,6 @@ export default function AddNewScript({ onClose, onAddScript }: AddNewScriptProps
                                     fontSize: typography.sizeSm,
                                     fontFamily: typography.normalFont,
                                     cursor: "pointer",
-                                    transition: "all 0.2s",
                                 }}
                             >
                                 Number
@@ -222,7 +255,6 @@ export default function AddNewScript({ onClose, onAddScript }: AddNewScriptProps
                                     fontSize: typography.sizeSm,
                                     fontFamily: typography.normalFont,
                                     cursor: "pointer",
-                                    transition: "all 0.2s",
                                 }}
                             >
                                 Type

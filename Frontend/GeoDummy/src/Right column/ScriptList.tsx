@@ -46,12 +46,20 @@ export default function ScriptList() {
   const [scripts, setScripts] = useState<Script[]>(EXAMPLE_SCRIPTS);
 
   const handleAddScript = useCallback(
-    (name: string, category: string) => {
+    (name: string, category: string, description: string) => {
+      const cleanCategory =
+        category.trim().length > 0
+          ? category.trim().replace(/\s+/g, " ").toLowerCase()
+          : "uncategorized";
+
+      const formattedCategory =
+        cleanCategory.charAt(0).toUpperCase() + cleanCategory.slice(1);
+
       const newScript: Script = {
         id: crypto.randomUUID(),
         name,
-        description: `${category} script`,
-        category,
+        description,
+        category: formattedCategory,
       };
 
       setScripts(prev => [newScript, ...prev]);
@@ -59,9 +67,17 @@ export default function ScriptList() {
     []
   );
 
-  const categories = Array.from(
-    new Set(scripts.map((s) => s.category ?? "Uncategorized"))
-  ).sort();
+
+const categories = Array.from(
+    new Set(
+      scripts.map((s) =>
+        (s.category ?? "Uncategorized").trim().replace(/\s+/g, " ").toLowerCase()
+      )
+    )
+  )
+    .map(c => c.charAt(0).toUpperCase() + c.slice(1))
+    .sort();
+
 
   return (
     <>
@@ -84,7 +100,7 @@ export default function ScriptList() {
         {categories.map((category) => (
           <ToolCategoryToggle key={category} title={category}>
             {scripts
-              .filter((script) => script.category === category)
+              .filter((script) => script.category?.toLowerCase() === category.toLowerCase())
               .map((script) => (
                 <ScriptCard
                   key={script.id}
