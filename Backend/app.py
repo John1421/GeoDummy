@@ -4,6 +4,7 @@ from werkzeug.exceptions import HTTPException, BadRequest
 import geopandas as gpd
 import shutil
 import os
+import ast
 import zipfile
 import FileManager
 from BasemapManager import BasemapManager
@@ -15,6 +16,8 @@ CORS(app,origins=["http://localhost:5173"])
 file_manager = FileManager.FileManager()
 basemap_manager = BasemapManager()
 layer_manager = LayerManager()
+
+ALLOWED_EXTENSIONS = {'.geojson', '.shp', '.gpkg', '.tif', '.tiff'}
 
 @app.errorhandler(HTTPException)
 def handle_http_exception(e):
@@ -201,6 +204,52 @@ def script_metadata(script_id):
 
     return jsonify({"script_id": script_id, "output": "Metadata here"}), 200
 
+@app.route('/scripts/<script_id>/inspect', methods=['GET'])
+def script_in_out_inspect(script_id):
+    if not script_id:
+        raise BadRequest("script_id parameter is required")
+    
+    script_path = f'scripts/{script_id}'
+
+    if not os.path.exists(script_path):
+        raise BadRequest("script was not found")
+    
+    inputs = []
+    outputs = []
+    
+    with open(script_path, "r") as file:
+        tree = ast.parse(file.read(), filename = script_path)
+
+    for node in ast.walk(tree):
+
+        # Detect variables assigned to folder paths (strings)
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant):
+            if isinstance(node.value.value, str):
+                path = node.value.value.lower()
+
+                # Checks all targets for the assignment 
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        name = target.id
+                        #simple heuristics to detect files of allowed extensions or folders
+                        if os.path.isdir(path):
+                            inputs.append({"type": "folder", "name": name, "path": path})
+                        elif any(path.endswith(ext) for ext in ALLOWED_EXTENSIONS):
+                            outputs.append({"type": "file", "name": name, "path": path})
+
+
+        # Detect calls to GeoDataFrame.to_file (writing output shapefiles)
+        if isinstance(node, ast.Call) and hasattr(node.func, "attr"):
+            if node.func.attr == "to_file":
+                if node.args:
+                    arg = node.args[0]
+                    if isinstance(arg, ast.Constant):
+                        path = arg.value.lower()
+                        if any(path.endswith(ext) for ext in ALLOWED_EXTENSIONS):
+                            outputs.append({"type": "file", "name": "to_file", "path": path})
+
+
+    return jsonify({"inputs": inputs, "outputs": outputs})
 
 
 # Script Execution Endpoints
