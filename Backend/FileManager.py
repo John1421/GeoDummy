@@ -16,6 +16,8 @@ class FileManager:
         
         Parameters:
             layers_dir (str): Path for layer files.
+            temporary (str): Path for temporary files.
+            scripts (str): Path for script tools
         """
         self.layers_dir = layers_dir
         self.temp_dir = temp_dir

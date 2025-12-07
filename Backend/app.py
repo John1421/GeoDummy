@@ -138,8 +138,6 @@ def add_file():
 
     return jsonify({"message": f"File added successfully"}), 200
 
-    
-
 @app.route('/files/<file_id>', methods=['GET'])
 def export_file(file_id):
 
@@ -284,7 +282,6 @@ def get_script_status(script_id):
 
     return jsonify({"script_id": script_id, "status": "running"}), 200
 
-
 @app.route('/execute_script/<script_id>/output', methods=['GET'])
 def get_script_output(script_id):
     if not script_id:
@@ -424,10 +421,30 @@ def extract_data_from_layer_for_table_view(layer_id):
     if not layer_id:
         raise BadRequest("layer_id parameter is required")
 
-    # TODO: extract data from file
+    _, file_name_ext = os.path.splitext(layer_id)
 
-    table_data = [{"name": "Feature 1", "type": "Polygon"}, {"name": "Feature 2", "type": "Line"}]
-    return jsonify({"layer_id": layer_id, "table_data": table_data}), 200
+    # Check if the file extension in supported
+    if file_name_ext.lower() != '.gpkg':
+        raise BadRequest("layer format not supported")
+    
+    layer_path = os.path.join(file_manager.layers_dir, layer_id)
+    total_data = {}
+    
+    # Extracts all internal layers from the .gpkg file
+    internal_layers = gpd.list_layers(layer_path)
+
+    # Iterating though all the internal alyers
+    for internal_layer in internal_layers["name"]:
+        # Read all the data from the layer
+        geo_data_frame = gpd.read_file(layer_path, layer=internal_layer)
+
+        # Drop the geometric data, keeping only attributes
+        table_data = geo_data_frame.drop(columns = "geometry")
+
+        # Add the new internal_layer entry with its name as a key and the table data as the values
+        total_data[internal_layer] = table_data.to_dict(orient = "records")
+
+    return jsonify(total_data), 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
