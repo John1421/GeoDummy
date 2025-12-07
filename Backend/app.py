@@ -433,7 +433,7 @@ def extract_data_from_layer_for_table_view(layer_id):
     # Extracts all internal layers from the .gpkg file
     internal_layers = gpd.list_layers(layer_path)
 
-    # Iterating though all the internal alyers
+    # Iterating though all the internal layers by name
     for internal_layer in internal_layers["name"]:
         # Read all the data from the layer
         geo_data_frame = gpd.read_file(layer_path, layer=internal_layer)
