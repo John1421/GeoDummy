@@ -26,7 +26,7 @@ class FileManager:
         # Create directories if they don't exist
         os.makedirs(self.layers_dir, exist_ok = True)
         os.makedirs(self.temp_dir, exist_ok = True)
-        os.makedirs(self.temp_dir, exists_ok = True)
+        os.makedirs(self.scripts_dir, exist_ok = True)
 
 
     def move_file(self, source_path, destination_path):
