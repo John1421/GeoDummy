@@ -13,7 +13,10 @@ RUN if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.
 # Copiar o resto do código para dentro do container
 COPY . .
 
-# Change ownership of the dist folder (optional but recommended)
+# Create group and user before changing ownership
+RUN groupadd -r appgroup && useradd -r -g appgroup user
+
+# Change ownership of the /app folder
 RUN chown -R user:appgroup /app
 
 # Switch to the new user
