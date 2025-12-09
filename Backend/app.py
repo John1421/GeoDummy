@@ -446,13 +446,16 @@ def set_layer_priority(layer_id,priority):
 
 # Layer Information Endpoints
 
+'''
+Use Case: UC-B-020
+'''
 @app.route('/layers/<layer_id>/information', methods=['GET'])
 def identify_layer_information(layer_id):
     try:
         info = layer_manager.get_layer_information(layer_id)
         return jsonify({"layer_id": layer_id, "info": info}), 200
     except ValueError as e:
-        return jsonify({"error": str(e)}), 404
+        raise ValueError(f"Error in identifying layer information: {e}")
 
 '''
 Use Case: UC-B-022
