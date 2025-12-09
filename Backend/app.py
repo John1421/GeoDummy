@@ -11,9 +11,12 @@ import FileManager
 from BasemapManager import BasemapManager
 from LayerManager import LayerManager
 from ScriptManager import ScriptManager
+from DataManager import DataManager
 from flask_cors import CORS
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
+
+ALLOWED_EXTENSIONS = {'.geojson', '.shp', '.gpkg', '.tif', '.tiff'}
 
 app = Flask(__name__)
 CORS(app,origins=["http://localhost:5173"])
@@ -21,11 +24,9 @@ file_manager = FileManager.FileManager()
 basemap_manager = BasemapManager()
 layer_manager = LayerManager()
 script_manager = ScriptManager()
+data_manager = DataManager()
 
-ALLOWED_EXTENSIONS = {'.geojson', '.shp', '.gpkg', '.tif', '.tiff'}
 
-# Cached results (manual TTL cache)
-TABLE_CACHE = {}  # { cache_key: { "expires": datetime, "data": {...} } }
 
 @app.errorhandler(HTTPException)
 def handle_http_exception(e):
@@ -458,53 +459,6 @@ Use Case: UC-B-022
 '''
 @app.route('/layers/<layer_id>/table', methods=['GET'])
 def extract_data_from_layer_for_table_view(layer_id):
-    '''UC-B-022 formatting rules.'''
-    def format_value(value):
-        # Null-safe
-        if value is None:
-            return None
-
-        # Boolean → "Yes"/"No"
-        if isinstance(value, bool):
-            return "Yes" if value else "No"
-
-        # Integer formatting → thousand separators
-        if isinstance(value, int):
-            return f"{value:,}"
-
-        # Float formatting → 2 decimals + thousand separator
-        if isinstance(value, float):
-            return f"{value:,.2f}"
-
-        # Datetime → ISO8601
-        if isinstance(value, datetime):
-            return value.isoformat()
-
-        # Strings → truncate above 100 chars
-        if isinstance(value, str):
-            if len(value) > 100:
-                return value[:100] + "..."
-            return value
-
-        # Fallback safe string
-        return str(value)
-
-    '''Infer type for header metadata.'''
-    def detect_type(value):
-        if value is None:
-            return "null"
-        if isinstance(value, bool):
-            return "boolean"
-        if isinstance(value, int):
-            return "int"
-        if isinstance(value, float):
-            return "float"
-        if isinstance(value, datetime):
-            return "datetime"
-        if isinstance(value, str):
-            return "string"
-        return "string"
-
     if not layer_id:
         raise BadRequest("layer_id parameter is required")
 
@@ -526,7 +480,14 @@ def extract_data_from_layer_for_table_view(layer_id):
     sort_field = request.args.get("sort")
     sort_dir = request.args.get("dir", "asc").lower()
 
-    # Caching
+    # Read internal layer
+    # UC-B-022 assumes that frontend requests one internal layer at a time
+    # GET /layers/x.gpkg/table?layer=buildings
+    layer_name = request.args.get("layer")
+    if not layer_name:
+        raise BadRequest("Missing ?layer={internal_layer_name}")
+    
+    # Checking cache before reading
     cache_key = json.dumps({
         "layer": layer_id,
         "internal_layer": layer_name,
@@ -536,18 +497,11 @@ def extract_data_from_layer_for_table_view(layer_id):
         "dir": sort_dir
     })
 
-    if cache_key in TABLE_CACHE:
-        cached = TABLE_CACHE[cache_key]
-        if datetime.now(timezone.utc) < cached["expires"]:
-            return jsonify(cached["data"]), 200
-        
-    # Read internal layer
-    # UC-B-022 assumes that frontend requests one internal layer at a time
-    # GET /layers/x.gpkg/table?layer=buildings
-    layer_name = request.args.get("layer")
-    if not layer_name:
-        raise BadRequest("Missing ?layer={internal_layer_name}")
+    response = data_manager.check_cache(cache_key)
+    if response:
+        return jsonify(response), 200
 
+    # If not in cache, proceed as normal
     gdf = gpd.read_file(layer_path, layer=layer_name)
 
     # Drop geometry — table display only
@@ -573,7 +527,7 @@ def extract_data_from_layer_for_table_view(layer_id):
     for col in gdf.columns:
         headers.append({
             "name": col,
-            "type": detect_type(sample_row.get(col)),
+            "type": data_manager.detect_type(sample_row.get(col)),
             "sortable": True  # All non-geometry fields are sortable
         })
 
@@ -584,7 +538,7 @@ def extract_data_from_layer_for_table_view(layer_id):
     for _, row in page_df.iterrows():
         formatted = {}
         for col, value in row.items():
-            formatted[col] = format_value(value)
+            formatted[col] = data_manager.format_value_for_table_view(value)
 
             if value is None:
                 warnings.add(f"Null value detected in field '{col}'")
@@ -606,10 +560,7 @@ def extract_data_from_layer_for_table_view(layer_id):
     }
 
     # Caching the data
-    TABLE_CACHE[cache_key] = {
-        "data": response_data,
-        "expires": datetime.now(timezone.utc) + timedelta(minutes=5)
-    }
+    data_manager.insert_to_cache(cache_key, response_data, 5)
 
     return jsonify(response_data), 200
 
