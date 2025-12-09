@@ -1,4 +1,5 @@
 
+import json
 from flask import Flask, request, after_this_request, jsonify, send_file
 from werkzeug.exceptions import HTTPException, BadRequest
 import geopandas as gpd
@@ -11,6 +12,8 @@ from BasemapManager import BasemapManager
 from LayerManager import LayerManager
 from ScriptManager import ScriptManager
 from flask_cors import CORS
+from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 
 app = Flask(__name__)
 CORS(app,origins=["http://localhost:5173"])
@@ -20,6 +23,9 @@ layer_manager = LayerManager()
 script_manager = ScriptManager()
 
 ALLOWED_EXTENSIONS = {'.geojson', '.shp', '.gpkg', '.tif', '.tiff'}
+
+# Cached results (manual TTL cache)
+TABLE_CACHE = {}  # { cache_key: { "expires": datetime, "data": {...} } }
 
 @app.errorhandler(HTTPException)
 def handle_http_exception(e):
@@ -231,6 +237,7 @@ def script_metadata(script_id):
     # TODO: retrieve metadata
 
     return jsonify({"script_id": script_id, "output": "Metadata here"}), 200
+
 
 @app.route('/scripts/<script_id>/inspect', methods=['GET'])
 def script_in_out_inspect(script_id):
@@ -446,8 +453,58 @@ def identify_layer_information(layer_id):
     except ValueError as e:
         return jsonify({"error": str(e)}), 404
 
+'''
+Use Case: UC-B-022
+'''
 @app.route('/layers/<layer_id>/table', methods=['GET'])
 def extract_data_from_layer_for_table_view(layer_id):
+    '''UC-B-022 formatting rules.'''
+    def format_value(value):
+        # Null-safe
+        if value is None:
+            return None
+
+        # Boolean → "Yes"/"No"
+        if isinstance(value, bool):
+            return "Yes" if value else "No"
+
+        # Integer formatting → thousand separators
+        if isinstance(value, int):
+            return f"{value:,}"
+
+        # Float formatting → 2 decimals + thousand separator
+        if isinstance(value, float):
+            return f"{value:,.2f}"
+
+        # Datetime → ISO8601
+        if isinstance(value, datetime):
+            return value.isoformat()
+
+        # Strings → truncate above 100 chars
+        if isinstance(value, str):
+            if len(value) > 100:
+                return value[:100] + "..."
+            return value
+
+        # Fallback safe string
+        return str(value)
+
+    '''Infer type for header metadata.'''
+    def detect_type(value):
+        if value is None:
+            return "null"
+        if isinstance(value, bool):
+            return "boolean"
+        if isinstance(value, int):
+            return "int"
+        if isinstance(value, float):
+            return "float"
+        if isinstance(value, datetime):
+            return "datetime"
+        if isinstance(value, str):
+            return "string"
+        return "string"
+
     if not layer_id:
         raise BadRequest("layer_id parameter is required")
 
@@ -458,23 +515,103 @@ def extract_data_from_layer_for_table_view(layer_id):
         raise BadRequest("layer format not supported")
     
     layer_path = os.path.join(file_manager.layers_dir, layer_id)
-    total_data = {}
-    
-    # Extracts all internal layers from the .gpkg file
-    internal_layers = gpd.list_layers(layer_path)
+    if not os.path.exists(layer_path):
+        raise BadRequest("layer not found")
 
-    # Iterating though all the internal layers by name
-    for internal_layer in internal_layers["name"]:
-        # Read all the data from the layer
-        geo_data_frame = gpd.read_file(layer_path, layer=internal_layer)
+    # Query parameters
+    # Extracts query parameters from the URL, applying defaults if they are not provided
+    # Sorting's default is subentended as no sorting, hence no default value
+    page = int(request.args.get("page", 1))
+    page_size = int(request.args.get("page_size", 50))
+    sort_field = request.args.get("sort")
+    sort_dir = request.args.get("dir", "asc").lower()
 
-        # Drop the geometric data, keeping only attributes
-        table_data = geo_data_frame.drop(columns = "geometry")
+    # Caching
+    cache_key = json.dumps({
+        "layer": layer_id,
+        "internal_layer": layer_name,
+        "page": page,
+        "page_size": page_size,
+        "sort": sort_field,
+        "dir": sort_dir
+    })
 
-        # Add the new internal_layer entry with its name as a key and the table data as the values
-        total_data[internal_layer] = table_data.to_dict(orient = "records")
+    if cache_key in TABLE_CACHE:
+        cached = TABLE_CACHE[cache_key]
+        if datetime.now(timezone.utc) < cached["expires"]:
+            return jsonify(cached["data"]), 200
+        
+    # Read internal layer
+    # UC-B-022 assumes that frontend requests one internal layer at a time
+    # GET /layers/x.gpkg/table?layer=buildings
+    layer_name = request.args.get("layer")
+    if not layer_name:
+        raise BadRequest("Missing ?layer={internal_layer_name}")
 
-    return jsonify(total_data), 200
+    gdf = gpd.read_file(layer_path, layer=layer_name)
+
+    # Drop geometry — table display only
+    if "geometry" in gdf.columns:
+        gdf = gdf.drop(columns="geometry")
+
+    # Sort the data
+    if sort_field:
+        if sort_field in gdf.columns:
+            gdf = gdf.sort_values(sort_field, ascending=(sort_dir == "asc"))
+        # Alternative path A1: ignore invalid sortable request
+
+    # Pagination
+    total_rows = len(gdf)
+    start = (page - 1) * page_size
+    end = start + page_size
+    page_df = gdf.iloc[start:end]
+
+    # Headers metadata
+    headers = []
+    sample_row = gdf.iloc[0].to_dict() if total_rows > 0 else {}
+
+    for col in gdf.columns:
+        headers.append({
+            "name": col,
+            "type": detect_type(sample_row.get(col)),
+            "sortable": True  # All non-geometry fields are sortable
+        })
+
+    # Data formatting
+    rows = []
+    warnings = set()    # warnings as a set to avoid duplicates
+
+    for _, row in page_df.iterrows():
+        formatted = {}
+        for col, value in row.items():
+            formatted[col] = format_value(value)
+
+            if value is None:
+                warnings.add(f"Null value detected in field '{col}'")
+
+        rows.append(formatted)
+
+    # Contruction of final data
+    response_data = {
+        "headers": headers,
+        "rows": rows,
+        "pagination": {
+            "page": page,
+            "page_size": page_size,
+            "total": total_rows,
+            "next": page + 1 if end < total_rows else None,
+            "prev": page - 1 if page > 1 else None
+        },
+        "warnings": list(warnings)
+    }
+
+    # Caching the data
+    TABLE_CACHE[cache_key] = {
+        "data": response_data,
+        "expires": datetime.now(timezone.utc) + timedelta(minutes=5)
+    }
+
+    return jsonify(response_data), 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
