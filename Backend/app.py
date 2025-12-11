@@ -183,7 +183,7 @@ def add_script():
 
     if not parameters:
         raise BadRequest("You must provide at least one parameter in the request.")
-    
+
     # File is temporarily stored in tmp_dir folder for handling
     temp_path = os.path.join(file_manager.temp_dir, added_file.filename)
     added_file.save(temp_path)
@@ -284,14 +284,35 @@ def script_in_out_inspect(script_id):
 
 @app.route('/execute_script/<script_id>', methods=['POST'])
 def run_script(script_id):
-    data = request.get_json()
     if not script_id:
         raise BadRequest("script_id is required")
-    parameters = data.get('parameters', {})
+    
+    # Parse JSON body
+    data = request.get_json()
+    if not data:
+        raise BadRequest("Request body must be JSON")
 
-    # TODO: Implement script execution logic here
+    parameters = data.get("parameters", {})
+    if not isinstance(parameters, dict):
+        raise BadRequest("'parameters' must be a JSON object")
 
-    return jsonify({"message": f"Running script {script_id}", "parameters": parameters}), 200
+    # Construct file path
+    script_path = os.path.join(file_manager.scripts_dir, f"{script_id}.py")
+
+    if not os.path.isfile(script_path):
+        raise BadRequest(f"Script '{script_id}' does not exist")
+    
+    output = script_manager.run_script(script_path, script_id, parameters)
+
+    if isinstance(output, str) and os.path.isfile(output):
+        file_name, file_extension = os.path.splitext(output)
+        layer_id = os.path.basename(file_name)
+        return send_file(output, as_attachment=True, download_name=f"{layer_id}{file_extension}")
+            
+    elif output != None:        
+        return jsonify({"message": f"Run script {script_id}", "output": output}), 200
+    else:
+        raise ValueError(f"script {script_id} did not return a output") 
 
 @app.route('/execute_script/<script_id>', methods=['DELETE'])
 def stop_script(script_id):
@@ -400,7 +421,7 @@ def add_layer():
         case _: 
             if os.path.exists(temp_path):
                 os.remove(temp_path)
-            raise BadRequest("Fle extension not supported")
+            raise BadRequest("File extension not supported")
 
 @app.route('/layers/<layer_id>', methods=['PUT'])
 def export_layer(layer_id):    

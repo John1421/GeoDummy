@@ -361,7 +361,51 @@ class LayerManager:
             raise ValueError(
                 "Cannot import GeoPackage. Conflicting layer names: "
                 + ", ".join(conflicts)
-            )     
+            )
+
+    def get_layer_for_script(self, layer_id):
+        possible_exts = [".tif", ".tiff"]
+        raster_path = None
+        for ext in possible_exts:
+            candidate = os.path.join(file_manager.layers_dir, layer_id + ext)
+            candidate_upper = os.path.join(file_manager.layers_dir, layer_id + ext.upper())
+            if os.path.isfile(candidate):
+                raster_path = candidate
+                break
+            elif os.path.isfile(candidate_upper):
+                raster_path = candidate_upper
+                break
+
+        if raster_path:
+            return raster_path
+
+        # Check if the layer_id matches a vector layer in the GeoPackage
+        if os.path.isfile(self.default_gpkg_path):
+            try:
+                layers = fiona.listlayers(self.default_gpkg_path)
+                if layer_id in layers:
+                    output_gpkg = os.path.join(file_manager.temp_dir, f"{layer_id}.gpkg")
+
+                    # Copy only the requested layer
+                    with fiona.open(self.default_gpkg_path, layer=layer_id) as src:
+                        meta = src.meta
+
+                        # Write single-layer GPKG
+                        with fiona.open(
+                            output_gpkg,
+                            mode="w",
+                            **meta
+                        ) as dst:
+                            for feature in src:
+                                dst.write(feature)
+
+                    return output_gpkg
+                            
+                else:
+                    return None                
+
+            except Exception as e:
+                raise ValueError(f"Error reading GeoPackage: {e}")        
 
     #=====================================================================================
     #                               HELPER METHODS
