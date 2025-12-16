@@ -32,8 +32,22 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+
+        const isPythonFile =
+            file.name.toLowerCase().endsWith(".py") ||
+            file.type === "text/x-python";
+
+        if (!isPythonFile) {
+            setError("Only .py files are allowed.");
+            e.target.value = ""; // reset input
+            setSelectedFileName(null);
+            return;
+        }
+
+        setError(null);
         setSelectedFileName(file.name);
     };
+
 
     const handleParamToggle = (paramType: string) => {
         setSelectedParams((prev) =>
@@ -158,7 +172,7 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
 
                             <input
                                 type="file"
-                                accept=".txt,.py"
+                                accept=".py"
                                 onChange={handleFileChange}
                                 style={{ display: "none" }}
                             />
