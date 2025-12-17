@@ -385,6 +385,9 @@ def script_in_out_inspect(script_id):
 
 # Script Execution Endpoints
 
+'''
+Implements UC-B-12 and UC-B-13 
+'''
 @app.route('/execute_script/<script_id>', methods=['POST'])
 def run_script(script_id):
     if not script_id:
@@ -405,6 +408,12 @@ def run_script(script_id):
     if not os.path.isfile(script_path):
         raise BadRequest(f"Script '{script_id}' does not exist")
     
+    # TODO: Obter um execution ID e criar o folder temporário
+
+    # TODO: Copiar o script para o caminho temporário
+    
+    # script_manager.run_script() = UC-B-13
+    # TODO: Passar o execution ID para a função e o caminho temporário do script
     output = script_manager.run_script(script_path, script_id, parameters)
 
     if isinstance(output, str) and os.path.isfile(output):

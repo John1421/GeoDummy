@@ -81,65 +81,92 @@ class ScriptManager:
 
         self._save_metadata()
 
-    def run_script(self,script_path, script_id, parameters):
-        # Load Python file dynamically
-        spec = importlib.util.spec_from_file_location(script_id, script_path)
+    def run_script(self, script_path, script_id, execution_id, parameters):
+
+        # Creating the execution_id folder within /temporary/scripts
+        execution_folder = os.path.join(file_manager.execution_dir, str(execution_id))
+        os.makedirs(execution_folder, exist_ok=True)
+
+        # Copying script onto execution_folder
+        script_copy_path = os.path.join(execution_folder, f"{script_id}.py")
+        shutil.copy(script_path, script_copy_path)
+
+        # Load Python file dynamically as a module
+        spec = importlib.util.spec_from_file_location(script_id, script_copy_path)
         module = importlib.util.module_from_spec(spec)
         
+        # Module execution attempt to catch loading errors
         try:
             spec.loader.exec_module(module)
         except Exception as e:
             raise BadRequest(f"Error loading script: {str(e)}")
         
+        # -------- EXECUTION_ID FOLDERS/FILES SETUP --------
 
-        
-        # -------- LOGGING SETUP --------
-        log_path = os.path.join(file_manager.temp_dir, f"log_{script_id}.txt")
+        # Creating the inputs folder
+        inputs_folder = os.path.join(execution_folder, "inputs")
+        os.makedirs(inputs_folder, exist_ok=True)
+
+        # Creating the outputs folder
+        outputs_folder = os.path.join(execution_folder, "outputs")
+        os.makedirs(outputs_folder, exist_ok=True)
+
+        # Creating the log file
+        log_path = os.path.join(execution_folder, f"log_{script_id}.txt")
+    
         export = None
 
         buffer = io.StringIO()
 
-
-
+        # Redirects all stdout outputs into the buffer for later logging
         with redirect_stdout(buffer):
             try:
                 # ----- LOAD SCRIPT DYNAMICALLY -----
-                spec = importlib.util.spec_from_file_location(script_id, script_path)
-                module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(module)
 
+                # This bit of code is redundant - Esteves
+                # spec = importlib.util.spec_from_file_location(script_id, script_path)
+                # module = importlib.util.module_from_spec(spec)
+                # spec.loader.exec_module(module)
+
+                # Validate if script has "main" function
                 if not hasattr(module, "main"):
                     raise BadRequest("Script must define a function named 'main(params)'")
-                else:
-                    func = getattr(module, "main")
+                
+                func = getattr(module, "main")
 
-                args = self.__prepare_parameters_for_script(func,parameters)
+                # Prepare/Get required arguments for script execution and store in inputs folder   
+                args = self.__prepare_parameters_for_script(func, parameters, inputs_folder)
 
+                # Execute the main script function
                 result = func(*args)
 
-                # If result is a file path, move/copy it to temp_dir
+                # If result is a file path, move it to temporary/scripts/[execution_id]/outputs
                 if isinstance(result, str) and os.path.isfile(result):
                     try:
                         _, ext = os.path.splitext(result)
-                        filename = f"{script_id}_output{ext}"
-                        saved_file_path = os.path.join(file_manager.temp_dir, filename)
+                        output_filename = f"{execution_id}/{script_id}_output{ext}"
+                        saved_file_path = os.path.join(outputs_folder, output_filename)
+
                         shutil.move(result, saved_file_path)
 
+                        # Process the file based on the type
                         export = self.__add_output_to_existing_layers_and_create_export_file(saved_file_path)
                     except Exception as e:
-                        raise ValueError(f"Error saving script {script_id} result, error: {e}")
-                    finally:
-                        self.__clean_temp_layer_files(args)    
+                        raise ValueError(f"Error saving script {script_id} result, error: {e}")                           
                 else:
+                    # If the result is not a file, return as-is
                     export = result
 
             except Exception as e:
                 raise ValueError(f"Error executing script: {script_id}, error: {e}")
             
             finally:
+                # Remove remporary layer files
+                self.__clean_temp_layer_files(args) 
+                # Write to log the captured stdout
                 with open(log_path, 'w', encoding='utf-8') as f:
                     f.write(buffer.getvalue())
-                
+
         return export    
 
     def _save_metadata(self):
@@ -217,31 +244,48 @@ class ScriptManager:
                 raise BadRequest("Fle extension not supported")
             
     @staticmethod
-    def __prepare_parameters_for_script(script_function, parameters):
+    def __prepare_parameters_for_script(script_function, parameters, execution_dir_input):
+        # Get expected parameter count
         signature = inspect.signature(script_function)
         expected_arg_count = len(signature.parameters)
 
         arguments = list(parameters.values())
 
+        # Validade argument count
         if len(arguments) != expected_arg_count:
             raise BadRequest(
                 f"main() expects {expected_arg_count} arguments, but client sent {len(arguments)}"
             )
         
-        processed_arguments = []
+        # Validade execution_dir_input exists
+        if not os.path.isdir(execution_dir_input):
+            raise BadRequest(
+                f"Couldn't locate folder to load input layers onto: {execution_dir_input}"
+            )
+
+        processed_arguments = [] 
         
+        # Process each argument
         for arg in arguments:
             if isinstance(arg, str):
-                # Replace string with get_layer result
+                # If string, attempt to replace it with get_layer result
                 layer = layer_manager.get_layer_for_script(arg)
+
                 if layer != None:
-                    processed_arguments.append(layer)
+                    # Copy layer onto the execution_dir_input folder
+                    layer_name = os.path.basename(layer)
+                    layer_copy = os.path.join(execution_dir_input, layer_name)
+                    shutil.copy(layer, layer_copy)
+
+                    # Append layer_copy path if found
+                    processed_arguments.append(layer_copy)
                 else:    
+                    # If layer not found, keep the original string
                     processed_arguments.append(arg)
             else:
+                # If non-string argument, keep as-is
                 processed_arguments.append(arg)
-
-
+        
         return processed_arguments
     
     @staticmethod
