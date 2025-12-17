@@ -1,7 +1,7 @@
 
 import json
 from flask import Flask, request, after_this_request, jsonify, send_file
-from werkzeug.exceptions import HTTPException, BadRequest
+from werkzeug.exceptions import HTTPException, BadRequest, NotFound
 import geopandas as gpd
 import shutil
 import os
@@ -15,6 +15,7 @@ from DataManager import DataManager
 from flask_cors import CORS
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
+
 
 ALLOWED_EXTENSIONS = {'.geojson', '.shp', '.gpkg', '.tif', '.tiff'}
 
@@ -581,6 +582,22 @@ def identify_layer_information(layer_id):
         return jsonify({"layer_id": layer_id, "info": info}), 200
     except ValueError as e:
         raise ValueError(f"Error in identifying layer information: {e}")
+
+
+'''
+Use Case: UC-B-05
+'''
+@app.route('/layers/<layer_id/attributes', methods=['GET'])
+def get_layer_attributes(layer_id):
+    if not layer_id:
+        raise BadRequest("layer_id parameter is required")
+    try:
+        data = layer_manager.get_layer_information(layer_id)
+        return jsonify({"layer_id": layer_id, "attributes": data}), 200
+    except ValueError as e:
+        raise NotFound(f"Error in retrieving layer attributes: {e}")
+
+
 
 '''
 Use Case: UC-B-022
