@@ -81,6 +81,18 @@ class ScriptManager:
 
         self._save_metadata()
 
+    # TODO:
+    # 1 - Construir um comando de execução controlado como: python script.py --params params.json
+    # 2 - Lançar um processo de execução do script como subprocesso com utilizador de sistema não privilegiado e timeout de execução
+    # 3 - Interpretar os outputs diferentes deste tipo de execução 
+    # 4 - Devolver a API endpoint um objeto com:
+    # {
+    #   execution_id,
+    #   estado final (success/failure/timeout/oom),
+    #   paths dos outputs gerados,
+    #   paths dos logs
+    # }
+    # 5 - Perguntar se a limpeza dos ficheiros temporários é para aqui ou para quem desenvolver o use case UC-B-14
     def run_script(self, script_path, script_id, execution_id, parameters):
 
         # Creating the execution_id folder within /temporary/scripts
