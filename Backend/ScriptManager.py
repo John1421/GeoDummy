@@ -85,6 +85,114 @@ class ScriptManager:
         self._save_metadata()
 
     def run_script(self, script_path, script_id, execution_id, parameters):
+        """
+        Executes a Python script in an isolated, sandboxed environment with 
+        comprehensive input/output handling, validation, and logging.
+        
+        This method orchestrates the complete lifecycle of script execution:
+        - Creates an isolated execution environment with standardized folder structure
+        - Validates script integrity (syntax, structure, entry point)
+        - Prepares and serializes input parameters, resolving layer references to files
+        - Executes the script as a subprocess with timeout protection
+        - Processes and normalizes output files (GeoJSON, shapefiles, rasters, etc.)
+        - Registers outputs with the layer manager for downstream usage
+        - Captures all execution logs for debugging and audit purposes
+        
+        Execution Environment Structure:
+            /temporary/scripts/{execution_id}/
+            ├── {script_id}.py          # Isolated copy of the script
+            ├── inputs/                  # Input files and params.json
+            ├── outputs/                 # Script-generated output files
+            └── log_{script_id}.txt     # Execution logs (stdout/stderr)
+        
+        Script Requirements:
+            - Must define a function named 'main(params)'
+            - Must call main() within 'if __name__ == "__main__":' guard
+            - Must be syntactically valid Python
+            - Should save outputs to the provided outputs_folder path
+            - Should read parameters from the provided params.json path
+        
+        Parameter Processing:
+            - String parameters: Checked against layer manager
+                * If layer exists: Layer file copied to inputs/, path provided to script
+                * If not a layer: Original string value passed through
+            - Non-string parameters: Passed through unchanged (numbers, booleans, etc.)
+            - All parameters serialized to inputs/params.json for script consumption
+        
+        Output Processing:
+            Supported output formats (automatically normalized):
+            - .geojson: Added to layer manager, exported as standardized GeoJSON
+            - .zip (shapefile): Extracted, added to layer manager, exported as GeoJSON
+            - .tif/.tiff: Added as raster layer, exported for download
+            - .gpkg: All layers extracted, exported as zip of GeoJSON files
+            - .shp: Rejected (must use .zip format)
+            
+            If no output files produced, stdout is captured as the result value.
+        
+        Args:
+            script_path (str): Absolute path to the Python script to execute.
+            script_id (str): Unique identifier for the script (used in naming).
+            execution_id (str|int): Unique identifier for this execution instance.
+                Used to create an isolated execution folder.
+            parameters (dict): Dictionary of parameters to pass to the script.
+                Keys are parameter names, values can be:
+                - str: Treated as potential layer IDs or literal strings
+                - int, float, bool: Passed through as-is
+                - Other JSON-serializable types
+        
+        Returns:
+            dict: Execution result containing:
+                {
+                    "execution_id": str|int,  # Echo of input execution_id
+                    "status": str,             # "success", "timeout", or "failure"
+                    "outputs": list,           # Paths to processed output files, or
+                                            # [stdout_value] if no files produced
+                    "log_path": str           # Path to execution log file
+                }
+        
+        Raises:
+            BadRequest: If script validation fails (syntax errors, missing main(),
+                improper structure), if parameter processing encounters issues,
+                or if unsupported output file formats are produced.
+            
+            Note: Exceptions during script execution are caught and returned as
+            status="failure" rather than propagated.
+        
+        Execution Constraints:
+            - Timeout: 30 seconds (scripts exceeding this are killed)
+            - Working directory: Set to execution_folder during subprocess execution
+            - Environment: Inherits parent process environment
+        
+        Side Effects:
+            - Creates execution folder and subdirectories in file_manager.execution_dir
+            - Copies script file to execution folder
+            - Copies layer files to inputs/ folder (if parameters reference layers)
+            - Writes params.json to inputs/ folder
+            - Writes log file to execution folder
+            - Registers output layers with layer_manager
+            - Removes temporary input layer files after execution
+            - May remove temporary output files after processing (format-dependent)
+        
+        Example:
+            >>> response = executor.run_script(
+            ...     script_path="/scripts/buffer_analysis.py",
+            ...     script_id="buffer_001",
+            ...     execution_id="exec_12345",
+            ...     parameters={"input_layer": "roads_2024", "distance": 100}
+            ... )
+            >>> print(response)
+            {
+                "execution_id": "exec_12345",
+                "status": "success",
+                "outputs": ["/exports/buffered_roads.geojson"],
+                "log_path": "/temporary/scripts/exec_12345/log_buffer_001.txt"
+            }
+        
+        Thread Safety:
+            Each execution uses a unique execution_id, making concurrent executions
+            safe as long as execution_id values are unique.
+        """
+
 
         # -------- EXECUTION_ID FOLDERS/FILES SETUP --------
 
