@@ -18,6 +18,7 @@ from functools import lru_cache
 
 
 ALLOWED_EXTENSIONS = {'.geojson', '.shp', '.gpkg', '.tif', '.tiff'}
+MAX_LAYER_FILE_SIZE_MB = 500
 
 app = Flask(__name__)
 CORS(app,origins=["http://localhost:5173"])
@@ -335,7 +336,12 @@ def list_basemaps():
 
 # Layer Management Endpoints
 
-#Requirement FR_028
+'''
+Use Case: UC-B-001
+Use Case: UC-B-002
+Use Case: UC-B-003
+Use Case: UC-B-004
+'''
 @app.route('/layers', methods=['POST'])
 def add_layer():    
     # Accept file from the browser via multipart/form-data
@@ -347,9 +353,13 @@ def add_layer():
     temp_path = os.path.join(file_manager.temp_dir, added_file.filename)
     added_file.save(temp_path)
 
-    layer_id, file_extension = os.path.splitext(added_file.filename)
+    if os.path.getsize(temp_path) > MAX_LAYER_FILE_SIZE_MB * 1024 * 1024:
+        os.remove(temp_path)
+        raise BadRequest("The uploaded file exceeds the maximum allowed size.")
 
-    if layer_manager.check_layer_name_exists(layer_id):
+    file_name, file_extension = os.path.splitext(added_file.filename)
+
+    if layer_manager.check_layer_name_exists(file_name):
         if os.path.exists(temp_path):
             os.remove(temp_path)
         raise BadRequest("A Layer with the same name already exists")
@@ -362,41 +372,23 @@ def add_layer():
             raise BadRequest("Please upload shapefiles as a .zip containing all necessary components (.shp, .shx, .dbf, optional .prj).")
         
         case ".zip":
-            layer_manager.add_shapefile_zip(temp_path,layer_id)
-            export_file = layer_manager.export_geopackage_layer_to_geojson(layer_id)
-            return send_file(export_file, as_attachment=True, download_name=f"{layer_id}.geojson")
+            layer_id, metadata = layer_manager.add_shapefile_zip(temp_path,file_name)
         
         case ".geojson":        
-            layer_manager.add_geojson(temp_path,layer_id)
-            os.remove(temp_path)
-            export_file = layer_manager.export_geopackage_layer_to_geojson(layer_id)
-            return send_file(export_file, as_attachment=True, download_name=f"{layer_id}.geojson")
+            layer_id, metadata = layer_manager.add_geojson(temp_path,file_name)
         
         case ".tif" | ".tiff":
-            layer_manager.add_raster(temp_path,layer_id)
-            export_file = layer_manager.export_raster_layer(layer_id)
-            return send_file(export_file, as_attachment=True, download_name=f"{layer_id}.tiff")
+            layer_id, metadata = layer_manager.add_raster(temp_path,file_name)
         
         case ".gpkg":
-            new_layers = layer_manager.add_gpkg_layers(temp_path)
-            os.remove(temp_path)
-            zip_path = os.path.join(file_manager.temp_dir, f"{layer_id}_export.zip")
+            layer_id, metadata = layer_manager.add_gpkg_layers(temp_path)
 
-            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-                for layer in new_layers:
-                    # Export each layer from the default gpkg
-                    exported_geojson = layer_manager.export_geopackage_layer_to_geojson(layer)
-                    # Add it into zip
-                    zipf.write(exported_geojson, arcname=f"{layer}.geojson")
-                    # Optional cleanup
-                    os.remove(exported_geojson)
-
-            return send_file(zip_path, as_attachment=True, download_name=f"{layer_id}_layers.zip")
-            
         case _: 
             if os.path.exists(temp_path):
                 os.remove(temp_path)
             raise BadRequest("File extension not supported")
+
+    return jsonify({"layer_id": layer_id, "metadata": metadata}), 200    
 
 @app.route('/layers/<layer_id>', methods=['PUT'])
 def export_layer(layer_id):    

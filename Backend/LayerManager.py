@@ -9,6 +9,7 @@ from shapely.geometry import shape, mapping
 import rioxarray
 import shutil
 import rasterio
+import uuid
 
 file_manager = FileManager()
 
@@ -41,20 +42,20 @@ class LayerManager:
 
     def add_shapefile_zip(self, zip_path, layer_name=None, target_crs="EPSG:4326"):
         """
-        Extracts a zipped shapefile, validates required components,
-        reads it using Fiona, reprojects features if needed,
-        and writes it as a new layer in the default GeoPackage.
+        Import a zipped ESRI Shapefile into the system by converting it into a
+        GeoPackage layer.
 
         Parameters:
-            zip_path (str): Path to the ZIP shapefile.
-            layer_name (str): Optional layer name for the GeoPackage.
-            target_crs (str): CRS to convert into before writing.
+            zip_path(str): Absolute path to the ZIP file containing the shapefile components.
+            layer_name(str): Name of the layer to be created in the GeoPackage. If not provided,
+            target_crs(str): Target coordinate reference system to reproject the data to. Defaults to "EPSG:4326".
 
         Returns:
-            str: The layer name added to the GeoPackage.
+            tuple[new_gpkg_id(str), metadata(str)]:
+            The UUID of the newly created GeoPackage.
+            Metadata extracted from the GeoPackage.
         """
-
-         # 1. Extract ZIP
+        # 1. Extract ZIP
         temp_dir = os.path.join(file_manager.temp_dir, "shp_extracted")
         os.makedirs(temp_dir, exist_ok=True)
 
@@ -93,31 +94,37 @@ class LayerManager:
                 raise ValueError("Shapefile has no CRS defined (.prj missing or unreadable).")
 
             # 6. Reproject if needed
-            if gdf.crs.to_string() != target_crs:
+            original_crs = gdf.crs.to_string()
+            if original_crs != target_crs:
                 gdf = gdf.to_crs(target_crs)
+
 
             # 7. Determine layer name
             if layer_name is None:
                 layer_name = os.path.splitext(shp_files[0])[0]
 
-            # 8. Check for existing layer
-            if self.check_layer_name_exists(layer_name):
-                shutil.rmtree(temp_dir)
-                raise ValueError(f"A layer with the name '{layer_name}' already exists.")
+            # 8. Create unique gpkg ids
+            new_gpkg_id = str(uuid.uuid4())
+            new_gpkg_path = os.path.join(file_manager.temp_dir, f"{new_gpkg_id}.gpkg")
+
 
             # 9. Write to default GeoPackage
             gdf.to_file(
-                self.default_gpkg_path,
+                new_gpkg_path,
                 layer=layer_name,
                 driver="GPKG"
             )
 
             # 10. Cleanup extracted files
             shutil.rmtree(temp_dir)
+
+
+            metadata = self.__get_gpkg_metadata(new_gpkg_path, original_crs)
+            self.__move_to_permanent(new_gpkg_path, new_gpkg_id, metadata)
         except Exception as e:
             raise ValueError(f"Error writing shapefile into GeoPackage: {e}")    
 
-        return layer_name
+        return new_gpkg_id, metadata
 
     def add_geojson(self, geojson_path, layer_name=None, target_crs="EPSG:4326"):
         """
@@ -130,15 +137,13 @@ class LayerManager:
             target_crs (str): Target CRS for storage.
 
         Returns:
-            str: The layer name added to the GeoPackage.
+            tuple[new_gpkg_id(str), metadata(str)]:
+            The UUID of the newly created GeoPackage.
+            Metadata extracted from the GeoPackage.
         """
 
         if not os.path.isfile(geojson_path):
             raise ValueError("GeoJSON file does not exist.")
-        
-        # Check if layer already exists (optional)
-        if self.check_layer_name_exists(layer_name):
-            raise ValueError(f"A raster layer with the name '{layer_name}' already exists.")
 
         try:
             # Read source layer
@@ -149,30 +154,43 @@ class LayerManager:
                 raise ValueError("Source layer has no CRS")
 
             # Reproject if needed
-            if gdf.crs.to_string() != target_crs:
+            original_crs = gdf.crs.to_string()
+            if original_crs != target_crs:
                 gdf = gdf.to_crs(target_crs)
+
+            # Create unique gpkg ids
+            new_gpkg_id = str(uuid.uuid4())
+            new_gpkg_path = os.path.join(file_manager.temp_dir, f"{new_gpkg_id}.gpkg")
+
 
             # Write to default GeoPackage
             gdf.to_file(
-                self.default_gpkg_path,
+                new_gpkg_path,
                 layer=layer_name,
                 driver="GPKG"
-                )
+            )
+
+            os.remove(geojson_path)
+
+            metadata = self.__get_gpkg_metadata(new_gpkg_path, original_crs)
+            self.__move_to_permanent(new_gpkg_path, new_gpkg_id, metadata)
         except Exception as e:
             raise ValueError(f"Error writing GeoJSON into GeoPackage: {e}")
 
-        return layer_name
+        return new_gpkg_id, metadata
 
     def add_raster(self, raster_path, layer_name=None, target_crs="EPSG:4326"):
         """
-        Adds a raster (.tiff) file into a GeoPackage-compatible storage location.
+        Adds a raster (.tiff) file into a storage location.
 
         Parameters:
             raster_path (str): Path to the .tiff file.
             layer_name (str): Optional layer name for storage.
 
         Returns:
-            str: The layer name added.
+            tuple[raster_name(str), metadata(str)]:
+            The name of the raster.
+            Metadata extracted from the raster.
         """
 
         if not os.path.isfile(raster_path):
@@ -187,20 +205,23 @@ class LayerManager:
             raise ValueError(f"A raster layer with the name '{layer_name}' already exists.")
 
         try:
-            if not self.__check_raster_system_coordinates(raster_path):
+            original_crs = self.__check_raster_system_coordinates(raster_path)
+            if original_crs != target_crs:
                 try:
                     temp_path = self.__convert_raster_system_coordinates(raster_path)
-                    file_manager.move_file(temp_path, file_manager.layers_dir)
+                    metadata = self.__get_raster_metadata(temp_path, original_crs)
+                    self.__move_to_permanent(temp_path, layer_name, metadata)
                 except Exception as e:
                     os.remove(raster_path)
                     raise ValueError(f"Failed convert raster system coordinates: {e}")    
             else:
-                file_manager.move_file(raster_path, file_manager.layers_dir)
+                metadata = self.__get_raster_metadata(raster_path, target_crs)
+                self.__move_to_permanent(raster_path, layer_name, metadata)
         except Exception as e:
             os.remove(raster_path)
             raise ValueError(f"Failed to add raster layer: {e}")
 
-        return layer_name
+        return layer_name, metadata
 
     def add_gpkg_layers(self, geopackage_path, target_crs="EPSG:4326"):
         """
@@ -208,16 +229,22 @@ class LayerManager:
         default GeoPackage, with CRS normalization and name conflict checks.
 
         Parameters:
-        geopackage_path (str): Path to the incoming .gpkg file.
-        target_crs (str): CRS to convert vector layers to (default EPSG:4326)
+            geopackage_path (str): Path to the incoming .gpkg file.
+            target_crs (str): CRS to convert vector layers to (default EPSG:4326)
+
+        Returns
+        tuple[list(new_gpkg_id(str)), list(metadata(str))]:
+            The UUID of the newly created GeoPackages.
+            Metadata extracted from the GeoPackages.
 
         Raises:
             ValueError: If file does not exist, is invalid, or contains conflicting layer names.
         """
 
-        incoming_layers = self.__retrieve_spatial_layers_from_incoming_gpkg(geopackage_path) 
+        incoming_layers = self.__retrieve_spatial_layers_from_incoming_gpkg(geopackage_path)
 
-        self.check_incoming_gpkg_layers_for_names_conflicts(incoming_layers)
+        all_metadata = []
+        all_gpkg_ids = [] 
 
         # Import each layer
         for layer_name in incoming_layers:
@@ -228,20 +255,32 @@ class LayerManager:
                 if gdf.crs is None:
                     raise ValueError(f"Layer '{layer_name}' has no CRS.")
 
-                if gdf.crs.to_string() != target_crs:
+                original_crs = gdf.crs.to_string()
+                if original_crs != target_crs:
                     gdf = gdf.to_crs(target_crs)
 
-                # Append layer to DEFAULT GeoPackage
+                # Create unique gpkg ids
+                new_gpkg_id = str(uuid.uuid4())
+                new_gpkg_path = os.path.join(file_manager.temp_dir, f"{new_gpkg_id}.gpkg")
+
+
+                # Write to default GeoPackage
                 gdf.to_file(
-                    self.default_gpkg_path,
+                    new_gpkg_path,
                     layer=layer_name,
                     driver="GPKG"
                 )
 
+                metadata = self.__get_gpkg_metadata(new_gpkg_path, original_crs)
+                self.__move_to_permanent(new_gpkg_path, new_gpkg_id, metadata)
+                all_gpkg_ids.append(new_gpkg_id)
+                all_metadata.append(metadata)
             except Exception as e:
                 raise ValueError(f"Failed to import layer '{layer_name}': {e}")
 
-        return incoming_layers
+        os.remove(geopackage_path)
+
+        return all_gpkg_ids, all_metadata
 
     def export_geopackage_layer_to_geojson(self, layer_name, output_name=None):
         """
@@ -343,25 +382,6 @@ class LayerManager:
                 break
 
         return exists
-    
-    def check_incoming_gpkg_layers_for_names_conflicts(self, new_layers):
-        # Load existing GPkg layers + raster names
-        existing_layers = set(fiona.listlayers(self.default_gpkg_path))
-        existing_raster_layers = {
-            os.path.splitext(f)[0]
-            for f in os.listdir(file_manager.layers_dir)
-            if f.lower().endswith((".tif", ".tiff"))
-        }
-        all_existing = existing_layers | existing_raster_layers
-
-        # Check for name conflicts
-        conflicts = [name for name in new_layers if name in all_existing]
-
-        if conflicts:
-            raise ValueError(
-                "Cannot import GeoPackage. Conflicting layer names: "
-                + ", ".join(conflicts)
-            )
         
     def get_layer_information(self, layer_id):
         """
@@ -482,7 +502,7 @@ class LayerManager:
                 if raster.rio.crs is None:
                     raise ValueError("Raster has no CRS information.")
                 else:
-                    return raster.rio.crs.to_string() == target_crs
+                    return raster.rio.crs.to_string()
         except Exception as e:
             raise ValueError(f"Error checking tif CRS: {e}")    
 
@@ -536,3 +556,38 @@ class LayerManager:
             raise ValueError("No valid spatial layers found in GeoPackage.")
         
         return incoming_layers
+    
+    @staticmethod
+    def __get_gpkg_metadata(gpkg_path, crs_original):
+        try:
+            layers = fiona.listlayers(gpkg_path)
+
+            gdf = gpd.read_file(gpkg_path, layer=layers[0])
+            return {
+                "layer_name": layers[0],    
+                "type": "vector",
+                "geometry_type": gdf.geom_type.mode()[0] if not gdf.empty else None,
+                "crs": gdf.crs.to_string() if gdf.crs else None,
+                "crs_original": crs_original,
+                "attributes": list(gdf.columns.drop("geometry")),
+                "feature_count": len(gdf),
+                "bounding_box": gdf.total_bounds.tolist()
+            }
+        except Exception as e:
+            raise ValueError(f"Error reading GeoPackage: {e}")
+
+    @staticmethod
+    def __get_raster_metadata(raster_path, crs_original):
+        with rasterio.open(raster_path) as src:
+            return {
+                "type": "raster",
+                "crs": src.crs.to_string() if src.crs else None,
+                "crs_original": crs_original,
+                "bands": src.count,
+                "width": src.width,
+                "height": src.height,
+                "resolution": src.res
+            }
+
+    def __move_to_permanent(self, temp_path, layer_name, metadata):
+        return "temp"
