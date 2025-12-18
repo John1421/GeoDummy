@@ -22,11 +22,13 @@ class FileManager:
         self.layers_dir = layers_dir
         self.temp_dir = temp_dir
         self.scripts_dir = scripts_dir
+        self.execution_dir = os.path.join(self.temp_dir, "scripts")
 
         # Create directories if they don't exist
         os.makedirs(self.layers_dir, exist_ok = True)
         os.makedirs(self.temp_dir, exist_ok = True)
         os.makedirs(self.scripts_dir, exist_ok = True)
+        os.makedirs(self.execution_dir, exist_ok = True)
 
 
     def move_file(self, source_path, destination_path):

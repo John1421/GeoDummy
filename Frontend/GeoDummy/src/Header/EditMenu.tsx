@@ -1,7 +1,7 @@
 import {useState, useRef, useEffect} from "react";
 import BaseMapSettings from "./BaseMapSettings";
 
-function EditMenu({ open, setBaseMapUrl, setOpen }: { open: boolean; setBaseMapUrl: (url: string) => void; setOpen: (open: boolean) => void }) {
+function EditMenu({ open, setBaseMapUrl, setBaseMapAttribution, setOpen }: { open: boolean; setBaseMapUrl: (url: string) => void; setBaseMapAttribution: (attribution: string) => void; setOpen: (open: boolean) => void }) {
   const [openBaseMapSet, setOpenBaseMapSet] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -37,7 +37,7 @@ function EditMenu({ open, setBaseMapUrl, setOpen }: { open: boolean; setBaseMapU
       <button className="w-full text-black text-left px-4 py-2 hover:bg-gray-100">
         Settings
       </button>
-      <BaseMapSettings openBaseMapSet={openBaseMapSet} onClose={() => setOpenBaseMapSet(false)} setBaseMapUrl={setBaseMapUrl}/>
+      <BaseMapSettings openBaseMapSet={openBaseMapSet} onClose={() => setOpenBaseMapSet(false)} setBaseMapUrl={setBaseMapUrl} setBaseMapAttribution={setBaseMapAttribution}/>
     </div>
 
   );

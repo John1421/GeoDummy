@@ -11,6 +11,9 @@ function App() {
   const [baseMapUrl, setBaseMapUrl] = useState(
     "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
   );
+  const [baseMapAttribution, setBaseMapAttribution] = useState(
+    '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  );
 
   return (
     <div
@@ -20,7 +23,7 @@ function App() {
         color: colors.foreground,
       }}
     >
-      <Header setBaseMapUrl={setBaseMapUrl} />
+      <Header setBaseMapUrl={setBaseMapUrl} setBaseMapAttribution={setBaseMapAttribution} />
 
       {/* MAIN LAYOUT: 3 columns */}
       <div className="flex flex-1 min-h-0">
@@ -38,7 +41,7 @@ function App() {
         {/* CENTER – Map + Attribute Table */}
         <div className="flex-1 flex flex-col min-h-0 min-w-0 relative z-0">
           <div className="flex-1 min-h-0">
-            <BaseMap initialUrl={baseMapUrl} />
+            <BaseMap initialUrl={baseMapUrl} initialAttribution={baseMapAttribution} />
           </div>
 
           <div className="flex-none">
