@@ -381,7 +381,7 @@ class LayerManager:
         """
 
         layers_dir = os.path.join(file_manager.layers_dir)
-        gpkg_path = os.path.join(layers_dir, "layers.gpkg")
+        gpkg_path = os.path.join(layers_dir, layer_id + ".gpkg")
 
         # Checks if the layer_id matches a raster file
         possible_exts = [".tif", ".tiff"]
@@ -411,9 +411,9 @@ class LayerManager:
         if os.path.isfile(gpkg_path):
             try:
                 layers = fiona.listlayers(gpkg_path)
-                if layer_id in layers:
-                    gdf = gpd.read_file(gpkg_path, layer=layer_id)
-                    return {
+                candidate = layers[0]
+                gdf = gpd.read_file(gpkg_path, layer=candidate)
+                return {
                         "type": "vector",
                         "geometry_type": gdf.geom_type.mode()[0] if not gdf.empty else None,
                         "crs": gdf.crs.to_string() if gdf.crs else None,

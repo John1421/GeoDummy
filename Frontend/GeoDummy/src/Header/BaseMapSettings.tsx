@@ -5,20 +5,24 @@ interface BasemapMetadata {
     id: string;
     name: string;
     url?: string;
+    attribution?: string;
 }
 
 function BaseMapSettings({
     openBaseMapSet,
     onClose,
     setBaseMapUrl,
+    setBaseMapAttribution,
 }: {
     openBaseMapSet: boolean;
     onClose: () => void;
     setBaseMapUrl: (url: string) => void;
+    setBaseMapAttribution: (attribution: string) => void;
 }) {
     const [basemaps, setBasemaps] = useState<BasemapMetadata[]>([]);
     const [selectedBasemapId, setSelectedBasemapId] = useState<string | null>(null);
     const [currentBasemapUrl, setCurrentBasemapUrl] = useState<string | null>(null);
+    const [currentBasemapAttribution, setCurrentBasemapAttribution] = useState<string | null>(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -33,24 +37,36 @@ function BaseMapSettings({
         async function fetchBasemapUrl() {
             setLoading(true);
             setError(null);
+            const maxRetries = 3;
+            const retryDelay = 1000; // 1 second
 
-            try {
-                const response = await fetch("http://localhost:5000/basemaps");
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch basemap: ${response.statusText}`);
-                }
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    const response = await fetch("http://localhost:5000/basemaps");
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch basemap: ${response.statusText}`);
+                    }
 
-                const data = await response.json();
-                
-                setBasemaps(data);
-                if (data.length > 0) {
-                    setSelectedBasemapId(data[0].id);
+                    const data = await response.json();
+                    
+                    setBasemaps(data);
+                    if (data.length > 0) {
+                        setSelectedBasemapId(data[0].id);
+                    }
+                    setLoading(false);
+                    return; // Success, exit the function
+                } catch (err: unknown) {
+                    console.error(`Error fetching basemap (attempt ${attempt}/${maxRetries}):`, err);
+                    
+                    // If this is the last attempt, show error
+                    if (attempt === maxRetries) {
+                        setError("Error retrieving basemaps");
+                        setLoading(false);
+                    } else {
+                        // Wait before retrying
+                        await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    }
                 }
-            } catch (err: unknown) {
-                console.error("Error fetching basemap URL:", err);
-                setError("Error retrieving basemaps");
-            } finally {
-                setLoading(false);
             }
         }
         fetchBasemapUrl();
@@ -58,48 +74,40 @@ function BaseMapSettings({
  useEffect(() => {
         if (!selectedBasemapId) return;
 
-        async function fetchBasemap() {
-            setLoading(true);
-            setError(null);
-
-            try {
-                const response = await fetch(
-                    `http://localhost:5000/basemaps/${selectedBasemapId}`
-                );
-                if (!response.ok) {
-                    throw new Error("Invalid or unavailable basemap");
-                }
-
-                const data = await response.json();
-
-                if(initialBasemapUrl === null){
-                    setInitialBasemapUrl(data.url);
-                }
-
-                setPreviousBasemapUrl(currentBasemapUrl);
-                setCurrentBasemapUrl(data.url);
-                setBaseMapUrl(data.url);
-            } catch (err) {
-                console.error(err);
-                setError(
-                    "The selected basemap could not be loaded. The previous basemap will be retained."
-                );
-                if (previousBasemapUrl) {
-                setBaseMapUrl(previousBasemapUrl);
-                }
-            } finally {
-                setLoading(false);
-            }
+        const selectedBasemap = basemaps.find(b => b.id === selectedBasemapId);
+        
+        if (!selectedBasemap || !selectedBasemap.url) {
+            setError("The selected basemap could not be loaded.");
+            return;
         }
 
-        fetchBasemap();
-    }, [selectedBasemapId]);
+        try {
+            if(initialBasemapUrl === null){
+                setInitialBasemapUrl(selectedBasemap.url);
+            }
+
+            setPreviousBasemapUrl(currentBasemapUrl);
+            setCurrentBasemapUrl(selectedBasemap.url);
+            setCurrentBasemapAttribution(selectedBasemap.attribution || "");
+            setBaseMapUrl(selectedBasemap.url);
+            setBaseMapAttribution(selectedBasemap.attribution || "");
+        } catch (err) {
+            console.error(err);
+            setError(
+                "The selected basemap could not be loaded. The previous basemap will be retained."
+            );
+            if (previousBasemapUrl) {
+                setBaseMapUrl(previousBasemapUrl);
+            }
+        }
+    }, [selectedBasemapId, basemaps]);
 
    
     async function save_basemap() {
         if (currentBasemapUrl) {
             setBaseMapUrl(currentBasemapUrl);
-             onClose();
+            setBaseMapAttribution(currentBasemapAttribution || "");
+            onClose();
         }
     }
     function handleClose() {

@@ -2,7 +2,7 @@ import { useState } from "react";
 import EditMenu from "./EditMenu";
 import logo from "../assets/logo.png";
 const BUTTON_STYLE = " text-white text-shadow-lg  font-semibold py-2 px-4 rounded-lg hover:bg-[#39AC73] transition justify-between";
-function Header({ setBaseMapUrl }: { setBaseMapUrl: (url: string) => void }) {
+function Header({ setBaseMapUrl, setBaseMapAttribution }: { setBaseMapUrl: (url: string) => void; setBaseMapAttribution: (attribution: string) => void }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -17,7 +17,7 @@ function Header({ setBaseMapUrl }: { setBaseMapUrl: (url: string) => void }) {
           Edit
         </button>
 
-        <EditMenu open={open} setBaseMapUrl={setBaseMapUrl} setOpen={setOpen} />
+        <EditMenu open={open} setBaseMapUrl={setBaseMapUrl} setBaseMapAttribution={setBaseMapAttribution} setOpen={setOpen} />
       </div>
 
       <img

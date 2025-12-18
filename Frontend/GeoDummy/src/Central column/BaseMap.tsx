@@ -6,8 +6,9 @@ const INITIAL_LATITUDE = 39.557191;
 const INITIAL_LONGITUDE = -7.8536599;
 const INITIAL_ZOOM = 7;
 
-function BaseMap({ initialUrl }: { initialUrl: string }) {
+function BaseMap({ initialUrl, initialAttribution }: { initialUrl: string; initialAttribution?: string }) {
   const [currentBaseMapUrl, setCurrentBaseMapUrl] = useState(initialUrl);
+  const [currentAttribution, setCurrentAttribution] = useState(initialAttribution || '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>');
   const mapRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
 
@@ -34,15 +35,17 @@ function BaseMap({ initialUrl }: { initialUrl: string }) {
 
       tileLayerRef.current = L.tileLayer(currentBaseMapUrl, {
         maxZoom: 20,
-        attribution:
-          '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        attribution: currentAttribution,
       }).addTo(mapRef.current);
     }
-  }, [currentBaseMapUrl]);
+  }, [currentBaseMapUrl, currentAttribution]);
 
   useEffect(() => {
     setCurrentBaseMapUrl(initialUrl);
-  }, [initialUrl]);
+    if (initialAttribution) {
+      setCurrentAttribution(initialAttribution);
+    }
+  }, [initialUrl, initialAttribution]);
 
  return (
     <div className="flex-1 flex items-start justify-center w-full h-full ">
