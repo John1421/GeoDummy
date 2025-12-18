@@ -1,4 +1,4 @@
-from FileManager import FileManager
+from .FileManager import FileManager
 import os
 import geopandas as gpd
 import fiona
