@@ -87,7 +87,8 @@ class DataManager:
             cached = cache[cache_key]
             if datetime.now(timezone.utc) < cached["expires"]:
                 return cached["data"]
-            
+            del cache[cache_key]
+            return None
         else:
             return None
         

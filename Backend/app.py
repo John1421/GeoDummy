@@ -231,10 +231,15 @@ def list_scripts():
     scripts = ["script001", "script002", "script003"]
     return jsonify({"message": f"List of scripts received", "scripts":scripts}), 200
 
+
+'''
+Use Case: UC-B-10
+'''
 @app.route('/scripts/<script_id>', methods=['GET'])
 def script_metadata(script_id):
     if not script_id:
         raise BadRequest("script_id parameter is required")
+    
 
     # TODO: retrieve metadata
 
@@ -456,7 +461,60 @@ def get_layer_attributes(layer_id):
 
 
 
+'''
+Use Case: UC-B-06
+'''
+@app.route('/layers/<layer_id>/table', methods=['GET'])
+def extract_data_from_layer_for_table_view(layer_id):
+    if not layer_id:
+        raise BadRequest("layer_id parameter is required")
+    
+    
+    response = data_manager.check_cache(layer_id)
+    if response:
+        return jsonify(response), 200
+    
+    
+    
+    gdf = layer_manager.get_layer_information(layer_id)["attributes"]
 
+    total_rows = len(gdf)
+    # Headers metadata
+    headers = []
+    sample_row = gdf.iloc[0].to_dict() if total_rows > 0 else {}
+    for col in gdf.columns:
+        headers.append({
+            "name": col,
+            "type": data_manager.detect_type(sample_row.get(col)),
+            "sortable": True  # All non-geometry fields are sortable
+        })
+
+    # Data formatting
+    rows = []
+    warnings = set()    # warnings as a set to avoid duplicates
+
+    for _, row in gdf.iterrows():
+        formatted = {}
+        for col, value in row.items():
+            formatted[col] = data_manager.format_value_for_table_view(value)
+
+            if value is None:
+                warnings.add(f"Null value detected in field '{col}'")
+
+        rows.append(formatted)
+
+    # Contruction of final data
+    response_data = {
+        "headers": headers,
+        "rows": rows,
+        "total_rows": total_rows,
+        "warnings": list(warnings)
+    }
+    
+    # Caching the data
+    data_manager.insert_to_cache(layer_id, response_data, 10)
+
+    return jsonify(response_data), 200
 
 
 
