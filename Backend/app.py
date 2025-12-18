@@ -337,10 +337,10 @@ def list_basemaps():
 # Layer Management Endpoints
 
 '''
-Use Case: UC-B-001
-Use Case: UC-B-002
-Use Case: UC-B-003
-Use Case: UC-B-004
+Use Case: UC-B-01
+Use Case: UC-B-02
+Use Case: UC-B-03
+Use Case: UC-B-04
 '''
 @app.route('/layers', methods=['POST'])
 def add_layer():    
@@ -390,6 +390,9 @@ def add_layer():
 
     return jsonify({"layer_id": layer_id, "metadata": metadata}), 200    
 
+'''
+UC-B-16
+'''
 @app.route('/layers/<layer_id>', methods=['GET'])
 def get_layer(layer_id):
     if not layer_id:

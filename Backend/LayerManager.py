@@ -308,12 +308,10 @@ class LayerManager:
 
     def export_geopackage_layer_to_geojson(self, layer_id):
         """
-        Extracts a layer from the GeoPackage and saves it as a GeoJSON file.
+        Extracts a layer from a GeoPackage and saves it as a GeoJSON file.
 
         Parameters:
-            layer_name (str): Name of the layer inside the GeoPackage.
-            output_name (str): Optional output filename (without extension).
-                            If None, defaults to layer_name.
+            layer_id(str): The id of the GeoPackage.
 
         Returns:
             str: Path to the exported GeoJSON file.
