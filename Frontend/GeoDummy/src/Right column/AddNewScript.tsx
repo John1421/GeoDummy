@@ -2,12 +2,14 @@ import { useEffect, useState, useRef } from "react";
 import { FolderOpen, Plus } from "lucide-react";
 import WindowTemplate from "../TemplateModals/PopUpWindowModal";
 import { colors, typography, radii, spacing, icons } from "../Design/DesignTokens";
+import { ThreeDot } from "react-loading-indicators"
 
 type AddNewScriptProps = {
     onClose: () => void;
     onAddScript: (name: string, category: string, description: string) => void;
     existingCategories: string[];
 };
+type SaveStatus = "unsaved" | "saving" | "saved";
 
 export default function AddNewScript({ onClose, onAddScript, existingCategories }: AddNewScriptProps) {
     const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
@@ -17,6 +19,8 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
     const [paramsOpen, setParamsOpen] = useState(false);
     const [selectedParams, setSelectedParams] = useState<string[]>([]);
     const [description, setDescription] = useState("");
+    const [isUploading, setIsUploading] = useState(false);
+    const [saveStatus, setSaveStatus] = useState<SaveStatus>("unsaved");
 
     useEffect(() => {
         // reset when opened (component is mounted each time in current usage)
@@ -27,6 +31,7 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
         setParamsOpen(false);
         setSelectedParams([]);
         setDescription("");
+        setSaveStatus("unsaved");
     }, []);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,6 +51,7 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
 
         setError(null);
         setSelectedFileName(file.name);
+        setSaveStatus("unsaved");
     };
 
 
@@ -55,18 +61,23 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
         );
     };
 
-    const handleUpload = () => {
+    const handleUpload = async () => {
         // Basic validation
         if (!selectedFileName) {
             setError("Please choose a script file.");
             return;
         }
-
+        setIsUploading(true);
+        setSaveStatus("saving");
+        await new Promise((resolve) => setTimeout(resolve, 1200));
         // Call parent handler with the form data
         onAddScript(name, category, description);
-
-        // Close the modal
-        onClose();
+        
+        setSaveStatus("saved");
+        setIsUploading(false);
+        setTimeout(() => {
+            onClose();
+        }, 600);
     };
     const [showDropdown, setShowDropdown] = useState(false);
 
@@ -110,7 +121,9 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
                         <div style={{ flex: 1 }}>
                             <input
                                 value={name}
-                                onChange={(e) => setName(e.target.value)}
+                                onChange={(e) => {setName(e.target.value);
+                                            setSaveStatus("unsaved");
+                                }}
                                 placeholder="e.g. Tree Height Analyzer"
                                 style={{
                                     width: "100%",
@@ -197,7 +210,7 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
 
                             <input
                             value={category}
-                            onChange={(e) => setCategory(e.target.value)}
+                            onChange={(e) => {setCategory(e.target.value); setSaveStatus("unsaved");}}
                             placeholder="e.g. Analysis"
                             onFocus={() => setShowDropdown(true)}
                             style={{
@@ -340,13 +353,35 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
                     </p>
                 )}
 
+                <div
+                    style={{
+                        padding: "6px 12px",
+                        borderRadius: radii.sm,
+                        fontSize: typography.sizeSm,
+                        fontFamily: typography.normalFont,
+                        alignSelf: "flex-start",
+                        color:
+                            saveStatus === "saved"
+                                ? colors.accent
+                                :saveStatus === "saving"
+                                ? colors.primary
+                                : colors.error,
+                        
+                    }}
+                >
+                    {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved" : "Not saved"}
+                </div>
+
                 {/* Footer actions */}
                 <div style={{ display: "flex", justifyContent: "flex-end", marginTop: spacing.md }}>
                     <button
                         onClick={handleUpload}
+                        disabled={isUploading}
                         style={{
-                            backgroundColor: colors.primary,
+                            backgroundColor: isUploading ? colors.borderStroke : colors.primary,
                             color: colors.primaryForeground,
+                            opacity: isUploading ? 0.7 : 1,
+                            cursor: isUploading ? "not-allowed" : "pointer",
                             fontFamily: typography.normalFont,
                             paddingInline: spacing.lg,
                             paddingBlock: spacing.sm,
@@ -354,10 +389,15 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
                             border: "none",
                             fontSize: typography.sizeSm,
                             fontWeight: 500,
-                            cursor: "pointer",
                         }}
                     >
-                        Upload
+                        {isUploading ? (<ThreeDot
+                            color="#ffffff"
+                            size="small"
+                            text=""
+                            textColor=""
+                            />) : "Upload"}
+                        
                     </button>
                 </div>
             </div>
