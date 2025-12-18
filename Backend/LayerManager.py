@@ -1,4 +1,4 @@
-from .FileManager import FileManager
+from FileManager import FileManager
 import os
 import geopandas as gpd
 import fiona
@@ -10,30 +10,54 @@ import rioxarray
 import shutil
 import rasterio
 import uuid
+import json
 
 file_manager = FileManager()
 
 class LayerManager:
-    def __init__(self, default_geopackage='layers.gpkg'):
-        """
-        Initializes the BasemapManager.
+    def __init__(self):
+        # Supported layer formats
+        supported_ext = {'.gpkg', '.tif', '.tiff'}
 
-        - Checks if the default GeoPackage exists inside the FileManager layers directory.
-        - Creates an empty GeoPackage if it does not exist.
+        try:
+            all_files = set(os.listdir(file_manager.layers_dir))
+        except FileNotFoundError:
+            return
+        
+        for filename in list(all_files):
+            layer_id, ext = os.path.splitext(filename)
+            ext = ext.lower()
 
-        Parameters:
-            file_manager (FileManager): Instance of FileManager to access directories.
-            default_geopackage (str): File name for the default GeoPackage.
-        """
+            # --- Check 1: Layer File missing Metadata ---
+            if ext in supported_ext:
+                expected_meta = f"{layer_id}_metadata.json"
 
-        # Full path to the GeoPackage inside layers directory
-        self.default_gpkg_path = os.path.join(file_manager.layers_dir, default_geopackage)
+                if expected_meta not in all_files:
+                    try:
+                        os.remove(os.path.join(file_manager.layers_dir, filename))
+                        print(f"Integrity: Deleted orphan layer '{filename}'")
+                    except OSError as e:
+                        print(f"Error deleting orphan layer: {e}")
+            
+            # --- Check 2: Metadata File missing Layer ---
+            elif filename.endswith('_metadata.json'):
+                # Extract ID: "my_layer_metadata.json" -> "my_layer"
+                # len("_metadata.json") is 14
+                meta_layer_id = filename[:-14] 
+                
+                layer_found = False
+                for sext in supported_ext:
+                    candidate = f"{meta_layer_id}{sext}"
+                    if candidate in all_files:
+                        layer_found = True
+                        break
 
-        # Ensure the default GeoPackage exists
-        if not os.path.exists(self.default_gpkg_path):
-            # Create an empty GeoDataFrame to initialize the new GeoPackage
-            empty_gdf = gpd.GeoDataFrame(geometry=[], crs="EPSG:4326")
-            empty_gdf.to_file(self.default_gpkg_path, driver='GPKG')
+                if not layer_found:
+                    try:
+                        os.remove(os.path.join(file_manager.layers_dir, filename))
+                        print(f"Integrity: Deleted orphan metadata '{filename}'")
+                    except OSError as e:
+                        print(f"Error deleting orphan metadata: {e}")
 
 
     #=====================================================================================
@@ -589,5 +613,27 @@ class LayerManager:
                 "resolution": src.res
             }
 
-    def __move_to_permanent(self, temp_path, layer_name, metadata):
-        return "temp"
+    @staticmethod
+    def __move_to_permanent(temp_layer_path, layer_id, metadata_dict):
+        # Move layer file to permanent storage
+        _, ext = os.path.splitext(temp_layer_path)
+        dest_path = os.path.join(file_manager.layers_dir, f"{layer_id}{ext}")
+
+        try:
+            if not os.path.isfile(temp_layer_path):
+                 raise ValueError(f"Source file not found: {temp_layer_path}")
+
+            shutil.move(temp_layer_path, dest_path)
+        except Exception as e:
+            raise ValueError(f"Failed to move layer to permanent storage: {e}")
+
+        # Save layer metadata
+        meta_path = os.path.join(file_manager.layers_dir, f"{layer_id}_metadata.json")
+
+        try:
+            with open(meta_path, 'w') as f:
+                json.dump(metadata_dict, f, indent=4)
+        except Exception as e:
+            raise ValueError(f"Failed to save layer metadata: {e}")
+
+        return
