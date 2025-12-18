@@ -10,6 +10,9 @@ import zipfile
 from contextlib import redirect_stdout
 import io
 import inspect
+import subprocess
+import ast
+from pathlib import Path
 
 file_manager = FileManager()
 layer_manager = LayerManager()
@@ -81,19 +84,117 @@ class ScriptManager:
 
         self._save_metadata()
 
-    # TODO:
-    # 1 - Construir um comando de execução controlado como: python script.py --params params.json
-    # 2 - Lançar um processo de execução do script como subprocesso com utilizador de sistema não privilegiado e timeout de execução
-    # 3 - Interpretar os outputs diferentes deste tipo de execução 
-    # 4 - Devolver a API endpoint um objeto com:
-    # {
-    #   execution_id,
-    #   estado final (success/failure/timeout/oom),
-    #   paths dos outputs gerados,
-    #   paths dos logs
-    # }
-    # 5 - Perguntar se a limpeza dos ficheiros temporários é para aqui ou para quem desenvolver o use case UC-B-14
     def run_script(self, script_path, script_id, execution_id, parameters):
+        """
+        Executes a Python script in an isolated, sandboxed environment with 
+        comprehensive input/output handling, validation, and logging.
+        
+        This method orchestrates the complete lifecycle of script execution:
+        - Creates an isolated execution environment with standardized folder structure
+        - Validates script integrity (syntax, structure, entry point)
+        - Prepares and serializes input parameters, resolving layer references to files
+        - Executes the script as a subprocess with timeout protection
+        - Processes and normalizes output files (GeoJSON, shapefiles, rasters, etc.)
+        - Registers outputs with the layer manager for downstream usage
+        - Captures all execution logs for debugging and audit purposes
+        
+        Execution Environment Structure:
+            /temporary/scripts/{execution_id}/
+            ├── {script_id}.py          # Isolated copy of the script
+            ├── inputs/                  # Input files and params.json
+            ├── outputs/                 # Script-generated output files
+            └── log_{script_id}.txt     # Execution logs (stdout/stderr)
+        
+        Script Requirements:
+            - Must define a function named 'main(params)'
+            - Must call main() within 'if __name__ == "__main__":' guard
+            - Must be syntactically valid Python
+            - Should save outputs to the provided outputs_folder path
+            - Should read parameters from the provided params.json path
+        
+        Parameter Processing:
+            - String parameters: Checked against layer manager
+                * If layer exists: Layer file copied to inputs/, path provided to script
+                * If not a layer: Original string value passed through
+            - Non-string parameters: Passed through unchanged (numbers, booleans, etc.)
+            - All parameters serialized to inputs/params.json for script consumption
+        
+        Output Processing:
+            Supported output formats (automatically normalized):
+            - .geojson: Added to layer manager, exported as standardized GeoJSON
+            - .zip (shapefile): Extracted, added to layer manager, exported as GeoJSON
+            - .tif/.tiff: Added as raster layer, exported for download
+            - .gpkg: All layers extracted, exported as zip of GeoJSON files
+            - .shp: Rejected (must use .zip format)
+            
+            If no output files produced, stdout is captured as the result value.
+        
+        Args:
+            script_path (str): Absolute path to the Python script to execute.
+            script_id (str): Unique identifier for the script (used in naming).
+            execution_id (str|int): Unique identifier for this execution instance.
+                Used to create an isolated execution folder.
+            parameters (dict): Dictionary of parameters to pass to the script.
+                Keys are parameter names, values can be:
+                - str: Treated as potential layer IDs or literal strings
+                - int, float, bool: Passed through as-is
+                - Other JSON-serializable types
+        
+        Returns:
+            dict: Execution result containing:
+                {
+                    "execution_id": str|int,  # Echo of input execution_id
+                    "status": str,             # "success", "timeout", or "failure"
+                    "outputs": list,           # Paths to processed output files, or
+                                            # [stdout_value] if no files produced
+                    "log_path": str           # Path to execution log file
+                }
+        
+        Raises:
+            BadRequest: If script validation fails (syntax errors, missing main(),
+                improper structure), if parameter processing encounters issues,
+                or if unsupported output file formats are produced.
+            
+            Note: Exceptions during script execution are caught and returned as
+            status="failure" rather than propagated.
+        
+        Execution Constraints:
+            - Timeout: 30 seconds (scripts exceeding this are killed)
+            - Working directory: Set to execution_folder during subprocess execution
+            - Environment: Inherits parent process environment
+        
+        Side Effects:
+            - Creates execution folder and subdirectories in file_manager.execution_dir
+            - Copies script file to execution folder
+            - Copies layer files to inputs/ folder (if parameters reference layers)
+            - Writes params.json to inputs/ folder
+            - Writes log file to execution folder
+            - Registers output layers with layer_manager
+            - Removes temporary input layer files after execution
+            - May remove temporary output files after processing (format-dependent)
+        
+        Example:
+            >>> response = executor.run_script(
+            ...     script_path="/scripts/buffer_analysis.py",
+            ...     script_id="buffer_001",
+            ...     execution_id="exec_12345",
+            ...     parameters={"input_layer": "roads_2024", "distance": 100}
+            ... )
+            >>> print(response)
+            {
+                "execution_id": "exec_12345",
+                "status": "success",
+                "outputs": ["/exports/buffered_roads.geojson"],
+                "log_path": "/temporary/scripts/exec_12345/log_buffer_001.txt"
+            }
+        
+        Thread Safety:
+            Each execution uses a unique execution_id, making concurrent executions
+            safe as long as execution_id values are unique.
+        """
+
+
+        # -------- EXECUTION_ID FOLDERS/FILES SETUP --------
 
         # Creating the execution_id folder within /temporary/scripts
         execution_folder = os.path.join(file_manager.execution_dir, str(execution_id))
@@ -103,17 +204,8 @@ class ScriptManager:
         script_copy_path = os.path.join(execution_folder, f"{script_id}.py")
         shutil.copy(script_path, script_copy_path)
 
-        # Load Python file dynamically as a module
-        spec = importlib.util.spec_from_file_location(script_id, script_copy_path)
-        module = importlib.util.module_from_spec(spec)
-        
-        # Module execution attempt to catch loading errors
-        try:
-            spec.loader.exec_module(module)
-        except Exception as e:
-            raise BadRequest(f"Error loading script: {str(e)}")
-        
-        # -------- EXECUTION_ID FOLDERS/FILES SETUP --------
+        # Check for syntax errors, "main" function declaration and its call through __main__
+        self._validate_script_integrity(script_copy_path)
 
         # Creating the inputs folder
         inputs_folder = os.path.join(execution_folder, "inputs")
@@ -126,60 +218,74 @@ class ScriptManager:
         # Creating the log file
         log_path = os.path.join(execution_folder, f"log_{script_id}.txt")
     
-        export = None
+        # ----- SCRIPT PREPARATION AND EXECUTION -----
 
-        buffer = io.StringIO()
+        # Prepare/Get required arguments for script execution and store in inputs folder   
+        args = self.__prepare_parameters_for_script(parameters, inputs_folder)
 
-        # Redirects all stdout outputs into the buffer for later logging
-        with redirect_stdout(buffer):
-            try:
-                # ----- LOAD SCRIPT DYNAMICALLY -----
+        # Write arguments in inputs folder (paths for files and values for others) int oan input json
+        params_json = os.path.join(inputs_folder, "params.json")
+        with open(params_json, "w") as f:
+            json.dump(args, f)
 
-                # This bit of code is redundant - Esteves
-                # spec = importlib.util.spec_from_file_location(script_id, script_path)
-                # module = importlib.util.module_from_spec(spec)
-                # spec.loader.exec_module(module)
+        status = None
 
-                # Validate if script has "main" function
-                if not hasattr(module, "main"):
-                    raise BadRequest("Script must define a function named 'main(params)'")
+        # Execute the script as a subprocess. It will save outputs to the appropriate folder.
+        try:
+            result = subprocess.run(
+                ["python3", script_copy_path, outputs_folder, params_json],
+                cwd=execution_folder,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=True
+            )
+            status = "success"
+        except subprocess.TimeoutExpired:
+            status = "timeout"
+            result = None  # optional
+        except subprocess.CalledProcessError as e:
+            status = "failure"
+            result = e  # contains stdout/stderr
+
+
+        # ----- LOGGING AND OUTPUT HANDLING -----
+
+        # Write all prints and errors that occured during execution to the log file
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.write(result.stdout)
+            f.write(result.stderr)
+
+        # ---- Handle outputs ----
+        result_value = None
+        output_file_paths = []
+
+        # Check for any files in outputs folder (layers). 'Path([folder_path].glob("*"))' extracts all file paths within the folder_path
+        output_files = list(Path(outputs_folder).glob("*"))
+
+        for file_path in output_files:
+            if file_path.is_file():
+                saved_file = self.__add_output_to_existing_layers_and_create_export_file(file_path)
+                output_file_paths.append(saved_file)
                 
-                func = getattr(module, "main")
+        # If no files, fallback to stdout (simple value)
+        if not output_file_paths:
+            stdout_value = result.stdout.strip()
+            if stdout_value:
+                result_value = stdout_value
 
-                # Prepare/Get required arguments for script execution and store in inputs folder   
-                args = self.__prepare_parameters_for_script(func, parameters, inputs_folder)
+        # Build the JSON object to return
+        response = {
+            "execution_id": execution_id,
+            "status": status,
+            "outputs": output_file_paths or [result_value], # fallback to stdout if no files
+            "log_path": log_path
+        }
 
-                # Execute the main script function
-                result = func(*args)
+        # Remove temporary layer files
+        self.__clean_temp_layer_files(args) 
 
-                # If result is a file path, move it to temporary/scripts/[execution_id]/outputs
-                if isinstance(result, str) and os.path.isfile(result):
-                    try:
-                        _, ext = os.path.splitext(result)
-                        output_filename = f"{execution_id}/{script_id}_output{ext}"
-                        saved_file_path = os.path.join(outputs_folder, output_filename)
-
-                        shutil.move(result, saved_file_path)
-
-                        # Process the file based on the type
-                        export = self.__add_output_to_existing_layers_and_create_export_file(saved_file_path)
-                    except Exception as e:
-                        raise ValueError(f"Error saving script {script_id} result, error: {e}")                           
-                else:
-                    # If the result is not a file, return as-is
-                    export = result
-
-            except Exception as e:
-                raise ValueError(f"Error executing script: {script_id}, error: {e}")
-            
-            finally:
-                # Remove remporary layer files
-                self.__clean_temp_layer_files(args) 
-                # Write to log the captured stdout
-                with open(log_path, 'w', encoding='utf-8') as f:
-                    f.write(buffer.getvalue())
-
-        return export    
+        return response    
 
     def _save_metadata(self):
         """Helper to persist metadata to disk."""
@@ -256,34 +362,38 @@ class ScriptManager:
                 raise BadRequest("Fle extension not supported")
             
     @staticmethod
-    def __prepare_parameters_for_script(script_function, parameters, execution_dir_input):
-        # Get expected parameter count
-        signature = inspect.signature(script_function)
-        expected_arg_count = len(signature.parameters)
+    def __prepare_parameters_for_script(parameters, execution_dir_input, expected_arg_count=None):
+        """
+        Prepares input parameters for script execution.
+
+        - Validates parameter count if expected_arg_count is provided.
+        - Copies any string arguments that correspond to layers into the execution_dir_input.
+        - Returns a list of processed arguments ready to be passed to the script.
+        """
 
         arguments = list(parameters.values())
 
-        # Validade argument count
-        if len(arguments) != expected_arg_count:
+        # Validate argument count if provided
+        if expected_arg_count is not None and len(arguments) != expected_arg_count:
             raise BadRequest(
                 f"main() expects {expected_arg_count} arguments, but client sent {len(arguments)}"
             )
-        
-        # Validade execution_dir_input exists
+
+        # Validate execution_dir_input exists
         if not os.path.isdir(execution_dir_input):
             raise BadRequest(
                 f"Couldn't locate folder to load input layers onto: {execution_dir_input}"
             )
 
-        processed_arguments = [] 
-        
+        processed_arguments = []
+
         # Process each argument
         for arg in arguments:
             if isinstance(arg, str):
                 # If string, attempt to replace it with get_layer result
                 layer = layer_manager.get_layer_for_script(arg)
 
-                if layer != None:
+                if layer is not None:
                     # Copy layer onto the execution_dir_input folder
                     layer_name = os.path.basename(layer)
                     layer_copy = os.path.join(execution_dir_input, layer_name)
@@ -291,13 +401,13 @@ class ScriptManager:
 
                     # Append layer_copy path if found
                     processed_arguments.append(layer_copy)
-                else:    
+                else:
                     # If layer not found, keep the original string
                     processed_arguments.append(arg)
             else:
                 # If non-string argument, keep as-is
                 processed_arguments.append(arg)
-        
+
         return processed_arguments
     
     @staticmethod
@@ -305,3 +415,56 @@ class ScriptManager:
         for arg in arguments:
              if os.path.isfile(arg):
                  os.remove(arg) 
+
+
+    def _validate_script_integrity(script_path):
+        """
+        Validates the integrity of a Python script without executing it.
+
+        - Checks for syntax errors.
+        - Ensures a function named 'main' exists.
+        - Verifies that 'main' is called under the 
+        `if __name__ == "__main__"` guard.
+
+        :param script_path: Absolute path to the Python script to validate.
+        :raises BadRequest: If syntax errors exist, 'main' is missing,
+                            or 'main' is not called under __main__ guard.
+        """
+
+        # Syntax check
+        result = subprocess.run(
+            ["python3", "-m", "py_compile", script_path],
+            capture_output=True,
+            text=True
+        )
+        if result.returncode != 0:
+            raise BadRequest(result.stderr)
+
+        # Check for main() definition
+        with open(script_path, "r", encoding="utf-8") as f:
+            tree = ast.parse(f.read(), filename=script_path)
+
+        if not any(
+            isinstance(node, ast.FunctionDef) and node.name == "main"
+            for node in ast.walk(tree)
+        ):
+            raise BadRequest("Script must define a function named 'main(params)'")
+        
+        # Check for main() call under __main__ guard
+        main_called = False
+        for node in ast.walk(tree):
+            if isinstance(node, ast.If):
+                test = node.test
+                # Detect if __name__ == "__main__"
+                if (isinstance(test, ast.Compare) and
+                    isinstance(test.left, ast.Name) and
+                    test.left.id == "__name__" and
+                    isinstance(test.comparators[0], ast.Constant) and
+                    test.comparators[0].value == "__main__"):
+                    # Check if main() is called inside this block
+                    for child in ast.walk(node):
+                        if isinstance(child, ast.Call) and getattr(child.func, "id", None) == "main":
+                            main_called = True
+                            break
+        if not main_called:
+            raise BadRequest("'main(params)' function is not called under '__main__' guard")

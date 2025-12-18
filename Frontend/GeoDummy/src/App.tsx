@@ -3,11 +3,11 @@ import BaseMap from "./Central column/BaseMap";
 import AttributeTable from "./Central column/AttributeTable";
 import ScriptList from "./Right column/ScriptList";
 import LayerSidebar from "./LeftColumn/LayerSidebar";
-import { sampleFeatures } from "./Central column/data";
 import { colors } from "./Design/DesignTokens";
 import { useState } from "react";
 
 function App() {
+  
   const [baseMapUrl, setBaseMapUrl] = useState(
     "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
   );
@@ -15,7 +15,10 @@ function App() {
     '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
   );
 
+  const [selectedLayerId] = useState<string | null>(null);
+  
   return (
+    
     <div
       className="h-screen flex flex-col overflow-hidden"
       style={{
@@ -45,7 +48,7 @@ function App() {
           </div>
 
           <div className="flex-none">
-            <AttributeTable geoData={sampleFeatures} />
+             <AttributeTable layerId={selectedLayerId} />
           </div>
         </div>
 
