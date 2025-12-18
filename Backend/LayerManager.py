@@ -1,4 +1,4 @@
-from .FileManager import FileManager
+from FileManager import FileManager
 import os
 import geopandas as gpd
 import fiona
@@ -282,7 +282,7 @@ class LayerManager:
 
         return all_gpkg_ids, all_metadata
 
-    def export_geopackage_layer_to_geojson(self, layer_name, output_name=None):
+    def export_geopackage_layer_to_geojson(self, layer_id):
         """
         Extracts a layer from the GeoPackage and saves it as a GeoJSON file.
 
@@ -294,37 +294,49 @@ class LayerManager:
         Returns:
             str: Path to the exported GeoJSON file.
         """
+        export_dir = os.path.join(file_manager.temp_dir, "export")
 
-        # Determine output filename
-        if output_name is None:
-            output_name = layer_name
+        # Ensure export directory exists
+        os.makedirs(export_dir, exist_ok=True)
 
-        geojson_path = os.path.join(
-            file_manager.temp_dir,
-            f"{output_name}.geojson"
-        )
+        # Clean export directory (delete existing files)
+        for filename in os.listdir(export_dir):
+            file_path = os.path.join(export_dir, filename)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+
+        geojson_path = os.path.join(export_dir, f"{layer_id}.geojson")
+
+        gpkg_path = os.path.join(file_manager.layers_dir, f"{layer_id}.gpkg")
 
         # Open the layer in the GeoPackage
         try:
-            with fiona.open(self.default_gpkg_path, layer=layer_name) as src:
+            layers = fiona.listlayers(gpkg_path)
+            if not layers:
+                raise ValueError("No layers found in the GeoPackage.")
+
+            layer_name = layers[0]
+
+            # Open the only layer
+            with fiona.open(gpkg_path, layer=layer_name) as src:
                 src_crs = src.crs
                 schema = src.schema
 
                 # Create GeoJSON file
                 with fiona.open(
                     geojson_path,
-                    mode='w',
+                    mode="w",
                     driver="GeoJSON",
                     crs=src_crs,
                     schema=schema
                 ) as dst:
-
-                    # Copy features
                     for feature in src:
                         dst.write(feature)
 
         except Exception as e:
-            raise ValueError(f"Error exporting layer '{layer_name}' to GeoJSON: {e}")
+            raise ValueError(f"Failed to convert GeoPackage to GeoJSON: {e}")
 
         return geojson_path
         
@@ -343,7 +355,7 @@ class LayerManager:
         """
 
         # Allowed raster extensions
-        possible_exts = [".tif", ".tiff"]
+        possible_exts = [".tif", ".tiff", ".TIF", ".TIFF"]
 
         for ext in possible_exts:
             candidate_path = os.path.join(file_manager.layers_dir, layer_name + ext)
@@ -489,6 +501,41 @@ class LayerManager:
 
             except Exception as e:
                 raise ValueError(f"Error reading GeoPackage: {e}")        
+
+    def get_layer_extension(self, layer_id):
+            """
+            Return the file extension for a given layer ID stored in layers_dir.
+
+            Parameters:
+                layer_id(str): The unique layer identifier.
+
+            Returns:
+                extension(str): The file extension (including the leading dot), e.g. ".gpkg", ".tif".
+
+            """
+            prefix = f"{layer_id}."
+            metadata_suffix = f"{layer_id}_metadata.json"
+
+            matches = []
+
+            for filename in os.listdir(file_manager.layers_dir):
+                if filename == metadata_suffix:
+                    continue
+
+                if filename.startswith(prefix):
+                    matches.append(filename)
+
+            if not matches:
+                raise FileNotFoundError(f"No layer file found for layer_id '{layer_id}'")
+
+            if len(matches) > 1:
+                raise ValueError(
+                    f"Multiple layer files found for layer_id '{layer_id}': {matches}"
+                )
+
+            _, extension = os.path.splitext(matches[0])
+            return extension
+
 
     #=====================================================================================
     #                               HELPER METHODS

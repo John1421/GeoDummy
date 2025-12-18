@@ -390,6 +390,20 @@ def add_layer():
 
     return jsonify({"layer_id": layer_id, "metadata": metadata}), 200    
 
+@app.route('/layers/<layer_id>', methods=['GET'])
+def get_layer(layer_id):
+    if not layer_id:
+        raise BadRequest("layer_id is required")
+    
+    extension = layer_manager.get_layer_extension(layer_id)
+
+    if extension == ".gpkg":
+        export_file = layer_manager.export_geopackage_layer_to_geojson(layer_id)
+        extension = ".geojson"
+    else:
+        export_file = layer_manager.export_raster_layer(layer_id)
+    return send_file(export_file, as_attachment=True, download_name=f"{layer_id}{extension}")
+
 @app.route('/layers/<layer_id>', methods=['PUT'])
 def export_layer(layer_id):    
     data = request.get_json()
@@ -441,7 +455,7 @@ def identify_layer_information(layer_id):
 '''
 Use Case: UC-B-05
 '''
-@app.route('/layers/<layer_id/attributes', methods=['GET'])
+@app.route('/layers/<layer_id>/attributes', methods=['GET'])
 def get_layer_attributes(layer_id):
     if not layer_id:
         raise BadRequest("layer_id parameter is required")
