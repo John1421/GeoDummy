@@ -441,7 +441,7 @@ def identify_layer_information(layer_id):
 '''
 Use Case: UC-B-05
 '''
-@app.route('/layers/<layer_id/attributes', methods=['GET'])
+@app.route('/layers/<layer_id>/attributes', methods=['GET'])
 def get_layer_attributes(layer_id):
     if not layer_id:
         raise BadRequest("layer_id parameter is required")
