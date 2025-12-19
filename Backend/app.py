@@ -378,7 +378,7 @@ def add_layer():
             layer_id, metadata = layer_manager.add_geojson(temp_path,file_name)
         
         case ".tif" | ".tiff":
-            layer_id, metadata= layer_manager.add_raster(temp_path,file_name)
+            layer_id, metadata = layer_manager.add_raster(temp_path,file_name)
         
         case ".gpkg":
             layer_id, metadata = layer_manager.add_gpkg_layers(temp_path)
