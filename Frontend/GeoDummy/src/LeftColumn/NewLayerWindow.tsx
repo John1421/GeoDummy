@@ -7,24 +7,17 @@ interface NewLayerWindowProps {
   isOpen: boolean;
   onClose: () => void;
   onSelect: (file: File) => void;
-  existingLayerNames: string[];
 }
 
-export default function NewLayerWindow({
-  isOpen,
-  onClose,
-  onSelect,
-  existingLayerNames,
-}: NewLayerWindowProps) {
+export default function NewLayerWindow({ isOpen, onClose, onSelect }: NewLayerWindowProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Reset fields every time modal opens
   useEffect(() => {
-    if (isOpen) {
-      setSelectedFile(null);
-      setError(null);
-    }
+    if (!isOpen) return;
+    setSelectedFile(null);
+    setError(null);
   }, [isOpen]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -39,7 +32,6 @@ export default function NewLayerWindow({
       setError("Please choose a file for this layer.");
       return;
     }
-
     onSelect(selectedFile);
     onClose();
   }, [selectedFile, onSelect, onClose]);
@@ -51,16 +43,14 @@ export default function NewLayerWindow({
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Enter") {
-        if (!isCreateDisabled) handleCreate();
-      }
+      if (e.key === "Enter" && !isCreateDisabled) handleCreate();
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, handleCreate, isCreateDisabled]);
 
-return (
+  return (
     <WindowTemplate
       isOpen={isOpen}
       onClose={onClose}
@@ -90,7 +80,6 @@ return (
       }
     >
       <div style={{ display: "flex", flexDirection: "column", rowGap: spacing.lg }}>
-        {/* Choose Layer File */}
         <div style={{ display: "flex", alignItems: "center", columnGap: 16 }}>
           <label
             style={{
@@ -125,13 +114,11 @@ return (
             >
               <span>{selectedFile?.name ?? "Browse Files"}</span>
               <FolderOpen size={18} />
-
               <input type="file" onChange={handleFileChange} style={{ display: "none" }} />
             </label>
           </div>
         </div>
 
-        {/* Error message */}
         {error && (
           <p
             style={{
