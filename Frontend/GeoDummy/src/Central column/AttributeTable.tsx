@@ -1,7 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 //  MOCK – remover quando backend estiver estavel
-import { sampleFeatures } from "./data";
-
 
 interface TableHeader {
   name: string;

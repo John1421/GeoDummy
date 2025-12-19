@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Layer, RasterDescriptor } from "../LeftColumn/LayerSidebar";
@@ -12,6 +12,8 @@ type Props = {
   initialAttribution?: string;
   layers: Layer[];
 };
+
+type GjFeature = GeoJSON.Feature<GeoJSON.Geometry, GeoJSON.GeoJsonProperties>;
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
@@ -32,27 +34,28 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
   // Keep track of which panes we created, so we can manage them if needed
   const panesRef = useRef<Map<string, string>>(new Map());
 
-  // Order: lower first, higher last (higher should appear on top)
-  const sortedLayers = useMemo(() => {
-    const copy = [...layers];
-    copy.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-    return copy;
-  }, [layers]);
 
   // Init map once
   useEffect(() => {
     if (mapRef.current) return;
 
-    mapRef.current = L.map("map").setView([INITIAL_LATITUDE, INITIAL_LONGITUDE], INITIAL_ZOOM);
+    const map = L.map("map").setView([INITIAL_LATITUDE, INITIAL_LONGITUDE], INITIAL_ZOOM);
+    mapRef.current = map;
+
+    // capture refs once for cleanup safety
+    const vectorOverlays = vectorOverlaysRef.current;
+    const rasterOverlays = rasterOverlaysRef.current;
+    const panes = panesRef.current;
 
     return () => {
-      mapRef.current?.remove();
+      map.remove();
       mapRef.current = null;
-      vectorOverlaysRef.current.clear();
-      rasterOverlaysRef.current.clear();
-      panesRef.current.clear();
+      vectorOverlays.clear();
+      rasterOverlays.clear();
+      panes.clear();
     };
   }, []);
+
 
   // Update basemap tiles when url/attribution changes
   useEffect(() => {
@@ -135,23 +138,15 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
     };
   };
 
-  const applyVectorStyle = (gj: L.GeoJSON, opacity: number, color: string) => {
-    gj.setStyle((feat) => leafletStyleForFeature(feat as any, opacity, color));
-
-    // Also update point layers (circle markers)
+  const applyVectorStyle = useCallback((gj: L.GeoJSON, opacity: number, color: string) => {
+    gj.setStyle((feat) => leafletStyleForFeature(feat as GjFeature, opacity, color));
     gj.eachLayer((child) => {
-      const anyChild = child as any;
-      if (typeof anyChild.setStyle === "function") {
-        anyChild.setStyle({
-          stroke: false,
-          opacity: 0,
-          fill: true,
-          fillColor: color,
-          fillOpacity: opacity,
-        });
+      if (child instanceof L.CircleMarker) {
+        child.setStyle({ stroke: false, opacity: 0, fill: true, fillColor: color, fillOpacity: opacity });
       }
     });
-  };
+  }, []);
+
 
   const createRasterLayer = (desc: RasterDescriptor, opacity: number, pane?: string): L.Layer => {
     if (desc.kind === "xyz") {
@@ -168,9 +163,10 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
   };
 
   const applyRasterOpacity = (layer: L.Layer, opacity: number) => {
-    const anyLayer = layer as any;
-    if (typeof anyLayer.setOpacity === "function") anyLayer.setOpacity(opacity);
+    const maybe = layer as unknown as { setOpacity?: (o: number) => void };
+    if (typeof maybe.setOpacity === "function") maybe.setOpacity(opacity);
   };
+
 
   // Sync overlays with state + enforce ordering via panes
   useEffect(() => {

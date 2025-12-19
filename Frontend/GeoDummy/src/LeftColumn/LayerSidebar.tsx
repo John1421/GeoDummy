@@ -55,16 +55,16 @@ export interface Layer {
  * Keep it small and consistent to avoid UX chaos.
  */
 export const LAYER_COLOR_PALETTE: string[] = [
-  "#2563EB", // blue
-  "#16A34A", // green
-  "#F97316", // orange
-  "#DC2626", // red
-  "#7C3AED", // purple
-  "#0891B2", // cyan
-  "#CA8A04", // amber
-  "#BE185D", // pink
-  "#0F172A", // slate
   "#4B5563", // gray
+  "#0F172A", // slate
+  "#6936c3ff", // purple
+  "#1e52c1ff", // blue
+  "#0891B2", // cyan
+  "#49aa6dff", // green
+  "#CA8A04", // amber
+  "#F97316", // orange
+  "#ca5887ff", // pink
+  "#bf1717ff", // red
 ];
 
 const DEFAULT_COLOR_BY_GEOM = {
