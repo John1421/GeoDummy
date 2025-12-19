@@ -378,7 +378,7 @@ def add_layer():
             layer_id, metadata = layer_manager.add_geojson(temp_path,file_name)
         
         case ".tif" | ".tiff":
-            layer_id, metadata = layer_manager.add_raster(temp_path,file_name)
+            layer_id, metadata= layer_manager.add_raster(temp_path,file_name)
         
         case ".gpkg":
             layer_id, metadata = layer_manager.add_gpkg_layers(temp_path)
@@ -388,6 +388,13 @@ def add_layer():
                 os.remove(temp_path)
             raise BadRequest("File extension not supported")
 
+    
+    if not isinstance(layer_id, list):
+        layer_id = [layer_id]
+
+    if not isinstance(metadata, list):
+        metadata = [metadata]
+        
     return jsonify({"layer_id": layer_id, "metadata": metadata}), 200    
 
 '''
