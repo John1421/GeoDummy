@@ -136,7 +136,7 @@ export default function NewLayerWindow({ isOpen, onClose, onSelect }: NewLayerWi
         <p
           style={{
             fontSize: typography.sizeSm,
-            color: colors.mutedForeground,
+            color: colors.dragIcon,
             fontFamily: typography.normalFont,
             margin: 0,
           }}
