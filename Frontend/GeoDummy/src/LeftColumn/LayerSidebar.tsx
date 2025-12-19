@@ -11,10 +11,12 @@ export interface Layer {
   id: string;
   title: string;
   fileName?: string;
+  file?: File;                // store the actual file for later upload/parsing
+  fileLastModified?: number;  // file.lastModified (ms since epoch)
   geometryType?: string;
-  opacity?: number; // 0..1
-  previousOpacity?: number; // last non-zero opacity
-  order: number; // higher = closer to top
+  opacity?: number;           // 0..1
+  previousOpacity?: number;   // last non-zero opacity
+  order: number;              // higher = closer to top
 }
 
 /** Example layers to test geometry ordering. */
@@ -118,16 +120,16 @@ function getGeometryRank(geometryType?: string): number {
   if (g.includes("point")) return 1; // top
   if (g.includes("line")) return 2;
   if (g.includes("polygon")) return 3;
-  if (g.includes("raster")) return 4; // bottom of known types
+  if (g.includes("vectorial")) return 4;
+  if (g.includes("raster")) return 5; // bottom of known types
 
-  return 5; // unknown
+  return 6; // unknown
 }
 
 export default function LayerSidebar() {
   const [isWindowOpen, setIsWindowOpen] = useState(false);
   const [layers, setLayers] = useState<Layer[]>(EXAMPLE_LAYERS);
 
-  // Selected layer for settings window.
   const [settingsLayerId, setSettingsLayerId] = useState<string | null>(null);
   const [settingsPosition, setSettingsPosition] = useState<{
     top: number;
@@ -140,35 +142,46 @@ export default function LayerSidebar() {
   );
 
   /** Add a new layer from the NewLayerWindow. */
-  const handleAddLayer = useCallback(
-    (chosenTitle: string, fileName: string) => {
-      setLayers((prev) => {
-        // Use explicit order; higher = closer to top
-        const maxOrder =
-          prev.length === 0
-            ? 0
-            : Math.max(
-                ...prev.map((l, index) =>
-                  typeof l.order === "number" ? l.order : index
-                )
-              );
+  const handleAddLayer = useCallback((file: File) => {
+    setLayers((prev) => {
+      const maxOrder =
+        prev.length === 0
+          ? 0
+          : Math.max(
+              ...prev.map((l, index) =>
+                typeof l.order === "number" ? l.order : index
+              )
+            );
 
-        return [
-          ...prev,
-          {
-            id: crypto.randomUUID(),
-            title: chosenTitle,
-            fileName,
-            geometryType: undefined,
-            opacity: 1,
-            previousOpacity: 1,
-            order: maxOrder + 1,
-          },
-        ];
-      });
-    },
-    []
-  );
+      const id = crypto.randomUUID();
+
+      return [
+        ...prev,
+        {
+          id,
+          title: id,            // testing: layer name = id
+          fileName: file.name,
+          file,                 // keep the actual file object
+          fileLastModified: file.lastModified,
+          geometryType: undefined,
+          opacity: 1,
+          previousOpacity: 1,
+          order: maxOrder + 1,
+        },
+      ];
+    });
+  }, []);
+
+  /** Rename a layer title (double-click edit in card). */
+  const handleRenameLayer = useCallback((layerId: string, newTitle: string) => {
+    const trimmed = newTitle.trim();
+    if (!trimmed) return;
+
+    setLayers((prev) =>
+      prev.map((layer) => (layer.id === layerId ? { ...layer, title: trimmed } : layer))
+    );
+  }, []);
+
 
   /** Open settings window for a given layer. */
   const handleSettings = useCallback((layerId: string, rect: DOMRect) => {
@@ -353,6 +366,7 @@ export default function LayerSidebar() {
           setLayers={setLayers}
           onSettings={handleSettings}
           onToggleVisibility={handleToggleVisibility}
+          onRename={handleRenameLayer}
         />
       </SidebarPanel>
 
@@ -360,7 +374,7 @@ export default function LayerSidebar() {
         isOpen={isWindowOpen}
         onClose={() => setIsWindowOpen(false)}
         onSelect={handleAddLayer}
-        existingLayerNames={layers.map((layer) => layer.title)}
+        existingLayerNames={layers.map((layer) => layer.title)} // unused after changes (remove later)
       />
 
       <LayerSettingsWindow

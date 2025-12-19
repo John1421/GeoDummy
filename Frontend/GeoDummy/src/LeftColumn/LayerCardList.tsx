@@ -25,6 +25,7 @@ interface Props {
   setLayers: React.Dispatch<React.SetStateAction<Layer[]>>;
   onSettings: (layerId: string, rect: DOMRect) => void;
   onToggleVisibility: (layerId: string) => void;
+  onRename: (layerId: string, newTitle: string) => void;
 }
 
 export default function LayerCardList({
@@ -32,6 +33,7 @@ export default function LayerCardList({
   setLayers,
   onSettings,
   onToggleVisibility,
+  onRename,
 }: Props) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -102,6 +104,7 @@ export default function LayerCardList({
             layer={layer}
             onSettings={onSettings}
             onToggleVisibility={onToggleVisibility}
+            onRename={onRename}
           />
         ))}
       </SortableContext>
