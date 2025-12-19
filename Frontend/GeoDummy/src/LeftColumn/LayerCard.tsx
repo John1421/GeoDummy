@@ -1,4 +1,4 @@
-import { memo, useMemo, useRef } from "react";
+import { memo, useMemo, useRef, useState, useEffect } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Eye, EyeOff } from "lucide-react";
@@ -9,9 +9,10 @@ interface LayerCardProps {
   layer: Layer;
   onSettings: (layerId: string, rect: DOMRect) => void;
   onToggleVisibility: (layerId: string) => void;
+  onRename: (layerId: string, newTitle: string) => void;
 }
 
-function LayerCardComponent({ layer, onSettings, onToggleVisibility }: LayerCardProps) {
+function LayerCardComponent({ layer, onSettings, onToggleVisibility, onRename }: LayerCardProps) {
   const {
     setNodeRef,
     attributes,
@@ -23,6 +24,7 @@ function LayerCardComponent({ layer, onSettings, onToggleVisibility }: LayerCard
     id: layer.id,
     animateLayoutChanges: () => false,
   });
+
 
   // Local ref to measure the card position (used to place the settings window)
   const cardRef = useRef<HTMLDivElement | null>(null);
@@ -64,6 +66,31 @@ function LayerCardComponent({ layer, onSettings, onToggleVisibility }: LayerCard
     onToggleVisibility(layer.id);
   };
 
+  // Inline rename state
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [draftTitle, setDraftTitle] = useState(layer.title);
+
+  useEffect(() => {
+    // Keep draft in sync if the layer title changes externally
+    if (!isEditingTitle) setDraftTitle(layer.title);
+  }, [layer.title, isEditingTitle]);
+
+  const commitTitle = () => {
+    const trimmed = draftTitle.trim();
+    setIsEditingTitle(false);
+    if (!trimmed) {
+      setDraftTitle(layer.title);
+      return;
+    }
+    if (trimmed !== layer.title) onRename(layer.id, trimmed);
+  };
+
+  const cancelTitle = () => {
+    setIsEditingTitle(false);
+    setDraftTitle(layer.title);
+  };
+
+
   return (
     <div
       ref={(node) => {
@@ -102,20 +129,51 @@ function LayerCardComponent({ layer, onSettings, onToggleVisibility }: LayerCard
           <GripVertical size={18} style={{ color: colors.dragIcon }} />
         </button>
 
-        {/* Layer title */}
-        <span
-          style={{
-            flex: 1,
-            fontFamily: typography.normalFont,
-            fontSize: typography.sizeSm,
-            fontWeight: 500,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {layer.title}
-        </span>
+        {/* Layer title (double click to edit) */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {isEditingTitle ? (
+            <input
+              value={draftTitle}
+              onChange={(e) => setDraftTitle(e.target.value)}
+              autoFocus
+              onBlur={commitTitle}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitTitle();
+                if (e.key === "Escape") cancelTitle();
+              }}
+              style={{
+                width: "100%",
+                fontFamily: typography.normalFont,
+                fontSize: typography.sizeSm,
+                fontWeight: 500,
+                background: "transparent",
+                border: `1px solid ${colors.borderStroke}`,
+                borderRadius: radii.sm,
+                paddingInline: 6,
+                paddingBlock: 2,
+                color: colors.sidebarForeground,
+                outline: "none",
+              }}
+            />
+          ) : (
+            <span
+              onDoubleClick={() => setIsEditingTitle(true)}
+              title="Double click to rename"
+              style={{
+                display: "block",
+                fontFamily: typography.normalFont,
+                fontSize: typography.sizeSm,
+                fontWeight: 500,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                cursor: "text",
+              }}
+            >
+              {layer.title}
+            </span>
+          )}
+        </div>
 
         {/* Visibility icon (eye or eye-off) */}
         <button

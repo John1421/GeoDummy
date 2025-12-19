@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { Layer } from "./LayerSidebar";
+import { LAYER_COLOR_PALETTE } from "./LayerSidebar";
 import { colors, typography, radii, spacing, shadows } from "../Design/DesignTokens";
 
 /**
@@ -16,6 +17,7 @@ interface LayerSettingsWindowProps {
   onOpacityChange: (layerId: string, opacity: number) => void;
   onRestoreOpacity: (layerId: string) => void;
   onDeleteLayer: (layerId: string) => void;
+  onColorChange: (layerId: string, color: string) => void;
 }
 
 export default function LayerSettingsWindow({
@@ -26,6 +28,7 @@ export default function LayerSettingsWindow({
   onOpacityChange,
   onRestoreOpacity,
   onDeleteLayer,
+  onColorChange,
 }: LayerSettingsWindowProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
 
@@ -34,6 +37,8 @@ export default function LayerSettingsWindow({
     top: number;
     left: number;
   } | null>(null);
+
+  const [isColorPaletteOpen, setIsColorPaletteOpen] = useState(false);
 
   // Close with ESC key
   useEffect(() => {
@@ -102,11 +107,19 @@ export default function LayerSettingsWindow({
     setAdjustedPosition({ top, left });
   }, [isOpen, position]);
 
+  // Reset palette state when opening/closing or switching layer
+  useEffect(() => {
+    if (!isOpen) return;
+    setIsColorPaletteOpen(false);
+  }, [isOpen, layer?.id]);
+
   // If closed or missing data, render nothing
   if (!isOpen || !layer || !position) return null;
 
+  const isVector = layer.kind === "vector" || !!layer.vectorData;
   const currentOpacity = layer.opacity ?? 1;
   const opacityPercent = Math.round(currentOpacity * 100);
+  const currentColor = layer.color ?? "#2563EB";
 
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = Number(e.target.value);
@@ -126,6 +139,11 @@ export default function LayerSettingsWindow({
     onDeleteLayer(layer.id);
   };
 
+  const handlePickColor = (c: string) => {
+    onColorChange(layer.id, c);
+    setIsColorPaletteOpen(false);
+  };
+
   // Inline style for CSS variable used in the slider gradient
   const sliderStyle: React.CSSProperties = {
     width: "100%",
@@ -138,11 +156,7 @@ export default function LayerSettingsWindow({
 
   return (
     <>
-      {/* Local styles for the opacity slider.
-          - Filled part: colors.primary
-          - Unfilled part: colors.borderStroke
-          - Thumb: darker solid color, no border
-      */}
+      {/* Local styles for the opacity slider. */}
       <style>
         {`
           .opacity-slider {
@@ -222,7 +236,7 @@ export default function LayerSettingsWindow({
           overflow: "hidden",
         }}
       >
-        {/* Header with gradient similar to WindowTemplate */}
+        {/* Header */}
         <div
           style={{
             display: "flex",
@@ -290,14 +304,7 @@ export default function LayerSettingsWindow({
               gap: 12,
             }}
           >
-            <span
-              style={{
-                fontWeight: 600,
-                whiteSpace: "nowrap",
-              }}
-            >
-              Source file:
-            </span>
+            <span style={{ fontWeight: 600, whiteSpace: "nowrap" }}>Source file:</span>
             <span
               style={{
                 flex: 1,
@@ -322,14 +329,7 @@ export default function LayerSettingsWindow({
               gap: 12,
             }}
           >
-            <span
-              style={{
-                fontWeight: 600,
-                whiteSpace: "nowrap",
-              }}
-            >
-              Geometry type:
-            </span>
+            <span style={{ fontWeight: 600, whiteSpace: "nowrap" }}>Geometry type:</span>
             <span
               style={{
                 flex: 1,
@@ -344,6 +344,87 @@ export default function LayerSettingsWindow({
               {layer.geometryType ?? "Unknown"}
             </span>
           </div>
+
+          {/* Color (vector only) */}
+          {isVector && (
+            <div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 6,
+                }}
+              >
+                <span style={{ fontWeight: 600 }}>Color</span>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span
+                    title={currentColor}
+                    style={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: 999,
+                      backgroundColor: currentColor,
+                      border: `1px solid ${colors.borderStroke}`,
+                      display: "inline-block",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setIsColorPaletteOpen((v) => !v)}
+                    style={{
+                      paddingInline: 10,
+                      paddingBlock: 4,
+                      borderRadius: radii.sm,
+                      border: `1px solid ${colors.borderStroke}`,
+                      backgroundColor: colors.cardBackground,
+                      cursor: "pointer",
+                      fontSize: typography.sizeSm,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {isColorPaletteOpen ? "Close" : "Change"}
+                  </button>
+                </div>
+              </div>
+
+              {isColorPaletteOpen && (
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 8,
+                    padding: 10,
+                    borderRadius: radii.md,
+                    border: `1px solid ${colors.borderStroke}`,
+                    backgroundColor: colors.cardBackground,
+                  }}
+                >
+                  {LAYER_COLOR_PALETTE.map((c) => {
+                    const selected = c.toLowerCase() === currentColor.toLowerCase();
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => handlePickColor(c)}
+                        title={c}
+                        style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: 999,
+                          border: selected ? `2px solid ${colors.primary}` : `1px solid ${colors.borderStroke}`,
+                          backgroundColor: c,
+                          cursor: "pointer",
+                          padding: 0,
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Opacity controls */}
           <div>
@@ -377,12 +458,7 @@ export default function LayerSettingsWindow({
                 columnGap: 8,
               }}
             >
-              <div
-                style={{
-                  display: "flex",
-                  gap: 8,
-                }}
-              >
+              <div style={{ display: "flex", gap: 8 }}>
                 <button
                   type="button"
                   onClick={handleHide}

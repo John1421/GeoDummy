@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Layers as LayersIcon, ListFilter } from "lucide-react";
 import LayerCardList from "./LayerCardList";
 import NewLayerWindow from "./NewLayerWindow";
@@ -6,271 +6,504 @@ import SidebarPanel from "../TemplateModals/SidebarModal";
 import LayerSettingsWindow from "./LayerSettingsWindow";
 import { colors, icons } from "../Design/DesignTokens";
 
-/** Layer model stored in state. */
+/**
+ * Layer data model stored in UI state.
+ * - "vector": holds GeoJSON FeatureCollection (ready to render)
+ * - "raster": holds a raster descriptor (XYZ tiles or georeferenced image)
+ */
+export type LayerKind = "vector" | "raster";
+
+export type RasterDescriptor =
+  | {
+      kind: "xyz";
+      urlTemplate: string; // e.g. /tiles/{id}/{z}/{x}/{y}.png
+      minZoom?: number;
+      maxZoom?: number;
+    }
+  | {
+      kind: "image";
+      url: string; // e.g. /rasters/{id}.png
+      bounds: [[number, number], [number, number]]; // [[southWestLat, southWestLng],[northEastLat,northEastLng]]
+    };
+
 export interface Layer {
   id: string;
   title: string;
+  order: number; // higher = visually on top
+
   fileName?: string;
-  geometryType?: string;
   opacity?: number; // 0..1
-  previousOpacity?: number; // last non-zero opacity
-  order: number; // higher = closer to top
+  previousOpacity?: number;
+
+  kind?: LayerKind;
+  geometryType?: string; // backend metadata (vector), e.g. Polygon, MultiLineString, etc.
+
+  // Raw file selected in the browser (used for POST /layers later)
+  file?: File;
+  fileLastModified?: number;
+
+  // Data that BaseMap will actually render
+  vectorData?: GeoJSON.FeatureCollection;
+  rasterData?: RasterDescriptor;
+
+  // Vector styling (raster ignores this for now)
+  color?: string; // hex like "#22C55E"
 }
 
-/** Example layers to test geometry ordering. */
-const EXAMPLE_LAYERS: Layer[] = [
-  // Raster (bottom)
+/**
+ * Predefined palette for vector styling.
+ * Keep it small and consistent to avoid UX chaos.
+ */
+export const LAYER_COLOR_PALETTE: string[] = [
+  "#4B5563", // gray
+  "#0F172A", // slate
+  "#6936c3ff", // purple
+  "#1e52c1ff", // blue
+  "#0891B2", // cyan
+  "#49aa6dff", // green
+  "#CA8A04", // amber
+  "#F97316", // orange
+  "#ca5887ff", // pink
+  "#bf1717ff", // red
+];
+
+const DEFAULT_COLOR_BY_GEOM = {
+  point: "#16A34A",
+  line: "#F97316",
+  polygon: "#2563EB",
+  unknown: "#7C3AED",
+} as const;
+
+const normalizeGeomKey = (geometryType?: string) => {
+  const t = (geometryType ?? "").toLowerCase();
+  if (t.includes("point")) return "point";
+  if (t.includes("line")) return "line";
+  if (t.includes("polygon")) return "polygon";
+  return "unknown";
+};
+
+const defaultColorForGeometryType = (geometryType?: string) => {
+  const k = normalizeGeomKey(geometryType);
+  return DEFAULT_COLOR_BY_GEOM[k];
+};
+
+const detectGeometryTypeFromFC = (fc: GeoJSON.FeatureCollection): string | undefined => {
+  const first = fc.features?.find((f) => f?.geometry?.type)?.geometry?.type;
+  return first || "FeatureCollection";
+};
+
+/**
+ * Demo GeoJSON data (kept inline to avoid extra files/config).
+ * Typed as FeatureCollection so TS knows "features" exists.
+ */
+const DEMO_POINTS: GeoJSON.FeatureCollection = {
+  type: "FeatureCollection",
+  features: [
+    {
+      type: "Feature",
+      properties: { name: "Lisboa" },
+      geometry: { type: "Point", coordinates: [-9.1393, 38.7223] },
+    },
+    {
+      type: "Feature",
+      properties: { name: "Porto" },
+      geometry: { type: "Point", coordinates: [-8.6291, 41.1579] },
+    },
+    {
+      type: "Feature",
+      properties: { name: "Coimbra" },
+      geometry: { type: "Point", coordinates: [-8.4292, 40.2115] },
+    },
+  ],
+};
+
+const DEMO_POLYGONS: GeoJSON.FeatureCollection = {
+  type: "FeatureCollection",
+  features: [
+    {
+      type: "Feature",
+      properties: { region: "Centro" },
+      geometry: {
+        type: "Polygon",
+        coordinates: [
+          [
+            [-8.9, 40.5],
+            [-8.0, 40.5],
+            [-8.0, 39.8],
+            [-8.9, 39.8],
+            [-8.9, 40.5],
+          ],
+        ],
+      },
+    },
+    {
+      type: "Feature",
+      properties: { region: "Lisboa" },
+      geometry: {
+        type: "Polygon",
+        coordinates: [
+          [
+            [-9.5, 38.9],
+            [-9.0, 38.9],
+            [-9.0, 38.5],
+            [-9.5, 38.5],
+            [-9.5, 38.9],
+          ],
+        ],
+      },
+    },
+  ],
+};
+
+// Demo layers to show on first app open
+const DEMO_LAYERS: Layer[] = [
   {
-    id: "r1",
-    title: "Satellite Imagery",
-    fileName: "sentinel2.tif",
-    geometryType: "Raster",
-    opacity: 1,
-    previousOpacity: 1,
+    id: "demo_raster_osm",
+    title: "Demo Raster (Satellite)",
     order: 0,
+    opacity: 1,
+    kind: "raster",
+    rasterData: {
+      kind: "xyz",
+      urlTemplate:
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      minZoom: 0,
+      maxZoom: 19,
+    },
+    // raster ignores color for now
   },
   {
-    id: "r2",
-    title: "Elevation Model",
-    fileName: "dem_25m.tif",
-    geometryType: "Raster",
-    opacity: 1,
-    previousOpacity: 1,
+    id: "demo_points",
+    title: "Demo Points",
     order: 1,
-  },
-
-  // Polygons
-  {
-    id: "p1",
-    title: "Administrative Boundaries",
-    fileName: "admin_boundaries.geojson",
-    geometryType: "Polygon",
     opacity: 1,
-    previousOpacity: 1,
+    kind: "vector",
+    geometryType: "Point",
+    vectorData: DEMO_POINTS,
+    color: defaultColorForGeometryType("Point"),
+  },
+  {
+    id: "demo_polygons",
+    title: "Demo Polygons",
     order: 2,
-  },
-  {
-    id: "p2",
-    title: "Building Footprints",
-    fileName: "buildings.geojson",
+    opacity: 1,
+    kind: "vector",
     geometryType: "Polygon",
-    opacity: 1,
-    previousOpacity: 1,
-    order: 3,
-  },
-  {
-    id: "p3",
-    title: "Land Parcels",
-    fileName: "parcels.geojson",
-    geometryType: "Polygon",
-    opacity: 1,
-    previousOpacity: 1,
-    order: 4,
-  },
-
-  // Lines
-  {
-    id: "l1",
-    title: "Road Network",
-    fileName: "roads.geojson",
-    geometryType: "Line",
-    opacity: 1,
-    previousOpacity: 1,
-    order: 5,
-  },
-  {
-    id: "l2",
-    title: "Rivers",
-    fileName: "rivers.geojson",
-    geometryType: "Line",
-    opacity: 1,
-    previousOpacity: 1,
-    order: 6,
-  },
-
-  // Points (top)
-  {
-    id: "pt1",
-    title: "Tree Locations",
-    fileName: "trees.geojson",
-    geometryType: "Point",
-    opacity: 1,
-    previousOpacity: 1,
-    order: 7,
-  },
-  {
-    id: "pt2",
-    title: "Public Facilities",
-    fileName: "facilities.geojson",
-    geometryType: "Point",
-    opacity: 1,
-    previousOpacity: 1,
-    order: 8,
+    vectorData: DEMO_POLYGONS,
+    color: defaultColorForGeometryType("Polygon"),
   },
 ];
 
-/** Geometry rank for ordering. */
-function getGeometryRank(geometryType?: string): number {
-  if (!geometryType) return 5;
-
-  const g = geometryType.toLowerCase();
-
-  if (g.includes("point")) return 1; // top
-  if (g.includes("line")) return 2;
-  if (g.includes("polygon")) return 3;
-  if (g.includes("raster")) return 4; // bottom of known types
-
-  return 5; // unknown
+interface LayerSidebarProps {
+  layers: Layer[];
+  setLayers: React.Dispatch<React.SetStateAction<Layer[]>>;
 }
 
-export default function LayerSidebar() {
-  const [isWindowOpen, setIsWindowOpen] = useState(false);
-  const [layers, setLayers] = useState<Layer[]>(EXAMPLE_LAYERS);
+/**
+ * Placeholder API layer (no actual network calls yet).
+ * Keep this file as the single place where backend integration will be wired.
+ */
+async function postLayerFilePlaceholder(_file: File): Promise<{ ids: string[] }> {
+  // TODO: POST /layers multipart/form-data { file }
+  // Expected response example:
+  //  - { ids: ["layer_1"] }
+  //  - { ids: ["layer_a", "layer_b"] } (GeoPackage with multiple sublayers)
+  return { ids: [crypto.randomUUID()] };
+}
 
-  // Selected layer for settings window.
+async function getLayerMetadataPlaceholder(_id: string): Promise<{
+  kind: LayerKind;
+  geometryType?: string;
+}> {
+  // TODO: GET /layers/{id}/metadata
+  // Suggested: kind + geometryType for vectors, kind only for rasters.
+  return { kind: "vector", geometryType: "Unknown" };
+}
+
+async function getLayerDataPlaceholder(
+  _id: string,
+  _kind: LayerKind
+): Promise<{ vectorData?: GeoJSON.FeatureCollection; rasterData?: RasterDescriptor }> {
+  // TODO: GET /layers/{id}
+  // - If vector: return GeoJSON FeatureCollection (or a URL to fetch it)
+  // - If raster: return raster descriptor (XYZ tiles or image+bounds)
+  return {};
+}
+
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+
+export default function LayerSidebar({ layers, setLayers }: LayerSidebarProps) {
+  const [isWindowOpen, setIsWindowOpen] = useState(false);
+
   const [settingsLayerId, setSettingsLayerId] = useState<string | null>(null);
-  const [settingsPosition, setSettingsPosition] = useState<{
-    top: number;
-    left: number;
-  } | null>(null);
+  const [settingsPosition, setSettingsPosition] = useState<{ top: number; left: number } | null>(
+    null
+  );
 
   const selectedSettingsLayer = useMemo(
     () => layers.find((l) => l.id === settingsLayerId) ?? null,
     [layers, settingsLayerId]
   );
 
-  /** Add a new layer from the NewLayerWindow. */
-  const handleAddLayer = useCallback(
-    (chosenTitle: string, fileName: string) => {
-      setLayers((prev) => {
-        // Use explicit order; higher = closer to top
-        const maxOrder =
-          prev.length === 0
-            ? 0
-            : Math.max(
-                ...prev.map((l, index) =>
-                  typeof l.order === "number" ? l.order : index
-                )
-              );
+  const getNextOrder = useCallback(() => {
+    if (layers.length === 0) return 0;
+    return Math.max(...layers.map((l) => (typeof l.order === "number" ? l.order : 0))) + 1;
+  }, [layers]);
 
-        return [
-          ...prev,
-          {
-            id: crypto.randomUUID(),
-            title: chosenTitle,
-            fileName,
-            geometryType: undefined,
+  /**
+   * Add new layer workflow (prepared for backend):
+   * 1) Create a temporary UI layer (so the UI responds instantly).
+   * 2) Placeholder POST -> receive 1..N ids.
+   * 3) For each id: placeholder GET metadata + data.
+   * 4) Update / split layers accordingly.
+   *
+   * For now:
+   * - GeoJSON is previewed client-side (so you can see something immediately).
+   * - Raster is created as "pending data" (will render once backend provides rasterData).
+   */
+  const handleAddLayer = useCallback(
+    async (file: File) => {
+      const ext = file.name.split(".").pop()?.toLowerCase();
+      const tempId = crypto.randomUUID();
+      const nextOrder = getNextOrder();
+
+      // Create a single temporary layer now (may later become multiple layers if backend returns multiple ids)
+      setLayers((prev) => [
+        ...prev,
+        {
+          id: tempId,
+          title: tempId, // testing: name = id
+          order: nextOrder,
+          fileName: file.name,
+          file,
+          fileLastModified: file.lastModified,
+          opacity: 1,
+          previousOpacity: 1,
+          // color will be assigned once we know geometry type
+        },
+      ]);
+
+      // Client-side preview for GeoJSON/JSON only (keeps development fast)
+      if (ext === "geojson" || ext === "json") {
+        try {
+          const text = await file.text();
+          const parsed = JSON.parse(text);
+
+          if (!parsed || typeof parsed !== "object" || !("type" in parsed)) {
+            throw new Error("Invalid GeoJSON: missing root 'type'.");
+          }
+
+          // Normalize to FeatureCollection to keep UI state consistent
+          const normalized: GeoJSON.FeatureCollection =
+            parsed.type === "FeatureCollection"
+              ? parsed
+              : parsed.type === "Feature"
+              ? { type: "FeatureCollection", features: [parsed] }
+              : {
+                  type: "FeatureCollection",
+                  features: [
+                    {
+                      type: "Feature",
+                      properties: {},
+                      geometry: parsed,
+                    },
+                  ],
+                };
+
+          const detectedGeom = detectGeometryTypeFromFC(normalized);
+          const defaultColor = defaultColorForGeometryType(detectedGeom);
+
+          setLayers((prev) =>
+            prev.map((l) =>
+              l.id === tempId
+                ? {
+                    ...l,
+                    kind: "vector",
+                    geometryType: detectedGeom,
+                    vectorData: normalized,
+                    color: defaultColor,
+                  }
+                : l
+            )
+          );
+          return;
+        } catch {
+          // Keep the layer, but without data. Backend integration will later handle errors properly.
+          return;
+        }
+      }
+
+      // Backend placeholders (kept here, ready to wire)
+      // 1) POST file -> receive one or many ids
+      const { ids } = await postLayerFilePlaceholder(file);
+
+      // If the backend returns multiple ids, replace the temporary layer with one layer per id
+      if (ids.length > 1) {
+        setLayers((prev) => {
+          const withoutTemp = prev.filter((l) => l.id !== tempId);
+          const baseOrder = nextOrder;
+          const newOnes: Layer[] = ids.map((id, idx) => ({
+            id,
+            title: id,
+            order: baseOrder + idx,
+            fileName: file.name,
             opacity: 1,
             previousOpacity: 1,
-            order: maxOrder + 1,
-          },
-        ];
-      });
+          }));
+          return [...withoutTemp, ...newOnes];
+        });
+      } else {
+        // Single id: update the temporary layer id -> backend id
+        const backendId = ids[0];
+        setLayers((prev) =>
+          prev.map((l) =>
+            l.id === tempId
+              ? {
+                  ...l,
+                  id: backendId,
+                  title: backendId,
+                }
+              : l
+          )
+        );
+      }
+
+      // 2) GET metadata + data for each id (placeholders)
+      for (const id of ids) {
+        const meta = await getLayerMetadataPlaceholder(id);
+        const data = await getLayerDataPlaceholder(id, meta.kind);
+
+        setLayers((prev) =>
+          prev.map((l) =>
+            l.id === id
+              ? {
+                  ...l,
+                  kind: meta.kind,
+                  geometryType: meta.geometryType,
+                  vectorData: data.vectorData,
+                  rasterData: data.rasterData,
+                  color:
+                    meta.kind === "vector"
+                      ? l.color ?? defaultColorForGeometryType(meta.geometryType)
+                      : l.color,
+                }
+              : l
+          )
+        );
+      }
     },
-    []
+    [getNextOrder, setLayers]
   );
 
-  /** Open settings window for a given layer. */
+  // Seed demo layers only when the list is empty (first app open)
+  useEffect(() => {
+    if (layers.length > 0) return;
+    setLayers(DEMO_LAYERS);
+  }, [layers.length, setLayers]);
+
+  /** Rename layer title (double-click edit in card). */
+  const handleRenameLayer = useCallback(
+    (layerId: string, newTitle: string) => {
+      const trimmed = newTitle.trim();
+      if (!trimmed) return;
+      setLayers((prev) => prev.map((l) => (l.id === layerId ? { ...l, title: trimmed } : l)));
+    },
+    [setLayers]
+  );
+
+  /** Open settings window. */
   const handleSettings = useCallback((layerId: string, rect: DOMRect) => {
     setSettingsLayerId(layerId);
-    setSettingsPosition({
-      top: rect.top,
-      left: rect.right + 8,
-    });
+    setSettingsPosition({ top: rect.top, left: rect.right + 8 });
   }, []);
 
-  /**
-   * Change layer opacity.
-   * Stores last visible opacity in previousOpacity.
-   */
-  const handleOpacityChange = useCallback((layerId: string, opacity: number) => {
-    setLayers((prev) =>
-      prev.map((layer) => {
-        if (layer.id !== layerId) return layer;
+  /** Opacity change (stores previous non-zero opacity). */
+  const handleOpacityChange = useCallback(
+    (layerId: string, opacity: number) => {
+      const normalized = clamp01(opacity);
+      setLayers((prev) =>
+        prev.map((l) => {
+          if (l.id !== layerId) return l;
 
-        const oldOpacity = layer.opacity ?? 1;
-        const normalized = Math.min(1, Math.max(0, opacity));
+          const old = typeof l.opacity === "number" ? l.opacity : 1;
+          const next: Layer = { ...l, opacity: normalized };
 
-        const next: Layer = { ...layer, opacity: normalized };
+          if (normalized <= 0.01) {
+            next.previousOpacity =
+              (l.previousOpacity ?? old) > 0.01 ? (l.previousOpacity ?? old) : 1;
+          } else {
+            next.previousOpacity = normalized;
+          }
+          return next;
+        })
+      );
+    },
+    [setLayers]
+  );
 
-        if (normalized <= 0.01) {
-          const lastVisible =
-            layer.previousOpacity && layer.previousOpacity > 0.01
-              ? layer.previousOpacity
-              : oldOpacity > 0.01
-              ? oldOpacity
-              : 1;
-          next.previousOpacity = lastVisible;
-        } else {
-          next.previousOpacity = normalized;
-        }
+  /** Toggle visibility using opacity. */
+  const handleToggleVisibility = useCallback(
+    (layerId: string) => {
+      setLayers((prev) =>
+        prev.map((l) => {
+          if (l.id !== layerId) return l;
 
-        return next;
-      })
-    );
-  }, []);
+          const current = typeof l.opacity === "number" ? l.opacity : 1;
+          const hidden = current <= 0.01;
 
-  /**
-   * Toggle layer visibility using opacity.
-   *  - Visible → opacity 0 and store previous.
-   *  - Hidden  → restore previousOpacity or 1.
-   */
-  const handleToggleVisibility = useCallback((layerId: string) => {
-    setLayers((prev) =>
-      prev.map((layer) => {
-        if (layer.id !== layerId) return layer;
+          if (hidden) {
+            const restored = (l.previousOpacity ?? 1) > 0.01 ? (l.previousOpacity as number) : 1;
+            return { ...l, opacity: restored, previousOpacity: restored };
+          }
 
-        const currentOpacity = layer.opacity ?? 1;
-        const isHidden = currentOpacity <= 0.01;
-
-        if (isHidden) {
-          const restored =
-            (layer.previousOpacity ?? 1) > 0.01
-              ? (layer.previousOpacity as number)
-              : 1;
           return {
-            ...layer,
-            opacity: restored,
-            previousOpacity: restored,
+            ...l,
+            previousOpacity: current > 0.01 ? current : l.previousOpacity ?? 1,
+            opacity: 0,
           };
-        }
-
-        return {
-          ...layer,
-          previousOpacity:
-            currentOpacity > 0.01 ? currentOpacity : layer.previousOpacity ?? 1,
-          opacity: 0,
-        };
-      })
-    );
-  }, []);
+        })
+      );
+    },
+    [setLayers]
+  );
 
   /** Restore visibility from settings window shortcut. */
-  const handleRestoreOpacity = useCallback((layerId: string) => {
-    setLayers((prev) =>
-      prev.map((layer) => {
-        if (layer.id !== layerId) return layer;
+  const handleRestoreOpacity = useCallback(
+    (layerId: string) => {
+      setLayers((prev) =>
+        prev.map((l) => {
+          if (l.id !== layerId) return l;
+          const restored = (l.previousOpacity ?? 1) > 0.01 ? (l.previousOpacity as number) : 1;
+          return { ...l, opacity: restored, previousOpacity: restored };
+        })
+      );
+    },
+    [setLayers]
+  );
 
-        const restored =
-          (layer.previousOpacity ?? 1) > 0.01
-            ? (layer.previousOpacity as number)
-            : 1;
+  /** Change vector color (palette). */
+  const handleColorChange = useCallback(
+    (layerId: string, color: string) => {
+      setLayers((prev) =>
+        prev.map((l) => {
+          if (l.id !== layerId) return l;
+          // Only meaningful for vectors; keep field even if kind unknown (future metadata)
+          return { ...l, color };
+        })
+      );
+    },
+    [setLayers]
+  );
 
-        return {
-          ...layer,
-          opacity: restored,
-          previousOpacity: restored,
-        };
-      })
-    );
-  }, []);
-
-  /** Delete a layer from settings window. */
-  const handleDeleteLayer = useCallback((layerId: string) => {
-    setLayers((prev) => prev.filter((layer) => layer.id !== layerId));
-    setSettingsLayerId(null);
-    setSettingsPosition(null);
-  }, []);
+  /** Delete layer. */
+  const handleDeleteLayer = useCallback(
+    (layerId: string) => {
+      setLayers((prev) => prev.filter((l) => l.id !== layerId));
+      setSettingsLayerId(null);
+      setSettingsPosition(null);
+    },
+    [setLayers]
+  );
 
   /** Close settings window. */
   const handleCloseSettings = useCallback(() => {
@@ -279,33 +512,36 @@ export default function LayerSidebar() {
   }, []);
 
   /**
-   * Reorder layers by geometry type.
-   * Top → bottom: Points → Lines → Polygons → Raster → Others.
-   * Keeps relative order inside each group using current order.
+   * Header button: reorder by geometry type.
+   * This is your "reorder button" that was previously present.
    */
   const handleReorderByGeometry = useCallback(() => {
     setLayers((prev) => {
       const sorted = [...prev].sort((a, b) => {
-        const rankA = getGeometryRank(a.geometryType);
-        const rankB = getGeometryRank(b.geometryType);
+        const aType = (a.geometryType ?? "").toLowerCase();
+        const bType = (b.geometryType ?? "").toLowerCase();
 
-        if (rankA !== rankB) return rankA - rankB;
+        const rank = (t: string) => {
+          if (t.includes("point")) return 1;
+          if (t.includes("line")) return 2;
+          if (t.includes("polygon")) return 3;
+          if (t.includes("vector")) return 4;
+          if (t.includes("raster")) return 5;
+          return 6;
+        };
 
-        // Same geometry type → alphabetical by title
+        const ra = rank(aType);
+        const rb = rank(bType);
+        if (ra !== rb) return ra - rb;
         return a.title.localeCompare(b.title);
       });
 
-      // Assign new explicit order so that top has highest order
       const len = sorted.length;
-
-      return sorted.map((layer, index) => ({
-        ...layer,
-        order: len - 1 - index,
-      }));
+      // Ensure explicit order: top card has highest order
+      return sorted.map((layer, index) => ({ ...layer, order: len - 1 - index }));
     });
-  }, []);
+  }, [setLayers]);
 
-  /** Header button for reordering by geometry type. */
   const headerActions = (
     <button
       type="button"
@@ -336,13 +572,7 @@ export default function LayerSidebar() {
       <SidebarPanel
         side="left"
         title="Layers"
-        icon={
-          <LayersIcon
-            size={icons.size}
-            color={colors.primary}
-            strokeWidth={icons.strokeWidth}
-          />
-        }
+        icon={<LayersIcon size={icons.size} color={colors.primary} strokeWidth={icons.strokeWidth} />}
         expandedWidthClassName="w-72"
         collapsedWidthClassName="w-12"
         onAdd={() => setIsWindowOpen(true)}
@@ -353,6 +583,7 @@ export default function LayerSidebar() {
           setLayers={setLayers}
           onSettings={handleSettings}
           onToggleVisibility={handleToggleVisibility}
+          onRename={handleRenameLayer}
         />
       </SidebarPanel>
 
@@ -360,7 +591,6 @@ export default function LayerSidebar() {
         isOpen={isWindowOpen}
         onClose={() => setIsWindowOpen(false)}
         onSelect={handleAddLayer}
-        existingLayerNames={layers.map((layer) => layer.title)}
       />
 
       <LayerSettingsWindow
@@ -371,6 +601,7 @@ export default function LayerSidebar() {
         onOpacityChange={handleOpacityChange}
         onRestoreOpacity={handleRestoreOpacity}
         onDeleteLayer={handleDeleteLayer}
+        onColorChange={handleColorChange}
       />
     </>
   );
