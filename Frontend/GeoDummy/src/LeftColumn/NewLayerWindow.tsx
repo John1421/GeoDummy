@@ -12,6 +12,7 @@ interface NewLayerWindowProps {
 export default function NewLayerWindow({ isOpen, onClose, onSelect }: NewLayerWindowProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const allowedExtensions = [".geojson", ".zip", ".tiff", ".tif", ".gpkg"];
 
   // Reset fields every time modal opens
   useEffect(() => {
@@ -23,6 +24,14 @@ export default function NewLayerWindow({ isOpen, onClose, onSelect }: NewLayerWi
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const ext = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
+    if (!allowedExtensions.includes(ext)) {
+      setSelectedFile(null);
+      setError("Only .geojson, .zip, .tiff, .tif, or .gpkg files are supported.");
+      return;
+    }
+
     setSelectedFile(file);
     setError(null);
   };
@@ -114,10 +123,26 @@ export default function NewLayerWindow({ isOpen, onClose, onSelect }: NewLayerWi
             >
               <span>{selectedFile?.name ?? "Browse Files"}</span>
               <FolderOpen size={18} />
-              <input type="file" onChange={handleFileChange} style={{ display: "none" }} />
+              <input
+                type="file"
+                accept=".geojson,.zip,.tiff,.tif,.gpkg"
+                onChange={handleFileChange}
+                style={{ display: "none" }}
+              />
             </label>
           </div>
         </div>
+
+        <p
+          style={{
+            fontSize: typography.sizeSm,
+            color: colors.mutedForeground,
+            fontFamily: typography.normalFont,
+            margin: 0,
+          }}
+        >
+          Accepted: .geojson, .zip, .tiff, .tif, .gpkg
+        </p>
 
         {error && (
           <p
