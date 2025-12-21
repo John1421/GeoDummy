@@ -11,6 +11,8 @@ import shutil
 import rasterio
 import uuid
 import json
+from werkzeug.exceptions import NotFound
+import math
 
 file_manager = FileManager()
 
@@ -548,7 +550,7 @@ class LayerManager:
                     matches.append(filename)
 
             if not matches:
-                raise FileNotFoundError(f"No layer file found for layer_id '{layer_id}'")
+                raise NotFound(f"No layer file found for layer_id '{layer_id}'")
 
             if len(matches) > 1:
                 raise ValueError(
@@ -557,6 +559,51 @@ class LayerManager:
 
             _, extension = os.path.splitext(matches[0])
             return extension
+    
+    def tile_bounds(self, x, y, z):
+        """
+        Calculate the geographic bounding box of an XYZ tile in EPSG:4326.
+
+        Parameters:
+            x (int): Tile column number.
+            y (int): Tile row number.
+            z (int): Zoom level.
+
+        Returns:
+            (min_lon, min_lat, max_lon, max_lat): (float, float, float, float)
+            The longitude and latitude bounds of the tile in degrees.
+        """
+        n = 2.0 ** z
+        lon_deg_min = x / n * 360.0 - 180.0
+        lon_deg_max = (x + 1) / n * 360.0 - 180.0
+        lat_rad_min = math.atan(math.sinh(math.pi * (1 - 2 * (y + 1) / n)))
+        lat_rad_max = math.atan(math.sinh(math.pi * (1 - 2 * y / n)))
+        lat_deg_min = math.degrees(lat_rad_min)
+        lat_deg_max = math.degrees(lat_rad_max)
+        return lon_deg_min, lat_deg_min, lon_deg_max, lat_deg_max
+
+    def clean_raster_cache(self, cache_dir, CACHE_MAX_BYTES=500*1024*1024):
+        """
+        Remove oldest cached raster tiles to keep the total cache size under a limit.
+
+        Parameters:
+            cache_dir(str): Path to the cache directory containing raster tiles.
+            CACHE_MAX_BYTES(int, optional): Maximum allowed size of the cache in bytes. Defaults to 500 Mb.
+
+        Returns:
+        None
+        """
+        files = [(os.path.join(dp, f), os.path.getatime(os.path.join(dp, f)), os.path.getsize(os.path.join(dp, f)))
+                for dp, dn, filenames in os.walk(cache_dir) for f in filenames]
+        
+        files.sort(key=lambda x: x[1])  # oldest first
+        total_size = sum(f[2] for f in files)
+        
+        while total_size > CACHE_MAX_BYTES and files:
+            file_path, _, size = files.pop(0)
+            os.remove(file_path)
+            total_size -= size
+
 
 
     #=====================================================================================
@@ -646,8 +693,23 @@ class LayerManager:
             raise ValueError(f"Error reading GeoPackage: {e}")
 
     @staticmethod
-    def __get_raster_metadata(raster_path, crs_original):
+    def __get_raster_metadata(raster_path, crs_original, tile_size=256):
+
         with rasterio.open(raster_path) as src:
+            transform = src.transform
+            pixel_size_x = transform.a
+            pixel_size_y = -transform.e
+            pixel_size = max(pixel_size_x, pixel_size_y)
+
+            # Max zoom = finest resolution
+            zoom_max = math.ceil(math.log2(360 / (tile_size * pixel_size)))
+
+            # Min zoom = coarse resolution (whole raster fits in one tile)
+            raster_width_deg = pixel_size_x * src.width
+            raster_height_deg = pixel_size_y * src.height
+            raster_extent_deg = max(raster_width_deg, raster_height_deg)
+            zoom_min = max(0, math.floor(math.log2(360 / (tile_size * raster_extent_deg))))
+
             return {
                 "type": "raster",
                 "crs": src.crs.to_string() if src.crs else None,
@@ -655,7 +717,9 @@ class LayerManager:
                 "bands": src.count,
                 "width": src.width,
                 "height": src.height,
-                "resolution": src.res
+                "resolution": src.res,
+                "zoom_min": zoom_min,
+                "zoom_max": zoom_max    
             }
 
     @staticmethod

@@ -16,9 +16,16 @@ from flask_cors import CORS
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 
+import rasterio
+from rasterio.warp import transform_bounds
+from rasterio.windows import Window
+from PIL import Image
+import io
+import numpy as np
+
 
 ALLOWED_EXTENSIONS = {'.geojson', '.shp', '.gpkg', '.tif', '.tiff'}
-MAX_LAYER_FILE_SIZE_MB = 500
+MAX_LAYER_FILE_SIZE_MB = 1000
 
 app = Flask(__name__)
 CORS(app,origins=["http://localhost:5173"])
@@ -413,6 +420,69 @@ def get_layer(layer_id):
     else:
         export_file = layer_manager.export_raster_layer(layer_id)
     return send_file(export_file, as_attachment=True, download_name=f"{layer_id}{extension}")
+
+'''
+UC-B-16
+'''
+@app.route("/layers/<layer_id>/tiles/<int:z>/<int:x>/<int:y>.png")
+def serve_tile(layer_id, z, x, y, tile_size=256):
+    
+    # Compute a unique cache filenam
+    tile_key = f"{layer_id}_{z}_{x}_{y}.png"
+    cache_file = os.path.join(file_manager.raster_cache_dir, tile_key)
+
+    # Serve from cache if it exists
+    if os.path.exists(cache_file):
+        return send_file(cache_file, mimetype="image/png")
+
+    raster_path = layer_manager.export_raster_layer(layer_id)  # Update with your raster path
+
+    try:
+        with rasterio.open(raster_path) as src:
+
+            # Get the tile bounds
+            min_lon, min_lat, max_lon, max_lat = layer_manager.tile_bounds(x, y, z)
+
+            # Compute window in raster coordinates
+            col_start, row_start = src.index(min_lon, max_lat)  # top-left pixel
+            col_stop, row_stop = src.index(max_lon, min_lat)    # bottom-right pixel
+
+            width = col_stop - col_start
+            height = row_stop - row_start
+
+            if width <= 0 or height <= 0:
+                # Tile outside raster
+                img = Image.new("RGBA", (tile_size, tile_size), (0, 0, 0, 0))
+            else:
+                # Read window and resample to 256x256
+                window = Window(col_start, row_start, width, height)
+                data = src.read(
+                    window=window,
+                    out_shape=(src.count, tile_size, tile_size),
+                    resampling=rasterio.enums.Resampling.bilinear
+                )
+
+                # Convert to image
+                if src.count == 1:
+                    img = Image.fromarray(data[0], mode="L")  # single band
+                elif src.count >= 3:
+                    img = Image.fromarray(np.dstack(data[:3]), mode="RGB")
+                else:
+                    img = Image.fromarray(data[0], mode="L")
+            
+            # Save to cache
+            img.save(cache_file, format="PNG")
+
+            layer_manager.clean_raster_cache(file_manager.raster_cache_dir)
+
+            # Return as PNG
+            img_bytes = io.BytesIO()
+            img.save(img_bytes, format="PNG")
+            img_bytes.seek(0)
+            return send_file(img_bytes, mimetype="image/png")
+
+    except Exception as e:
+        raise ValueError(f"Error serving tile: {e}")
 
 @app.route('/layers/<layer_id>', methods=['PUT'])
 def export_layer(layer_id):    
