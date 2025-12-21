@@ -444,12 +444,12 @@ def serve_tile(layer_id, z, x, y, tile_size=256):
             min_lon, min_lat, max_lon, max_lat = layer_manager.tile_bounds(x, y, z)
 
             # Compute window in raster coordinates
-            col_start, row_start = src.index(min_lon, max_lat)  # top-left pixel
-            col_stop, row_stop = src.index(max_lon, min_lat)    # bottom-right pixel
+            row_start, col_start = src.index(min_lon, max_lat)  # top-left pixel
+            row_stop, col_stop = src.index(max_lon, min_lat)    # bottom-right pixel
 
             width = col_stop - col_start
             height = row_stop - row_start
-
+            
             if width <= 0 or height <= 0:
                 # Tile outside raster
                 img = Image.new("RGBA", (tile_size, tile_size), (0, 0, 0, 0))

@@ -9,6 +9,7 @@ from shapely.geometry import shape, mapping
 import rioxarray
 import shutil
 import rasterio
+from rasterio.warp import transform_bounds
 import uuid
 import json
 from werkzeug.exceptions import NotFound
@@ -710,6 +711,18 @@ class LayerManager:
             raster_extent_deg = max(raster_width_deg, raster_height_deg)
             zoom_min = max(0, math.floor(math.log2(360 / (tile_size * raster_extent_deg))))
 
+            # Bounding box (EPSG:4326)
+            bounds = src.bounds
+            min_lon, min_lat, max_lon, max_lat = transform_bounds(
+                src.crs,
+                "EPSG:4326",
+                bounds.left,
+                bounds.bottom,
+                bounds.right,
+                bounds.top,
+                densify_pts=21
+            )
+
             return {
                 "type": "raster",
                 "crs": src.crs.to_string() if src.crs else None,
@@ -719,7 +732,13 @@ class LayerManager:
                 "height": src.height,
                 "resolution": src.res,
                 "zoom_min": zoom_min,
-                "zoom_max": zoom_max    
+                "zoom_max": zoom_max,
+                "bbox": {
+                    "min_lon": min_lon,
+                    "min_lat": min_lat,
+                    "max_lon": max_lon,
+                    "max_lat": max_lat
+                }    
             }
 
     @staticmethod
