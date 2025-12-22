@@ -266,6 +266,9 @@ class ScriptManager:
 
         for file_path in output_files:
             if file_path.is_file():
+                filesize_bytes = os.path.getsize(file_path)
+                if filesize_bytes > layer_manager.MAX_LAYER_FILE_SIZE:
+                    raise BadRequest(f"Output file {file_path.name} exceeds the maximum allowed size of {layer_manager.MAX_LAYER_FILE_SIZE} MB.")
                 saved_file = self.__add_output_to_existing_layers_and_create_export_file(file_path)
                 output_file_paths.append(saved_file)
                 

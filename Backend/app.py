@@ -15,6 +15,7 @@ from DataManager import DataManager
 from flask_cors import CORS
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
+import uuid
 
 import rasterio
 from rasterio.warp import transform_bounds
@@ -25,7 +26,7 @@ import numpy as np
 
 
 ALLOWED_EXTENSIONS = {'.geojson', '.shp', '.gpkg', '.tif', '.tiff'}
-MAX_LAYER_FILE_SIZE_MB = 1000
+
 
 app = Flask(__name__)
 CORS(app,origins=["http://localhost:5173"])
@@ -265,15 +266,9 @@ def script_metadata(script_id):
 
 # Script Execution Endpoints
 
+
 '''
-Use Case: UC-B-11
-'''
-@app.route('/scripts/<script_id>', methods=['GET'])
-def script_validate_input():
-    
-    return 
-'''
-Implements UC-B-12 and UC-B-13, UC-B-14 is in the backgroung
+Implements UC-B-11, UC-B-12 and UC-B-13, UC-B-14 is in the background
 '''
 @app.route('/scripts/<script_id>', methods=['POST'])
 def run_script(script_id):
@@ -295,13 +290,16 @@ def run_script(script_id):
     if not os.path.isfile(script_path):
         raise BadRequest(f"Script '{script_id}' does not exist")
     
-    # TODO: Obter um execution ID e criar o folder temporário
 
-    # TODO: Copiar o script para o caminho temporário
+    execution_id = str(uuid.uuid4())
     
-    # script_manager.run_script() = UC-B-13
-    # TODO: Passar o execution ID para a função e o caminho temporário do script
-    output = script_manager.run_script(script_path, script_id, parameters)
+    output = script_manager.run_script(
+        script_path=script_path,
+        scriptid=script_id,
+        executionid=execution_id,
+        parameters=parameters,
+    )
+
 
     if isinstance(output, str) and os.path.isfile(output):
         file_name, file_extension = os.path.splitext(output)
@@ -376,7 +374,7 @@ def add_layer():
     temp_path = os.path.join(file_manager.temp_dir, added_file.filename)
     added_file.save(temp_path)
 
-    if os.path.getsize(temp_path) > MAX_LAYER_FILE_SIZE_MB * 1024 * 1024:
+    if os.path.getsize(temp_path) > layer_manager.MAX_LAYER_FILE_SIZE:
         os.remove(temp_path)
         raise BadRequest("The uploaded file exceeds the maximum allowed size.")
 
