@@ -25,7 +25,7 @@ import numpy as np
 
 
 ALLOWED_EXTENSIONS = {'.geojson', '.shp', '.gpkg', '.tif', '.tiff'}
-MAX_LAYER_FILE_SIZE_MB = 1000
+
 
 app = Flask(__name__)
 CORS(app,origins=["http://localhost:5173"])
@@ -376,7 +376,7 @@ def add_layer():
     temp_path = os.path.join(file_manager.temp_dir, added_file.filename)
     added_file.save(temp_path)
 
-    if os.path.getsize(temp_path) > MAX_LAYER_FILE_SIZE_MB * 1024 * 1024:
+    if os.path.getsize(temp_path) > layer_manager.MAX_LAYER_FILE_SIZE:
         os.remove(temp_path)
         raise BadRequest("The uploaded file exceeds the maximum allowed size.")
 

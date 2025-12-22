@@ -17,6 +17,7 @@ import math
 file_manager = FileManager()
 
 class LayerManager:
+    MAX_LAYER_FILE_SIZE = 1000 * 1024 * 1024 # 1000 MB
     def __init__(self):
         # Supported layer formats
         supported_ext = {'.gpkg', '.tif', '.tiff'}
