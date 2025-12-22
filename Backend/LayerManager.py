@@ -573,7 +573,16 @@ class LayerManager:
             os.remove(file_path)
             total_size -= size
 
+    def get_metadata(self, layer_id):
+        
+        metadata_filename = f"{layer_id}_metadata.json"
+        metadata_path = os.path.join(file_manager.layers_dir, metadata_filename)
 
+        if os.path.exists(metadata_path):
+            with open(metadata_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+            
+        return None
 
     #=====================================================================================
     #                               HELPER METHODS

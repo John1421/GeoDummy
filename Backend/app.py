@@ -540,7 +540,7 @@ def get_layer_attributes(layer_id):
     if not layer_id:
         raise BadRequest("layer_id parameter is required")
     try:
-        data = layer_manager.get_layer_information(layer_id)
+        data = layer_manager.get_metadata(layer_id)["attributes"]
         return jsonify({"layer_id": layer_id, "attributes": data}), 200
     except ValueError as e:
         raise NotFound(f"Error in retrieving layer attributes: {e}")
@@ -555,6 +555,9 @@ def extract_data_from_layer_for_table_view(layer_id):
     if not layer_id:
         raise BadRequest("layer_id parameter is required")
     
+    if layer_manager.__is_raster(layer_id):
+        raise BadRequest("Raster doesn't have attributes") 
+    
     
     response = data_manager.check_cache(layer_id)
     if response:
@@ -562,7 +565,7 @@ def extract_data_from_layer_for_table_view(layer_id):
     
     
     
-    gdf = layer_manager.get_layer_information(layer_id)["attributes"]
+    gdf = layer_manager.get_metadata(layer_id)["attributes"]
 
     total_rows = len(gdf)
     # Headers metadata
