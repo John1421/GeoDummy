@@ -1,7 +1,7 @@
 
 import json
 from flask import Flask, request, after_this_request, jsonify, send_file
-from werkzeug.exceptions import HTTPException, BadRequest, NotFound
+from werkzeug.exceptions import HTTPException, BadRequest, NotFound, InternalServerError
 import geopandas as gpd
 import shutil
 import os
@@ -247,15 +247,31 @@ Use Case: UC-B-10
 def script_metadata(script_id):
     if not script_id:
         raise BadRequest("script_id parameter is required")
-    
 
-    # TODO: retrieve metadata
+    try:
+        metadata = script_manager.get_metadata(script_id)
+    except FileNotFoundError:
+        # ficheiro script_id_metadata.json não existe
+        raise NotFound(f"Metadata not found for script_id={script_id}")
+    except ValueError as e:
+        # erro a ler/parsear o JSON, por exemplo
+        raise BadRequest(str(e))
+    except Exception as e:
+        # fallback para erros inesperados
+        raise InternalServerError(str(e))
 
-    return jsonify({"script_id": script_id, "output": "Metadata here"}), 200
+    return jsonify({"script_id": script_id, "output": metadata}), 200
 
 
 # Script Execution Endpoints
 
+'''
+Use Case: UC-B-11
+'''
+@app.route('/scripts/<script_id>', methods=['GET'])
+def script_validate_input():
+    
+    return 
 '''
 Implements UC-B-12 and UC-B-13, UC-B-14 is in the backgroung
 '''

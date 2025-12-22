@@ -49,6 +49,7 @@ class ScriptManager:
             self.metadata = json.load(f)
 
         self._validate_script_files()
+    
 
     def check_script_name_exists(self, script_id):
         """
@@ -291,7 +292,19 @@ class ScriptManager:
         """Helper to persist metadata to disk."""
         with open(self.metadata_path, 'w') as f:
             json.dump(self.metadata, f, indent=4)
-
+            
+            
+    def _load_metadata(self):
+        with open(self.metadata_path, 'r') as f:
+            self.metadata = json.load(f)
+    
+        return self.metadata
+    
+    def get_metadata(self, script_id):
+        self.metadata = self._load_metadata()
+        return self.metadata["scripts"][script_id]
+        
+            
     def _validate_script_files(self):
         """
         Ensures that every script_id stored in metadata corresponds
