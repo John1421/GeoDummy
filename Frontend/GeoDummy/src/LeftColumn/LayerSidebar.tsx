@@ -12,19 +12,20 @@ import { colors, icons } from "../Design/DesignTokens";
  * - "raster": holds a raster descriptor (XYZ tiles or georeferenced image)
  */
 export type LayerKind = "vector" | "raster";
+export type LayerOrigin = "file" | "backend" | "processing";
 
 export type RasterDescriptor =
   | {
-      kind: "xyz";
-      urlTemplate: string; // e.g. /tiles/{id}/{z}/{x}/{y}.png
-      minZoom?: number;
-      maxZoom?: number;
-    }
+    kind: "xyz";
+    urlTemplate: string; // e.g. /tiles/{id}/{z}/{x}/{y}.png
+    minZoom?: number;
+    maxZoom?: number;
+  }
   | {
-      kind: "image";
-      url: string; // e.g. /rasters/{id}.png
-      bounds: [[number, number], [number, number]]; // [[southWestLat, southWestLng],[northEastLat,northEastLng]]
-    };
+    kind: "image";
+    url: string; // e.g. /rasters/{id}.png
+    bounds: [[number, number], [number, number]]; // [[southWestLat, southWestLng],[northEastLat,northEastLng]]
+  };
 
 export interface Layer {
   id: string;
@@ -34,6 +35,9 @@ export interface Layer {
   fileName?: string;
   opacity?: number; // 0..1
   previousOpacity?: number;
+  origin?: LayerOrigin;
+  projection?: string;
+  status?: "active" | "error";
 
   kind?: LayerKind;
   geometryType?: string; // backend metadata (vector), e.g. Polygon, MultiLineString, etc.
@@ -49,6 +53,18 @@ export interface Layer {
   // Vector styling (raster ignores this for now)
   color?: string; // hex like "#22C55E"
 }
+type BackendLayerMetadata =
+  | {
+    type: "vector";
+    geometry_type: string;
+    crs?: string;
+  }
+  | {
+    type: "raster";
+    zoom_min?: number;
+    zoom_max?: number;
+    crs?: string;
+  };
 
 /**
  * Predefined palette for vector styling.
@@ -202,7 +218,7 @@ interface LayerSidebarProps {
 /**
  * Placeholder API layer (no actual network calls yet).
  * Keep this file as the single place where backend integration will be wired.
- */
+ 
 async function postLayerFilePlaceholder(_file: File): Promise<{ ids: string[] }> {
   // TODO: POST /layers multipart/form-data { file }
   // Expected response example:
@@ -228,7 +244,52 @@ async function getLayerDataPlaceholder(
   // - If vector: return GeoJSON FeatureCollection (or a URL to fetch it)
   // - If raster: return raster descriptor (XYZ tiles or image+bounds)
   return {};
+}*/
+
+async function postLayerFile(
+  file: File
+): Promise<{ ids: string[]; metadata: BackendLayerMetadata[] }> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch("http://localhost:5000/layers", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!res.ok) throw new Error("Error adding layer.");
+
+  const data = await res.json();
+
+  return {
+    ids: data.layer_id,
+    metadata: data.metadata,
+  };
 }
+
+async function getVectorLayerData(id: string): Promise<GeoJSON.FeatureCollection> {
+  const res = await fetch(`http://localhost:5000/layers/${id}`);
+  if (!res.ok) throw new Error("Error fetching GeoJSON");
+  return res.json();
+}
+
+type RasterMetadata = Extract<BackendLayerMetadata, { type: "raster" }>;
+
+function getRasterDescriptor(
+  id: string,
+  metadata: RasterMetadata
+): RasterDescriptor {
+  return {
+    kind: "xyz",
+    urlTemplate: `http://localhost:5000/layers/${id}/tiles/{z}/{x}/{y}.png`,
+    minZoom: metadata.zoom_min,
+    maxZoom: metadata.zoom_max,
+  };
+}
+
+
+
+
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
@@ -280,6 +341,7 @@ export default function LayerSidebar({ layers, setLayers }: LayerSidebarProps) {
           opacity: 1,
           previousOpacity: 1,
           // color will be assigned once we know geometry type
+          origin: "file",
         },
       ]);
 
@@ -298,8 +360,8 @@ export default function LayerSidebar({ layers, setLayers }: LayerSidebarProps) {
             parsed.type === "FeatureCollection"
               ? parsed
               : parsed.type === "Feature"
-              ? { type: "FeatureCollection", features: [parsed] }
-              : {
+                ? { type: "FeatureCollection", features: [parsed] }
+                : {
                   type: "FeatureCollection",
                   features: [
                     {
@@ -313,30 +375,34 @@ export default function LayerSidebar({ layers, setLayers }: LayerSidebarProps) {
           const detectedGeom = detectGeometryTypeFromFC(normalized);
           const defaultColor = defaultColorForGeometryType(detectedGeom);
 
+
           setLayers((prev) =>
             prev.map((l) =>
               l.id === tempId
                 ? {
-                    ...l,
-                    kind: "vector",
-                    geometryType: detectedGeom,
-                    vectorData: normalized,
-                    color: defaultColor,
-                  }
+                  ...l,
+                  kind: "vector",
+                  geometryType: detectedGeom,
+                  vectorData: normalized,
+                  color: defaultColor,
+                }
                 : l
             )
           );
-          return;
+          //return;
         } catch {
           // Keep the layer, but without data. Backend integration will later handle errors properly.
-          return;
+          //return;
         }
       }
 
       // Backend placeholders (kept here, ready to wire)
       // 1) POST file -> receive one or many ids
-      const { ids } = await postLayerFilePlaceholder(file);
+      //const { ids } = await postLayerFilePlaceholder(file);
 
+      const { ids, metadata } = await postLayerFile(file);
+      const displayName = file.name.replace(/\.[^/.]+$/, "");
+      console.log("Layer:", ids, metadata);
       // If the backend returns multiple ids, replace the temporary layer with one layer per id
       if (ids.length > 1) {
         setLayers((prev) => {
@@ -359,17 +425,17 @@ export default function LayerSidebar({ layers, setLayers }: LayerSidebarProps) {
           prev.map((l) =>
             l.id === tempId
               ? {
-                  ...l,
-                  id: backendId,
-                  title: backendId,
-                }
+                ...l,
+                id: backendId,
+                title: displayName,
+              }
               : l
           )
         );
       }
 
       // 2) GET metadata + data for each id (placeholders)
-      for (const id of ids) {
+      /*for (const id of ids) {
         const meta = await getLayerMetadataPlaceholder(id);
         const data = await getLayerDataPlaceholder(id, meta.kind);
 
@@ -377,22 +443,94 @@ export default function LayerSidebar({ layers, setLayers }: LayerSidebarProps) {
           prev.map((l) =>
             l.id === id
               ? {
-                  ...l,
-                  kind: meta.kind,
-                  geometryType: meta.geometryType,
-                  vectorData: data.vectorData,
-                  rasterData: data.rasterData,
-                  color:
-                    meta.kind === "vector"
-                      ? l.color ?? defaultColorForGeometryType(meta.geometryType)
-                      : l.color,
-                }
+                ...l,
+                kind: meta.kind,
+                geometryType: meta.geometryType,
+                vectorData: data.vectorData,
+                rasterData: data.rasterData,
+                color:
+                  meta.kind === "vector"
+                    ? l.color ?? defaultColorForGeometryType(meta.geometryType)
+                    : l.color,
+              }
               : l
           )
         );
       }
     },
-    [getNextOrder, setLayers]
+    [getNextOrder, setLayers]*/
+
+
+      for (let i = 0; i < ids.length; i++) {
+        const id = ids[i];
+        const meta = metadata[i];
+
+        if (meta.type === "vector") {
+          try {
+            const geojson = await getVectorLayerData(id);
+            setLayers(prev =>
+              prev.map(l =>
+                l.id === id
+                  ? {
+                    ...l,
+                    kind: "vector",
+                    geometryType: meta.geometry_type,
+                    vectorData: geojson,
+                    color: l.color ?? defaultColorForGeometryType(meta.geometry_type),
+                    origin: "backend",
+                    projection: meta.crs ?? "EPSG:4326",
+                    status: "active",
+                  }
+                  : l
+              )
+            );
+          } catch {
+            setLayers(prev =>
+              prev.map(l =>
+                l.id === id
+                  ? {
+                    ...l,
+                    status: "error",
+                    opacity: 0,
+                  }
+                  : l
+              )
+            );
+          }
+        }
+        if (meta.type === "raster") {
+          try {
+            setLayers(prev =>
+              prev.map(l =>
+                l.id === id
+                  ? {
+                    ...l,
+                    kind: "raster",
+                    rasterData: getRasterDescriptor(id, meta),
+                    origin: "backend",
+                    projection: meta.crs ?? "EPSG:4326",
+                    status: "active",
+                  }
+                  : l
+              )
+            );
+          } catch {
+            setLayers(prev =>
+              prev.map(l =>
+                l.id === id
+                  ? {
+                    ...l,
+                    status: "error",
+                    opacity: 0,
+                  }
+                  : l
+              )
+            );
+          }
+        }
+      }
+      }, 
+      [getNextOrder, setLayers]
   );
 
   // Seed demo layers only when the list is empty (first app open)
