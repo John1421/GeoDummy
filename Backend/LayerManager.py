@@ -2,7 +2,6 @@ from FileManager import FileManager
 import os
 import geopandas as gpd
 import fiona
-import fiona.transform
 from fiona.errors import FionaValueError
 import zipfile
 from shapely.geometry import shape, mapping
@@ -378,15 +377,10 @@ class LayerManager:
         Raises:
             ValueError: If the raster does not exist.
         """
-
-        # Allowed raster extensions
-        possible_exts = [".tif", ".tiff", ".TIF", ".TIFF"]
-
-        for ext in possible_exts:
-            candidate_path = os.path.join(file_manager.layers_dir, layer_name + ext)
-            if os.path.isfile(candidate_path):
-                return candidate_path
-
+        raster_path = self.__is_raster(layer_name)
+        if raster_path:
+            return raster_path
+       
         raise ValueError(f"Raster layer '{layer_name}' not found in layers directory.")
 
     def check_layer_name_exists(self, new_name):
@@ -409,14 +403,10 @@ class LayerManager:
         except Exception:
             # GPKG may not exist yet or unreadable
             pass
+        
 
-        # 2. Check raster layers (.tif/.tiff)
-        possible_exts = [".tif", ".tiff"]
-        for ext in possible_exts:
-            raster_path = os.path.join(file_manager.layers_dir, new_name + ext)
-            if os.path.isfile(raster_path):
-                exists = True
-                break
+        if self.__is_raster(new_name):
+            exists = True
 
         return exists
         
@@ -440,19 +430,7 @@ class LayerManager:
         layers_dir = os.path.join(file_manager.layers_dir)
         gpkg_path = os.path.join(layers_dir, layer_id + ".gpkg")
 
-        # Checks if the layer_id matches a raster file
-        possible_exts = [".tif", ".tiff"]
-        raster_path = None
-        for ext in possible_exts:
-            candidate = os.path.join(layers_dir, layer_id + ext)
-            candidate_upper = os.path.join(layers_dir, layer_id + ext.upper())
-            if os.path.isfile(candidate):
-                raster_path = candidate
-                break
-            elif os.path.isfile(candidate_upper):
-                raster_path = candidate_upper
-                break
-
+        raster_path = self.__is_raster(layer_id)
         if raster_path:
             with rasterio.open(raster_path) as src:
                 return {
@@ -484,17 +462,7 @@ class LayerManager:
         raise ValueError(f"Layer '{layer_id}' not found in rasters or GeoPackage")
     
     def get_layer_for_script(self, layer_id):
-        possible_exts = [".tif", ".tiff"]
-        raster_path = None
-        for ext in possible_exts:
-            candidate = os.path.join(file_manager.layers_dir, layer_id + ext)
-            candidate_upper = os.path.join(file_manager.layers_dir, layer_id + ext.upper())
-            if os.path.isfile(candidate):
-                raster_path = candidate
-                break
-            elif os.path.isfile(candidate_upper):
-                raster_path = candidate_upper
-                break
+        raster_path = self.__is_raster(layer_id)
 
         if raster_path:
             return raster_path
@@ -765,3 +733,24 @@ class LayerManager:
             raise ValueError(f"Failed to save layer metadata: {e}")
 
         return
+    
+    @staticmethod
+    def __is_raster(layer_id):
+        """
+        Docstring for __is_raster
+        
+        :param layer_id: Description
+
+        Returns raster_path or None
+        """
+        possible_exts = [".tif", ".tiff"]
+        possible_exts += [ext.upper() for ext in possible_exts]
+
+        raster_path = None
+        for ext in possible_exts:
+            candidate = os.path.join(file_manager.layers_dir, layer_id + ext)
+            if os.path.isfile(candidate):
+                raster_path = candidate
+                break
+        
+        return raster_path
