@@ -162,7 +162,7 @@ jobs:
         run: |
           docker build -t $DOCKERHUB_USERNAME/backend:${{ steps.version.outputs.version }} ./Backend/App
           docker push $DOCKERHUB_USERNAME/backend:${{ steps.version.outputs.version }}
-          docker tag $DOCKERHUB_USERNAME/backend:${{ steps.version.outputs.version }} $DOCKERHUB_USERNAME/backend:dev-latest
+          docker tag $DOCKERHUB_USERNAME/backend:${{ steps.version.outputs.version }} $DOCKERHUB_USERNAME/backend:latest
           docker push $DOCKERHUB_USERNAME/backend:dev-latest
 
       - name: Build and Push Frontend Image
@@ -173,6 +173,6 @@ jobs:
           cd ../../
           docker build -t $DOCKERHUB_USERNAME/frontend:${{ steps.version.outputs.version }} ./Frontend/GeoDummy
           docker push $DOCKERHUB_USERNAME/frontend:${{ steps.version.outputs.version }}
-          docker tag $DOCKERHUB_USERNAME/frontend:${{ steps.version.outputs.version }} $DOCKERHUB_USERNAME/frontend:dev-latest
+          docker tag $DOCKERHUB_USERNAME/frontend:${{ steps.version.outputs.version }} $DOCKERHUB_USERNAME/frontend:latest
           docker push $DOCKERHUB_USERNAME/frontend:dev-latest
 
