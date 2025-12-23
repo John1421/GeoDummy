@@ -23,7 +23,37 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
     const [params, setParams] = useState<Array<{ name: string; type: string }>>([]);
     const [isUploading, setIsUploading] = useState(false);
     const [saveStatus, setSaveStatus] = useState<SaveStatus>("unsaved");
+    const [scriptFile, setScriptFile] = useState<File | null>(null); // To store the actual file
 
+    // Backend Communication
+    /*async function postScript(
+        file: File,
+        metadata: {
+            name: string;
+            category: string;
+            description: string;
+            layer_type: string;
+            parameters: Array<{ name: string; type: string }>;
+        }
+        ) {
+        const formData = new FormData();
+
+        formData.append("file", file);
+        formData.append("metadata", JSON.stringify(metadata));
+
+        const res = await fetch("http://localhost:5050/scripts", {
+            method: "POST",
+            body: formData,
+        });
+
+        if (!res.ok) {
+            throw new Error("Error saving script");
+        }
+
+        return res.json();
+    }*/
+
+    
     useEffect(() => {
         // reset when opened (component is mounted each time in current usage)
         setSelectedFileName(null);
@@ -55,25 +85,44 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
 
         setError(null);
         setSelectedFileName(file.name);
+        setScriptFile(file);
         setSaveStatus("unsaved");
     };
 
-
-    /*const handleParamToggle = (paramType: string) => {
-        setSelectedParams((prev) =>
-            prev.includes(paramType) ? [] : [paramType]
-        );
-    };*/
-
     const handleUpload = async () => {
         // Basic validation
-        if (!selectedFileName) {
+        if (!scriptFile) {
             setError("Please choose a script file.");
             return;
         }
+        if (!name || !category){
+            setError("Please fill in all required fields.");
+            return;
+        }
+
         setIsUploading(true);
         setSaveStatus("saving");
-        await new Promise((resolve) => setTimeout(resolve, 1200));
+        setError(null);
+        const metadata = {
+            name,
+            category,
+            description,
+            layer_type: layerType,
+            parameters: params.filter(p => p.name && p.type),
+        };
+        try{
+            await postScriptMock(scriptFile, metadata);
+            setSaveStatus("saved");
+            onAddScript(name, category, description);
+            setTimeout(onClose, 500);
+        }catch (err){
+            setError("Failed to upload script. Please try again.");
+            setSaveStatus("unsaved");
+           
+        }finally{
+            setIsUploading(false);
+        }
+        /*await new Promise((resolve) => setTimeout(resolve, 1200));
 
         const paramsString = params.length
             ? `\nParams: ${params
@@ -90,8 +139,29 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
         setIsUploading(false);
         setTimeout(() => {
             onClose();
-        }, 600);
+        }, 600);*/
     };
+
+    // Mock function to simulate backend upload
+    async function postScriptMock(
+        file: File,
+        metadata: any
+        ) {
+        console.log("📦 Mock upload script");
+        console.log("File:", file);
+        console.log("Metadata:", metadata);
+
+        // simula latência de rede
+        await new Promise((r) => setTimeout(r, 800));
+
+        // simula resposta do backend
+        return {
+            id: crypto.randomUUID(),
+            name: metadata.name,
+            created_at: new Date().toISOString(),
+        };
+    }
+
     const [showDropdown, setShowDropdown] = useState(false);
     const [showLayerTypeDropdown, setShowLayerTypeDropdown] = useState(false);
 
