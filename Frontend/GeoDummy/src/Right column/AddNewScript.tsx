@@ -332,7 +332,89 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
                             style={{ cursor: "pointer", color: colors.foreground }}
                         />
                     </div>
-
+                    <div style={{ display: "flex", alignItems: "center", columnGap: 16, position: "relative" }}>
+                        <label
+                            style={{
+                                width: 120,
+                                fontSize: typography.sizeSm,
+                                fontWeight: 600,
+                                color: colors.foreground,
+                                fontFamily: typography.normalFont,
+                            }}
+                        >
+                            Layer Type
+                        </label>
+                        <div ref={layerTypeWrapperRef} style={{ flex: 1, position: "relative" }}>
+                            <input
+                                value={layerType === "raster" ? "Raster" : layerType === "vetorial" ? "Vetorial" : layerType === "both" ? "Ambos" : ""}
+                                readOnly
+                                onClick={() => setShowLayerTypeDropdown(!showLayerTypeDropdown)}
+                                placeholder="Select layer type..."
+                                style={{
+                                    width: "100%",
+                                    paddingInline: 12,
+                                    paddingBlock: 8,
+                                    borderRadius: radii.md,
+                                    borderStyle: "solid",
+                                    borderWidth: 1,
+                                    backgroundColor: colors.borderStroke,
+                                    borderColor: colors.borderStroke,
+                                    outline: "none",
+                                    fontSize: typography.sizeSm,
+                                    fontFamily: typography.normalFont,
+                                    color: colors.foreground,
+                                    cursor: "pointer",
+                                }}
+                            />
+                            {showLayerTypeDropdown && (
+                                <div
+                                    style={{
+                                        position: "absolute",
+                                        top: "100%",
+                                        left: 0,
+                                        right: 0,
+                                        marginTop: 4,
+                                        borderRadius: radii.md,
+                                        borderStyle: "solid",
+                                        borderWidth: 1,
+                                        backgroundColor: colors.cardBackground,
+                                        borderColor: colors.borderStroke,
+                                        fontSize: typography.sizeSm,
+                                        fontFamily: typography.normalFont,
+                                        color: colors.foreground,
+                                        boxShadow: shadows.subtle,
+                                        zIndex: 1000,
+                                    }}
+                                >
+                                    {[{value: "raster", label: "Raster"}, {value: "vetorial", label: "Vetorial"}, {value: "both", label: "Both"}].map((option) => (
+                                        <div
+                                            key={option.value}
+                                            onClick={() => {
+                                                setLayerType(option.value);
+                                                setSaveStatus("unsaved");
+                                                setShowLayerTypeDropdown(false);
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.backgroundColor = colors.borderStroke;
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.backgroundColor = "transparent";
+                                            }}
+                                            style={{
+                                                paddingInline: 12,
+                                                paddingBlock: 8,
+                                                cursor: "pointer",
+                                                fontFamily: typography.normalFont,
+                                                transition: "background-color 0.15s ease",
+                                            }}
+                                        >
+                                            {option.label}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
                     {paramsOpen && (
                         <div style={{ padding: `${spacing.md} 0`, display: "flex", flexDirection: "column", gap: spacing.sm }}>
                             <button
@@ -351,88 +433,7 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
                                 Number
                             </button>
 
-                            <div style={{ display: "flex", flexDirection: "column", gap: spacing.sm }}>
-                                <label
-                                    style={{
-                                        fontSize: typography.sizeSm,
-                                        fontWeight: 600,
-                                        color: colors.foreground,
-                                        fontFamily: typography.normalFont,
-                                    }}
-                                >
-                                    Layer Type
-                                </label>
-                                <div ref={layerTypeWrapperRef} style={{ position: "relative" }}>
-                                    <input
-                                        value={layerType === "raster" ? "Raster" : layerType === "vetorial" ? "Vetorial" : layerType === "both" ? "Ambos" : ""}
-                                        readOnly
-                                        onClick={() => setShowLayerTypeDropdown(!showLayerTypeDropdown)}
-                                        placeholder="Select layer type..."
-                                        style={{
-                                            width: "100%",
-                                            paddingInline: 12,
-                                            paddingBlock: 8,
-                                            borderRadius: radii.md,
-                                            borderStyle: "solid",
-                                            borderWidth: 1,
-                                            backgroundColor: colors.borderStroke,
-                                            borderColor: colors.borderStroke,
-                                            outline: "none",
-                                            fontSize: typography.sizeSm,
-                                            fontFamily: typography.normalFont,
-                                            color: colors.foreground,
-                                            cursor: "pointer",
-                                        }}
-                                    />
-                                    {showLayerTypeDropdown && (
-                                        <div
-                                            style={{
-                                                position: "absolute",
-                                                top: "100%",
-                                                left: 0,
-                                                right: 0,
-                                                marginTop: 4,
-                                                borderRadius: radii.md,
-                                                borderStyle: "solid",
-                                                borderWidth: 1,
-                                                backgroundColor: colors.cardBackground,
-                                                borderColor: colors.borderStroke,
-                                                fontSize: typography.sizeSm,
-                                                fontFamily: typography.normalFont,
-                                                color: colors.foreground,
-                                                boxShadow: shadows.subtle,
-                                                zIndex: 1000,
-                                            }}
-                                        >
-                                            {[{value: "raster", label: "Raster"}, {value: "vetorial", label: "Vetorial"}, {value: "both", label: "Both"}].map((option) => (
-                                                <div
-                                                    key={option.value}
-                                                    onClick={() => {
-                                                        setLayerType(option.value);
-                                                        setSaveStatus("unsaved");
-                                                        setShowLayerTypeDropdown(false);
-                                                    }}
-                                                    onMouseEnter={(e) => {
-                                                        e.currentTarget.style.backgroundColor = colors.borderStroke;
-                                                    }}
-                                                    onMouseLeave={(e) => {
-                                                        e.currentTarget.style.backgroundColor = "transparent";
-                                                    }}
-                                                    style={{
-                                                        paddingInline: 12,
-                                                        paddingBlock: 8,
-                                                        cursor: "pointer",
-                                                        fontFamily: typography.normalFont,
-                                                        transition: "background-color 0.15s ease",
-                                                    }}
-                                                >
-                                                    {option.label}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+                            
                         </div>
                     )}
                 </div>
