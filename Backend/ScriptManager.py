@@ -1,5 +1,5 @@
-from FileManager import FileManager
-from LayerManager import LayerManager
+from Backend.FileManager import FileManager
+from Backend.LayerManager import LayerManager
 import json
 import os
 import importlib.util
