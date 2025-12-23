@@ -469,20 +469,24 @@ def serve_tile(layer_id, z, x, y, tile_size=256):
                 img = Image.new("RGBA", (tile_size, tile_size), (0, 0, 0, 0))
             else:
                 # Read window and resample to 256x256
-                window = Window(col_start, row_start, width, height)
-                data = src.read(
-                    window=window,
-                    out_shape=(src.count, tile_size, tile_size),
-                    resampling=rasterio.enums.Resampling.bilinear
-                )
+                try:
+                    window = Window(col_start, row_start, width, height)
+                    data = src.read(
+                        window=window,
+                        out_shape=(src.count, tile_size, tile_size),
+                        resampling=rasterio.enums.Resampling.bilinear
+                    )
 
-                # Convert to image
-                if src.count == 1:
-                    img = Image.fromarray(data[0], mode="L")  # single band
-                elif src.count >= 3:
-                    img = Image.fromarray(np.dstack(data[:3]), mode="RGB")
-                else:
-                    img = Image.fromarray(data[0], mode="L")
+                    # Convert to image
+                    if src.count == 1:
+                        img = Image.fromarray(data[0], mode="L")  # single band
+                    elif src.count >= 3:
+                        img = Image.fromarray(np.dstack(data[:3]), mode="RGB")
+                    else:
+                        img = Image.fromarray(data[0], mode="L")
+                except Exception as e:
+                    # In case of any error reading the window, return transparent tile
+                    img = Image.new("RGBA", (tile_size, tile_size), (0, 0, 0, 0))        
             
             # Save to cache
             img.save(cache_file, format="PNG")
