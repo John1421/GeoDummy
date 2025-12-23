@@ -2,6 +2,7 @@ import { useEffect, useCallback, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Layer, RasterDescriptor } from "../LeftColumn/LayerSidebar";
+import { Console } from "console";
 
 const INITIAL_LATITUDE = 39.557191;
 const INITIAL_LONGITUDE = -7.8536599;
@@ -157,6 +158,8 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
         pane,
       });
     }
+
+    // TODO: print
 
     // desc.kind === "image"
     return L.imageOverlay(desc.url, desc.bounds, { opacity, pane });
