@@ -10,18 +10,18 @@ import shutil
 import pathlib
 import sys
 
-# Ensure repo root is on sys.path so `import Backend...` works when cwd is Backend/Pytest
-repo_root = pathlib.Path(__file__).resolve().parents[2]  # two levels up -> repo root
-sys.path.insert(0, str(repo_root))
+# # Ensure repo root is on sys.path so `import App...` works when cwd is Backend/Pytest
+# repo_root = pathlib.Path(__file__).resolve().parents[2]  # two levels up -> repo root
+# sys.path.insert(0, str(repo_root))
 
-from Backend.ScriptManager import ScriptManager
+from App.ScriptManager import ScriptManager
 
 @pytest.fixture(scope="module")
 def mock_file_manager(tmp_path_factory):
     scripts_dir = tmp_path_factory.mktemp("scripts")
     execution_dir = tmp_path_factory.mktemp("execution")
     temp_dir = tmp_path_factory.mktemp("temp")
-    with patch("Backend.ScriptManager.file_manager") as fm:
+    with patch("App.ScriptManager.file_manager") as fm:
         fm.scripts_dir = str(scripts_dir)
         fm.execution_dir = str(execution_dir)
         fm.temp_dir = str(temp_dir)
@@ -30,7 +30,7 @@ def mock_file_manager(tmp_path_factory):
 @pytest.fixture(scope="module")
 def script_manager(mock_file_manager):
     # Patch LayerManager globally for all tests
-    with patch("Backend.ScriptManager.layer_manager") as lm:
+    with patch("App.ScriptManager.layer_manager") as lm:
         yield ScriptManager(scripts_metadata="test_scripts_metadata.json")
 
 def test_init_creates_metadata_file(script_manager, mock_file_manager):
@@ -41,7 +41,7 @@ def test_init_creates_metadata_file(script_manager, mock_file_manager):
     assert "scripts" in data
 
 def test_init_missing_scripts_dir_raises(tmp_path):
-    with patch("Backend.ScriptManager.file_manager") as fm:
+    with patch("App.ScriptManager.file_manager") as fm:
         fm.scripts_dir = str(tmp_path / "does_not_exist")
         with pytest.raises(FileNotFoundError):
             ScriptManager(scripts_metadata="meta.json")
@@ -74,13 +74,13 @@ def test_check_script_name_exists_givenExistingAndMissing(script_manager):
 #     return x
 # """)
 #     # Patch all file/dir operations and LayerManager
-#     with patch("Backend.ScriptManager.shutil.copy"), \
-#          patch("Backend.ScriptManager.os.makedirs"), \
-#          patch("Backend.ScriptManager.importlib.util.spec_from_file_location") as spec_mock, \
-#          patch("Backend.ScriptManager.importlib.util.module_from_spec") as mod_mock, \
-#          patch("Backend.ScriptManager.ScriptManager._save_metadata"), \
-#          patch("Backend.ScriptManager.ScriptManager._validate_script_files"), \
-#          patch("Backend.ScriptManager.ScriptManager.__add_output_to_existing_layers_and_create_export_file", return_value="exported"):
+#     with patch("App.ScriptManager.shutil.copy"), \
+#          patch("App.ScriptManager.os.makedirs"), \
+#          patch("App.ScriptManager.importlib.util.spec_from_file_location") as spec_mock, \
+#          patch("App.ScriptManager.importlib.util.module_from_spec") as mod_mock, \
+#          patch("App.ScriptManager.ScriptManager._save_metadata"), \
+#          patch("App.ScriptManager.ScriptManager._validate_script_files"), \
+#          patch("App.ScriptManager.ScriptManager.__add_output_to_existing_layers_and_create_export_file", return_value="exported"):
 #         # Mock module with main
 #         dummy_mod = types.SimpleNamespace(main=lambda x: x)
 #         spec = MagicMock()
@@ -94,10 +94,10 @@ def test_run_script_no_main_raises(script_manager, tmp_path):
     script_file = tmp_path / "no_main.py"
     with open(script_file, "w") as f:
         f.write("def not_main(): pass\n")
-    with patch("Backend.ScriptManager.shutil.copy"), \
-         patch("Backend.ScriptManager.os.makedirs"), \
-         patch("Backend.ScriptManager.importlib.util.spec_from_file_location") as spec_mock, \
-         patch("Backend.ScriptManager.importlib.util.module_from_spec") as mod_mock:
+    with patch("App.ScriptManager.shutil.copy"), \
+         patch("App.ScriptManager.os.makedirs"), \
+         patch("App.ScriptManager.importlib.util.spec_from_file_location") as spec_mock, \
+         patch("App.ScriptManager.importlib.util.module_from_spec") as mod_mock:
         dummy_mod = types.SimpleNamespace()
         spec = MagicMock()
         spec.loader.exec_module = lambda m: None

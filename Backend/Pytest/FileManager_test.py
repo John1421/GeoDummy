@@ -9,12 +9,12 @@ import rasterio
 from rasterio.transform import from_origin
 import numpy as np
 
-# Ensure repo root is on sys.path so `import Backend...` works when cwd is Backend/Pytest
-repo_root = pathlib.Path(__file__).resolve().parents[2]  # two levels up -> repo root
-sys.path.insert(0, str(repo_root))
+# # Ensure repo root is on sys.path so `import Backend...` works when cwd is Backend/Pytest
+# repo_root = pathlib.Path(__file__).resolve().parents[2]  # two levels up -> repo root
+# sys.path.insert(0, str(repo_root))
 
 # now import the module
-from Backend.FileManager import FileManager
+from App.FileManager import FileManager
 
 def test_copy_file_success(tmp_path):
     src_dir = tmp_path / "src"
