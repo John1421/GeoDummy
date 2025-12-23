@@ -501,6 +501,73 @@ def serve_tile(layer_id, z, x, y, tile_size=256):
 
     except Exception as e:
         raise ValueError(f"Error serving tile: {e}")
+    
+@app.route('/layers/<layer_id>/preview.png', methods=['POST'])
+def get_layer_preview(layer_id, tile_size=256):
+    if not layer_id:
+        raise BadRequest("layer_id is required")
+    
+    bounds = request.get_json().get("bounds")
+
+    if not bounds or len(bounds) != 2:
+        raise BadRequest("bounds must be [[southLat, westLng], [northLat, eastLng]]")
+
+    min_lat, min_lon = bounds[0]  # south-west
+    max_lat, max_lon = bounds[1]  # north-east
+    # Compute a unique cache filenam
+    tile_key = f"{layer_id}_preview.png"
+    cache_file = os.path.join(file_manager.raster_cache_dir, tile_key)
+
+    # Serve from cache if it exists
+    if os.path.exists(cache_file):
+        return send_file(cache_file, mimetype="image/png")
+
+    raster_path = layer_manager.export_raster_layer(layer_id)  # Update with your raster path
+
+    try:
+        with rasterio.open(raster_path) as src:
+
+            # Compute window in raster coordinates
+            row_start, col_start = src.index(min_lon, max_lat)  # top-left pixel
+            row_stop, col_stop = src.index(max_lon, min_lat)    # bottom-right pixel
+
+            width = col_stop - col_start
+            height = row_stop - row_start
+            
+            if width <= 0 or height <= 0:
+                # Tile outside raster
+                img = Image.new("RGBA", (tile_size, tile_size), (0, 0, 0, 0))
+            else:
+                # Read window and resample to 256x256
+                try:
+                    window = Window(col_start, row_start, width, height)
+                    data = src.read(window=window)
+
+                    # Convert to image
+                    if src.count == 1:
+                        img = Image.fromarray(data[0], mode="L")  # single band
+                    elif src.count >= 3:
+                        img = Image.fromarray(np.dstack(data[:3]), mode="RGB")
+                    else:
+                        img = Image.fromarray(data[0], mode="L")
+                except Exception as e:
+                    # In case of any error reading the window, return transparent tile
+                    img = Image.new("RGBA", (tile_size, tile_size), (0, 0, 0, 0))        
+            
+            # Save to cache
+            img.save(cache_file, format="PNG")
+
+            layer_manager.clean_raster_cache(file_manager.raster_cache_dir)
+
+            # Return as PNG
+            img_bytes = io.BytesIO()
+            img.save(img_bytes, format="PNG")
+            img_bytes.seek(0)
+            return send_file(img_bytes, mimetype="image/png")
+
+    except Exception as e:
+        raise ValueError(f"Error serving tile: {e}")
+
 
 @app.route('/layers/<layer_id>', methods=['PUT'])
 def export_layer(layer_id):    
