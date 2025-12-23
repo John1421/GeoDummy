@@ -68,23 +68,6 @@ type BackendLayerMetadata =
     crs?: string;
   };
 
-/**
- * Predefined palette for vector styling.
- * Keep it small and consistent to avoid UX chaos.
- */
-export const LAYER_COLOR_PALETTE: string[] = [
-  "#4B5563", // gray
-  "#0F172A", // slate
-  "#6936c3ff", // purple
-  "#1e52c1ff", // blue
-  "#0891B2", // cyan
-  "#49aa6dff", // green
-  "#CA8A04", // amber
-  "#F97316", // orange
-  "#ca5887ff", // pink
-  "#bf1717ff", // red
-];
-
 const DEFAULT_COLOR_BY_GEOM = {
   point: "#16A34A",
   line: "#F97316",

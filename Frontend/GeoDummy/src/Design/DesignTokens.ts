@@ -37,6 +37,19 @@ export const colors = {
   errorForeground: "#ffffffff",
 };
 
+export const LAYER_COLOR_PALETTE: string[] = [
+  "#4B5563", // gray
+  "#0F172A", // slate
+  "#6936c3ff", // purple
+  "#1e52c1ff", // blue
+  "#0891B2", // cyan
+  "#49aa6dff", // green
+  "#CA8A04", // amber
+  "#F97316", // orange
+  "#ca5887ff", // pink
+  "#bf1717ff", // red
+];
+
 export const typography = {
   // Font families
   normalFont: "sans-serif",

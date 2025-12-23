@@ -100,7 +100,7 @@ function BaseMapSettings({
                 setBaseMapUrl(previousBasemapUrl);
             }
         }
-    }, [selectedBasemapId, basemaps]);
+    }, [selectedBasemapId, basemaps, currentBasemapUrl, initialBasemapUrl, previousBasemapUrl, setBaseMapAttribution, setBaseMapUrl]);
 
    
     async function save_basemap() {
