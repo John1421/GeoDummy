@@ -1,5 +1,5 @@
-from .FileManager import FileManager
-from .LayerManager import LayerManager
+from FileManager import FileManager
+from LayerManager import LayerManager
 import json
 import os
 import importlib.util
@@ -49,6 +49,7 @@ class ScriptManager:
             self.metadata = json.load(f)
 
         self._validate_script_files()
+    
 
     def check_script_name_exists(self, script_id):
         """
@@ -265,6 +266,9 @@ class ScriptManager:
 
         for file_path in output_files:
             if file_path.is_file():
+                filesize_bytes = os.path.getsize(file_path)
+                if filesize_bytes > layer_manager.MAX_LAYER_FILE_SIZE:
+                    raise BadRequest(f"Output file {file_path.name} exceeds the maximum allowed size of {layer_manager.MAX_LAYER_FILE_SIZE} MB.")
                 saved_file = self.__add_output_to_existing_layers_and_create_export_file(file_path)
                 output_file_paths.append(saved_file)
                 
@@ -291,7 +295,19 @@ class ScriptManager:
         """Helper to persist metadata to disk."""
         with open(self.metadata_path, 'w') as f:
             json.dump(self.metadata, f, indent=4)
-
+            
+            
+    def _load_metadata(self):
+        with open(self.metadata_path, 'r') as f:
+            self.metadata = json.load(f)
+    
+        return self.metadata
+    
+    def get_metadata(self, script_id):
+        self.metadata = self._load_metadata()
+        return self.metadata["scripts"][script_id]
+        
+            
     def _validate_script_files(self):
         """
         Ensures that every script_id stored in metadata corresponds

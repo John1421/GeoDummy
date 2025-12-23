@@ -210,7 +210,7 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
       if (!existing) {
         const gj = L.geoJSON(layer.vectorData, {
           pane,
-          style: (feat) => leafletStyleForFeature(feat as any, opacity, color),
+          style: (feat) => leafletStyleForFeature(feat as GjFeature, opacity, color),
           pointToLayer: (_feature, latlng) =>
             L.circleMarker(latlng, {
               pane,
@@ -247,7 +247,7 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
         // Pane is stable per layer id; zIndex is controlled by pane element style.
       }
     }
-  }, [layers]);
+  }, [layers, applyVectorStyle]);
 
   return (
     <div className="flex-1 flex items-start justify-center w-full h-full">

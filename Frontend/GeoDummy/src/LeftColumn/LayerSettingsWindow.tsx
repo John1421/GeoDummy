@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { Layer } from "./LayerSidebar";
-import { LAYER_COLOR_PALETTE } from "./LayerSidebar";
+import { LAYER_COLOR_PALETTE } from "../Design/DesignTokens";
 import { colors, typography, radii, spacing, shadows } from "../Design/DesignTokens";
 
 /**
