@@ -7,10 +7,10 @@ import shutil
 import os
 import ast
 import zipfile
-import FileManager
-from BasemapManager import BasemapManager
-from LayerManager import LayerManager
-from ScriptManager import ScriptManager
+# import FileManager
+from .BasemapManager import BasemapManager
+from .LayerManager import LayerManager
+from .ScriptManager import ScriptManager
 from flask_cors import CORS
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache

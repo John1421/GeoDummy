@@ -2,7 +2,7 @@ import os
 import json
 
 class BasemapManager:
-    def __init__(self, config_path='basemaps.json'):
+    def __init__(self, config_path='./App/basemaps.json'):
         if not os.path.exists(config_path):
             raise FileNotFoundError(f"Basemap configuration file not found: {config_path}")
 

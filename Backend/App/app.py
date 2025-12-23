@@ -7,11 +7,11 @@ import shutil
 import os
 import ast
 import zipfile
-import FileManager
-from BasemapManager import BasemapManager
-from LayerManager import LayerManager
-from ScriptManager import ScriptManager
-from DataManager import DataManager
+from .FileManager import FileManager
+from .BasemapManager import BasemapManager
+from .LayerManager import LayerManager
+from .ScriptManager import ScriptManager
+from .DataManager import DataManager
 from flask_cors import CORS
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
@@ -30,7 +30,7 @@ ALLOWED_EXTENSIONS = {'.geojson', '.shp', '.gpkg', '.tif', '.tiff'}
 
 app = Flask(__name__)
 CORS(app,origins=["http://localhost:5173"])
-file_manager = FileManager.FileManager()
+file_manager = FileManager()
 basemap_manager = BasemapManager()
 layer_manager = LayerManager()
 script_manager = ScriptManager()
@@ -693,5 +693,5 @@ def extract_data_from_layer_for_table_view(layer_id):
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5050)
 
