@@ -17,9 +17,10 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
     const [name, setName] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [paramsOpen, setParamsOpen] = useState(false);
-    const [selectedParams, setSelectedParams] = useState<string[]>([]);
+    
     const [layerType, setLayerType] = useState<string>("");
     const [description, setDescription] = useState("");
+    const [params, setParams] = useState<Array<{ name: string; type: string }>>([]);
     const [isUploading, setIsUploading] = useState(false);
     const [saveStatus, setSaveStatus] = useState<SaveStatus>("unsaved");
 
@@ -30,9 +31,10 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
         setName("");
         setError(null);
         setParamsOpen(false);
-        setSelectedParams([]);
+       
         setLayerType("");
         setDescription("");
+        setParams([]);
         setSaveStatus("unsaved");
     }, []);
 
@@ -57,11 +59,11 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
     };
 
 
-    const handleParamToggle = (paramType: string) => {
+    /*const handleParamToggle = (paramType: string) => {
         setSelectedParams((prev) =>
             prev.includes(paramType) ? [] : [paramType]
         );
-    };
+    };*/
 
     const handleUpload = async () => {
         // Basic validation
@@ -72,8 +74,17 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
         setIsUploading(true);
         setSaveStatus("saving");
         await new Promise((resolve) => setTimeout(resolve, 1200));
+
+        const paramsString = params.length
+            ? `\nParams: ${params
+                .filter((p) => p.name || p.type)
+                .map((p) => `${p.name || "?"}:${p.type || "?"}`)
+                .join(", ")}`
+            : "";
+        const descriptionWithParams = `${description}${paramsString}`;
+
         // Call parent handler with the form data
-        onAddScript(name, category, description);
+        onAddScript(name, category, descriptionWithParams);
         
         setSaveStatus("saved");
         setIsUploading(false);
@@ -321,18 +332,7 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
                             />
                         </div>
                     </div>
-                {/* Parameters Toggle */}
-                <div style={{ borderBottom: `1px solid ${colors.borderStroke}` }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <h4 style={{ margin: 0, fontSize: typography.sizeMd, fontWeight: 600, color: colors.foreground, fontFamily: typography.normalFont }}>Parameters</h4>
-
-                        <Plus
-                            size={20}
-                            onClick={() => setParamsOpen(!paramsOpen)}
-                            style={{ cursor: "pointer", color: colors.foreground }}
-                        />
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", columnGap: 16, position: "relative" }}>
+                <div style={{ display: "flex", alignItems: "center", columnGap: 16, position: "relative" }}>
                         <label
                             style={{
                                 width: 120,
@@ -349,7 +349,7 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
                                 value={layerType === "raster" ? "Raster" : layerType === "vetorial" ? "Vetorial" : layerType === "both" ? "Ambos" : ""}
                                 readOnly
                                 onClick={() => setShowLayerTypeDropdown(!showLayerTypeDropdown)}
-                                placeholder="Select layer type..."
+                                placeholder="Select Layer Type"
                                 style={{
                                     width: "100%",
                                     paddingInline: 12,
@@ -415,25 +415,80 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
                             )}
                         </div>
                     </div>
+                {/* Parameters Toggle */}
+                <div style={{ borderBottom: `1px solid ${colors.borderStroke}` }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <h4 style={{ margin: 0, fontSize: typography.sizeMd, fontWeight: 600, color: colors.foreground, fontFamily: typography.normalFont }}>Parameters</h4>
+
+                        <Plus
+                            size={20}
+                            onClick={() => {
+                                setParamsOpen(true);
+                                setParams((prev) => [...prev, { name: "", type: "" }]);
+                            }}
+                            style={{ cursor: "pointer", color: colors.foreground }}
+                        />
+                    </div>
+                    
                     {paramsOpen && (
                         <div style={{ padding: `${spacing.md} 0`, display: "flex", flexDirection: "column", gap: spacing.sm }}>
-                            <button
-                                onClick={() => handleParamToggle("number")}
-                                style={{
-                                    padding: `${spacing.sm} ${spacing.md}`,
-                                    backgroundColor: selectedParams.includes("number") ? colors.primary : colors.cardBackground,
-                                    color: selectedParams.includes("number") ? colors.primaryForeground : colors.foreground,
-                                    border: `1px solid ${colors.borderStroke}`,
-                                    borderRadius: radii.md,
-                                    fontSize: typography.sizeSm,
-                                    fontFamily: typography.normalFont,
-                                    cursor: "pointer",
-                                }}
-                            >
-                                Number
-                            </button>
-
-                            
+                            {params.map((p, idx) => (
+                                <div key={idx} style={{ display: "flex", columnGap: spacing.md }}>
+                                    <input
+                                        value={p.name}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            setParams((prev) => prev.map((item, i) => i === idx ? { ...item, name: value } : item));
+                                            setSaveStatus("unsaved");
+                                        }}
+                                        placeholder="Parameter name"
+                                        style={{
+                                            flex: 1,
+                                            paddingInline: 12,
+                                            paddingBlock: 8,
+                                            borderRadius: radii.md,
+                                            borderStyle: "solid",
+                                            borderWidth: 1,
+                                            backgroundColor: colors.borderStroke,
+                                            borderColor: colors.borderStroke,
+                                            outline: "none",
+                                            fontSize: typography.sizeSm,
+                                            fontFamily: typography.normalFont,
+                                            color: colors.foreground,
+                                        }}
+                                    />
+                                    <select
+                                        value={p.type}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            setParams((prev) => prev.map((item, i) => i === idx ? { ...item, type: value } : item));
+                                            setSaveStatus("unsaved");
+                                        }}
+                                        style={{
+                                            flexBasis: "40%",
+                                            paddingInline: 12,
+                                            paddingBlock: 8,
+                                            borderRadius: radii.md,
+                                            borderStyle: "solid",
+                                            borderWidth: 1,
+                                            backgroundColor: colors.cardBackground,
+                                            borderColor: colors.borderStroke,
+                                            outline: "none",
+                                            fontSize: typography.sizeSm,
+                                            fontFamily: typography.normalFont,
+                                            color: colors.foreground,
+                                            cursor: "pointer",
+                                        }}
+                                    >
+                                        <option value="">Type</option>
+                                        <option value="int">int</option>
+                                        <option value="float">float</option>
+                                        <option value="bool">bool</option>
+                                        <option value="string">string</option>
+                                        <option value="number">number</option>
+                                    </select>
+                                </div>
+                            ))}
                         </div>
                     )}
                 </div>
