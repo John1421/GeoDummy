@@ -66,6 +66,7 @@ type BackendLayerMetadata =
     zoom_min?: number;
     zoom_max?: number;
     crs?: string;
+    bbox: {min_lon: number; min_lat: number; max_lon: number; max_lat: number}; // [northEastLat, northEastLng, southWestLat, southWestLng]
   };
 
 const DEFAULT_COLOR_BY_GEOM = {
@@ -200,36 +201,6 @@ interface LayerSidebarProps {
   setLayers: React.Dispatch<React.SetStateAction<Layer[]>>;
 }
 
-/**
- * Placeholder API layer (no actual network calls yet).
- * Keep this file as the single place where backend integration will be wired.
- 
-async function postLayerFilePlaceholder(_file: File): Promise<{ ids: string[] }> {
-  // TODO: POST /layers multipart/form-data { file }
-  // Expected response example:
-  //  - { ids: ["layer_1"] }
-  //  - { ids: ["layer_a", "layer_b"] } (GeoPackage with multiple sublayers)
-  return { ids: [crypto.randomUUID()] };
-}
-
-async function getLayerMetadataPlaceholder(_id: string): Promise<{
-  kind: LayerKind;
-  geometryType?: string;
-}> {
-  // TODO: GET /layers/{id}/metadata
-  // Suggested: kind + geometryType for vectors, kind only for rasters.
-  return { kind: "vector", geometryType: "Unknown" };
-}
-
-async function getLayerDataPlaceholder(
-  _id: string,
-  _kind: LayerKind
-): Promise<{ vectorData?: GeoJSON.FeatureCollection; rasterData?: RasterDescriptor }> {
-  // TODO: GET /layers/{id}
-  // - If vector: return GeoJSON FeatureCollection (or a URL to fetch it)
-  // - If raster: return raster descriptor (XYZ tiles or image+bounds)
-  return {};
-}*/
 
 async function postLayerFile(
   file: File
@@ -237,7 +208,7 @@ async function postLayerFile(
   const formData = new FormData();
   formData.append("file", file);
 
-  const res = await fetch("http://localhost:5000/layers", {
+  const res = await fetch("http://localhost:5050/layers", {
     method: "POST",
     body: formData,
   });
@@ -253,7 +224,7 @@ async function postLayerFile(
 }
 
 async function getVectorLayerData(id: string): Promise<GeoJSON.FeatureCollection> {
-  const res = await fetch(`http://localhost:5000/layers/${id}`);
+  const res = await fetch(`http://localhost:5050/layers/${id}`);
   if (!res.ok) throw new Error("Error fetching GeoJSON");
   return res.json();
 }
@@ -265,10 +236,9 @@ function getRasterDescriptor(
   metadata: RasterMetadata
 ): RasterDescriptor {
   return {
-    kind: "xyz",
-    urlTemplate: `http://localhost:5000/layers/${id}/tiles/{z}/{x}/{y}.png`,
-    minZoom: metadata.zoom_min,
-    maxZoom: metadata.zoom_max,
+    kind: "image",
+    url: `http://localhost:5050/layers/${id}/tiles/{z}/{x}/{y}.png`,
+    bounds: [[metadata.bbox.min_lat, metadata.bbox.min_lon], [metadata.bbox.max_lat, metadata.bbox.max_lon]]
   };
 }
 
