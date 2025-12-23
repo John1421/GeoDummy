@@ -170,7 +170,7 @@ jobs:
           npm ci
           npm run build
           cd ../../
-          docker build -t $DOCKERHUB_USERNAME/frontend:${{ steps.version.outputs.version }} ./Frontend
+          docker build -t $DOCKERHUB_USERNAME/frontend:${{ steps.version.outputs.version }} ./Frontend/GeoDummy
           docker push $DOCKERHUB_USERNAME/frontend:${{ steps.version.outputs.version }}
           docker tag $DOCKERHUB_USERNAME/frontend:${{ steps.version.outputs.version }} $DOCKERHUB_USERNAME/frontend:dev-latest
           docker push $DOCKERHUB_USERNAME/frontend:dev-latest
