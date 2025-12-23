@@ -9,7 +9,7 @@ class FileManager:
     # Allowed file extensions for processing
     allowed_extensions = {'.geojson', '.shp', '.gpkg', '.tif', '.tiff'}
 
-    def __init__(self, layers_dir='./input_layers', temp_dir='./temporary', scripts_dir='./scripts'):
+    def __init__(self, layers_dir='./data/input_layers', temp_dir='./data/temporary', scripts_dir='./data/scripts'):
         """
         Constructor to initialize layer and temporary directories.
         Creates directories if they do not already exist.
