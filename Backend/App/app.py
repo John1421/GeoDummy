@@ -67,124 +67,7 @@ def handle_generic_exception(e):
 
 @app.route('/')
 def home():
-    return "Flask backend is running 2.0!\n"
-
-
-# Files Management Endpoints
-
-@app.route('/files', methods=['POST'])
-def add_file():
-    # Accept file from the browser via multipart/form-data
-    added_file = request.files.get('file')
-    if not added_file:
-        raise BadRequest("You must upload a file under the 'file' field.")
-    
-    # File is temporarily stored in tmp_dir folder for handling
-    temp_path = os.path.join(file_manager.temp_dir, added_file.filename)
-    added_file.save(temp_path)
-
-
-    _, file_extension = os.path.splitext(added_file.filename)
-
-    if file_extension.lower() == ".shp":
-        raise BadRequest("Please upload shapefiles as a .zip containing all necessary components (.shp, .shx, .dbf, optional .prj).")
-
-    # If its a .zip file, check if it has .shp info
-    if file_extension.lower() == '.zip':
-        extension_dict = {
-            ".shp": 0,
-            ".shx": 0,
-            ".dbf": 0,
-            ".prj": 0,
-        }
-
-        # Removes .zip extension from the full path text: 'path/zipfile.zip' --> 'path/zipfile'
-        extracted_folder_path = os.path.splitext(temp_path)[0]
-        # Then we take this new folder name and create a path: 'path/zipfile' --> path/zipfile/
-        os.makedirs(extracted_folder_path, exist_ok = True)
-
-        with zipfile.ZipFile(temp_path, 'r') as zip_contents:
-            zip_contents.extractall(extracted_folder_path)
-
-        # Get the file names in the extracted folder directory
-        for root, _, files in os.walk(extracted_folder_path):
-            for file in files:
-                match os.path.splitext(file)[1]:
-                    case ".shp":
-                        extension_dict[".shp"] += 1
-                        # Get the path of the .shp file (if more or less than one it will get caught later on)
-                        temp_path = os.path.join(root, file)
-                    case ".shx":
-                        extension_dict[".shx"] += 1
-                    case ".dbf":
-                        extension_dict[".dbf"] += 1
-                    case ".prj":
-                        extension_dict[".prj"] += 1
-                    case _:
-                        continue
-
-        if extension_dict[".shp"] != 1 or extension_dict[".shx"] != 1 or extension_dict[".dbf"] != 1 or extension_dict[".prj"] > 1:
-            raise BadRequest("The provided .zip file has an incorrect amount of files. " +
-                             "Please ensure only one file of the types .shp, .shx, .dbf and either one or no .prj files.")
-        
-        elif extension_dict[".prj"] == 0:
-            app.logger.warning("The provided zip file has no .prj file. Proceeding with conversion and addition anyway.")
-        
-    
-    # If the file is already in GeoJSON or TIFF format, copy it directly to layers directory
-    if file_extension.lower() in ['.geojson', '.tif']:
-        try:
-            file_manager.copy_file(temp_path, file_manager.layers_dir)
-        except ValueError as e:
-            os.remove(temp_path)
-            return jsonify({"error": str(e)}), 400
-    
-    # Otherwise, convert it to GeoJSON first, then move to layers directory
-    else:
-        converted_file_path = file_manager.convert_to_geojson(temp_path)
-
-        try:
-            file_manager.move_file(converted_file_path, file_manager.layers_dir)
-        except ValueError as e:
-            os.remove(temp_path)
-            return jsonify({"error": str(e)}), 400
-    
-    # Cleanup all the temporary files/folders
-    if file_extension.lower() == ".zip":
-        shutil.rmtree(extracted_folder_path)
-    else:
-        os.remove(temp_path)
-
-    return jsonify({"message": f"File added successfully"}), 200
-
-@app.route('/files/<file_id>', methods=['GET'])
-def export_file(file_id):
-
-    if not file_id:
-        raise BadRequest("file_id was not provided.")
-    
-    source_path = os.path.join(file_manager.temp_dir, file_id)
-
-    # Check if file exists
-    if not os.path.isfile(source_path):
-        return jsonify({"error": "File not found"}), 404
-    
-    # Destination path in layers folder
-    output_path = os.path.join(file_manager.layers_dir, file_id)
-
-    # Copy to layers folder (for later selection)
-    try:
-        file_manager.copy_file(source_path, file_manager.layers_dir)
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-
-    # Send file to browser for download
-    return send_file(
-        output_path,
-        as_attachment=True,        # Forces download instead of inline display
-        download_name=file_id      # Sets the filename for download
-    )
-
+    return "GeoDummy backend is running!!!\n By SoftMinds"
 
 # Script Management Endpoints
 
@@ -519,7 +402,7 @@ def get_layer_preview(layer_id):
     # Rest of your code stays the same...
     tile_key = f"{layer_id}_preview.png"
     cache_file = os.path.join(file_manager.raster_cache_dir, tile_key)
-    
+
     # Serve from cache if it exists
     if os.path.exists(cache_file):
         return send_file(cache_file, mimetype="image/png")
