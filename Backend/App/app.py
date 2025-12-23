@@ -507,17 +507,19 @@ def get_layer_preview(layer_id):
     if not layer_id:
         raise BadRequest("layer_id is required")
     
-    bounds = request.get_json().get("bounds")
-
-    if not bounds or len(bounds) != 2:
-        raise BadRequest("bounds must be [[southLat, westLng], [northLat, eastLng]]")
-
-    min_lat, min_lon = bounds[0]  # south-west
-    max_lat, max_lon = bounds[1]  # north-east
-    # Compute a unique cache filenam
+    # Get bounds from query parameters instead of JSON body
+    min_lat = request.args.get('min_lat', type=float)
+    min_lon = request.args.get('min_lon', type=float)
+    max_lat = request.args.get('max_lat', type=float)
+    max_lon = request.args.get('max_lon', type=float)
+    
+    if None in [min_lat, min_lon, max_lat, max_lon]:
+        raise BadRequest("min_lat, min_lon, max_lat, max_lon are required as query parameters")
+    
+    # Rest of your code stays the same...
     tile_key = f"{layer_id}_preview.png"
     cache_file = os.path.join(file_manager.raster_cache_dir, tile_key)
-
+    
     # Serve from cache if it exists
     if os.path.exists(cache_file):
         return send_file(cache_file, mimetype="image/png")

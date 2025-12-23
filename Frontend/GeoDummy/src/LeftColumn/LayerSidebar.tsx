@@ -66,7 +66,7 @@ type BackendLayerMetadata =
     zoom_min?: number;
     zoom_max?: number;
     crs?: string;
-    bbox: {min_lon: number; min_lat: number; max_lon: number; max_lat: number}; // [northEastLat, northEastLng, southWestLat, southWestLng]
+    bbox: { min_lon: number; min_lat: number; max_lon: number; max_lat: number }; // [northEastLat, northEastLng, southWestLat, southWestLng]
   };
 
 const DEFAULT_COLOR_BY_GEOM = {
@@ -235,10 +235,12 @@ function getRasterDescriptor(
   id: string,
   metadata: RasterMetadata
 ): RasterDescriptor {
+  const { min_lat, min_lon, max_lat, max_lon } = metadata.bbox;
+
   return {
     kind: "image",
-    url: `http://localhost:5050/layers/${id}/tiles/{z}/{x}/{y}.png`,
-    bounds: [[metadata.bbox.min_lat, metadata.bbox.min_lon], [metadata.bbox.max_lat, metadata.bbox.max_lon]]
+    url: `http://localhost:5050/layers/${id}/preview.png?min_lat=${min_lat}&min_lon=${min_lon}&max_lat=${max_lat}&max_lon=${max_lon}`,
+    bounds: [[min_lat, min_lon], [max_lat, max_lon]]
   };
 }
 
@@ -466,7 +468,7 @@ export default function LayerSidebar({ layers, setLayers }: LayerSidebarProps) {
                     ...l,
                     title: meta.layer_name || id,
                     kind: "raster",
-                    geometryType : "Raster",
+                    geometryType: "Raster",
                     rasterData: getRasterDescriptor(id, meta),
                     origin: "backend",
                     projection: meta.crs ?? "EPSG:4326",
@@ -490,8 +492,8 @@ export default function LayerSidebar({ layers, setLayers }: LayerSidebarProps) {
           }
         }
       }
-      }, 
-      [getNextOrder, setLayers]
+    },
+    [getNextOrder, setLayers]
   );
 
   // Seed demo layers only when the list is empty (first app open)
