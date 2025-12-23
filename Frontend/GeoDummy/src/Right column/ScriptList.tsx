@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { Wrench as ToolsIcon } from "lucide-react";
 import SidebarPanel from "../TemplateModals/SidebarModal";
-import { colors } from "../Design/DesignTokens";
+import { colors, icons } from "../Design/DesignTokens";
 
 import ToolCategoryToggle from "./ToolCategoryToggle";
 import ScriptCard from "./ScriptCard";
@@ -11,10 +11,7 @@ export interface Script {
   id: string;
   name: string;
   description?: string;
-  fileName?: string;
   category?: string;
-  number?: string;
-  type?: string;
 }
 
 const EXAMPLE_SCRIPTS: Script[] = [
@@ -49,31 +46,45 @@ export default function ScriptList() {
   const [scripts, setScripts] = useState<Script[]>(EXAMPLE_SCRIPTS);
 
   const handleAddScript = useCallback(
-    (fileName: string, category: string, number: string, type: string) => {
-      // Extract name from filename (remove extension)
-      const scriptName = fileName.replace(/\.[^/.]+$/, "");
+    (name: string, category: string, description: string) => {
+      const cleanCategory =
+        category.trim().length > 0
+          ? category.trim().replace(/\s+/g, " ").toLowerCase()
+          : "uncategorized";
+
+      const formattedCategory =
+        cleanCategory.charAt(0).toUpperCase() + cleanCategory.slice(1);
 
       const newScript: Script = {
         id: crypto.randomUUID(),
-        name: scriptName,
-        description: `${category} - ${type}`,
-        fileName,
-        category,
-        number,
-        type,
+        name,
+        description,
+        category: formattedCategory,
       };
 
-      setScripts((prev) => [newScript, ...prev]);
+      setScripts(prev => [newScript, ...prev]);
     },
     []
   );
+
+
+const categories = Array.from(
+    new Set(
+      scripts.map((s) =>
+        (s.category ?? "Uncategorized").trim().replace(/\s+/g, " ").toLowerCase()
+      )
+    )
+  )
+    .map(c => c.charAt(0).toUpperCase() + c.slice(1))
+    .sort();
+
 
   return (
     <>
       <SidebarPanel
         side="right"
         title="Tools"
-        icon={<ToolsIcon size={18} color={colors.primary} />}
+        icon={<ToolsIcon size={icons.size} color={colors.primary} strokeWidth={icons.strokeWidth} />}
         expandedWidthClassName="w-72"
         collapsedWidthClassName="w-12"
         onAdd={() => setShowAddNew(true)}
@@ -82,33 +93,24 @@ export default function ScriptList() {
           <AddNewScript
             onClose={() => setShowAddNew(false)}
             onAddScript={handleAddScript}
+            existingCategories={categories}
           />
         )}
 
-        {/* TOOL CATEGORIES */}
-        <ToolCategoryToggle title="Category 1">
-          {scripts
-            .filter((s) => s.category === "Category 1" || !s.category)
-            .map((script) => (
-              <ScriptCard
-                key={script.id}
-                name={script.name}
-                description={script.description || ""}
-              />
-            ))}
-        </ToolCategoryToggle>
-
-        <ToolCategoryToggle title="Category 2">
-          {scripts
-            .filter((s) => s.category === "Category 2")
-            .map((script) => (
-              <ScriptCard
-                key={script.id}
-                name={script.name}
-                description={script.description || ""}
-              />
-            ))}
-        </ToolCategoryToggle>
+        {/* Renderização automática das categorias */}
+        {categories.map((category) => (
+          <ToolCategoryToggle key={category} title={category}>
+            {scripts
+              .filter((script) => script.category?.toLowerCase() === category.toLowerCase())
+              .map((script) => (
+                <ScriptCard
+                  key={script.id}
+                  name={script.name}
+                  description={script.description || ""}
+                />
+              ))}
+          </ToolCategoryToggle>
+        ))}
       </SidebarPanel>
     </>
   );

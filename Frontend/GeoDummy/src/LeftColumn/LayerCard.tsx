@@ -1,4 +1,4 @@
-import { memo, useMemo, useRef } from "react";
+import { memo, useMemo, useRef, useState, useEffect } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Eye, EyeOff } from "lucide-react";
@@ -8,9 +8,11 @@ import { colors, typography, radii, shadows } from "../Design/DesignTokens";
 interface LayerCardProps {
   layer: Layer;
   onSettings: (layerId: string, rect: DOMRect) => void;
+  onToggleVisibility: (layerId: string) => void;
+  onRename: (layerId: string, newTitle: string) => void;
 }
 
-function LayerCardComponent({ layer, onSettings }: LayerCardProps) {
+function LayerCardComponent({ layer, onSettings, onToggleVisibility, onRename }: LayerCardProps) {
   const {
     setNodeRef,
     attributes,
@@ -22,6 +24,7 @@ function LayerCardComponent({ layer, onSettings }: LayerCardProps) {
     id: layer.id,
     animateLayoutChanges: () => false,
   });
+
 
   // Local ref to measure the card position (used to place the settings window)
   const cardRef = useRef<HTMLDivElement | null>(null);
@@ -53,21 +56,53 @@ function LayerCardComponent({ layer, onSettings }: LayerCardProps) {
   // Consider the layer "hidden" when opacity is very low (you can tweak this threshold)
   const isHidden = (layer.opacity ?? 1) <= 0.01;
 
-  const handleSettingsClick = () => {
+  const handleSettingsOpen = () => {
     if (!cardRef.current) return;
     const rect = cardRef.current.getBoundingClientRect();
     onSettings(layer.id, rect);
   };
 
+  const handleToggleVisibilityClick = () => {
+    onToggleVisibility(layer.id);
+  };
+
+  // Inline rename state
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [draftTitle, setDraftTitle] = useState(layer.title);
+
+  useEffect(() => {
+    // Keep draft in sync if the layer title changes externally
+    if (!isEditingTitle) setDraftTitle(layer.title);
+  }, [layer.title, isEditingTitle]);
+
+  const commitTitle = () => {
+    const trimmed = draftTitle.trim();
+    setIsEditingTitle(false);
+    if (!trimmed) {
+      setDraftTitle(layer.title);
+      return;
+    }
+    if (trimmed !== layer.title) onRename(layer.id, trimmed);
+  };
+
+  const cancelTitle = () => {
+    setIsEditingTitle(false);
+    setDraftTitle(layer.title);
+  };
+
+
   return (
     <div
       ref={(node) => {
-        // Attach both sortable ref and local ref to the same DOM node
         setNodeRef(node);
         cardRef.current = node;
       }}
       style={cardStyle}
       {...attributes}
+      onContextMenu={(e) => {
+        e.preventDefault();      // evita o menu do browser
+        handleSettingsOpen();    // abre as settings no right-click
+      }}
     >
       <div
         style={{
@@ -94,25 +129,56 @@ function LayerCardComponent({ layer, onSettings }: LayerCardProps) {
           <GripVertical size={18} style={{ color: colors.dragIcon }} />
         </button>
 
-        {/* Layer title */}
-        <span
-          style={{
-            flex: 1,
-            fontFamily: typography.normalFont,
-            fontSize: typography.sizeSm,
-            fontWeight: 500,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {layer.title}
-        </span>
+        {/* Layer title (double click to edit) */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {isEditingTitle ? (
+            <input
+              value={draftTitle}
+              onChange={(e) => setDraftTitle(e.target.value)}
+              autoFocus
+              onBlur={commitTitle}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitTitle();
+                if (e.key === "Escape") cancelTitle();
+              }}
+              style={{
+                width: "100%",
+                fontFamily: typography.normalFont,
+                fontSize: typography.sizeSm,
+                fontWeight: 500,
+                background: "transparent",
+                border: `1px solid ${colors.borderStroke}`,
+                borderRadius: radii.sm,
+                paddingInline: 6,
+                paddingBlock: 2,
+                color: colors.sidebarForeground,
+                outline: "none",
+              }}
+            />
+          ) : (
+            <span
+              onDoubleClick={() => setIsEditingTitle(true)}
+              title="Double click to rename"
+              style={{
+                display: "block",
+                fontFamily: typography.normalFont,
+                fontSize: typography.sizeSm,
+                fontWeight: 500,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                cursor: "text",
+              }}
+            >
+              {layer.title}
+            </span>
+          )}
+        </div>
 
-        {/* Visibility / settings icon (eye or eye-off) */}
+        {/* Visibility icon (eye or eye-off) */}
         <button
-          aria-label="Layer settings"
-          onClick={handleSettingsClick}
+          aria-label={isHidden ? "Show layer" : "Hide layer"}
+          onClick={handleToggleVisibilityClick}
           style={{
             padding: 4,
             borderRadius: radii.sm,

@@ -1,60 +1,125 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+//  MOCK – remover quando backend estiver estavel
 
-interface GeoJSONProperties {
-  [key: string]: string | number | boolean | null | undefined;
+interface TableHeader {
+  name: string;
+  type: string;
+  sortable: boolean;
 }
 
-interface GeoJSONFeature {
-  type: string;
-  geometry: unknown;
-  properties: GeoJSONProperties;
-}
-
-interface GeoJSONData {
-  type: string;
-  features: GeoJSONFeature[];
+interface AttributeTableResponse {
+  headers: TableHeader[];
+  rows: Record<string, string | number | boolean | null>[];
+  total_rows: number;
+  warnings?: string[];
 }
 
 interface AttributeTableProps {
-  geoData: GeoJSONData | null;
-  onRowSelect?: (feature: GeoJSONFeature) => void;
-  onSelectionChange?: (selectedFeatures: GeoJSONFeature[]) => void;
+  layerId: string | null;
 }
 
-const AttributeTable: React.FC<AttributeTableProps> = ({
-  geoData,
-  onRowSelect,
-  onSelectionChange,
-}) => {
-  const [data, setData] = useState<GeoJSONFeature[]>([]);
-  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
-  const [sortConfig, setSortConfig] = useState<
-    { key: string; direction: "asc" | "desc" } | null
-  >(null);
+const AttributeTable: React.FC<AttributeTableProps> = ({ layerId }) => {
+  const [data, setData] = useState<AttributeTableResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const [isOpen, setIsOpen] = useState(true);
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+  const [sortConfig, setSortConfig] = useState<{
+    key: string;
+    direction: "asc" | "desc";
+  } | null>(null);
 
-  // Carrega dados
-  useEffect(() => {
-    if (geoData && geoData.features) setData(geoData.features);
-    else setData([]);
-  }, [geoData]);
+  /* MOCK- remover quando backend estiver estavel
+  
 
-  // Notifica seleções
   useEffect(() => {
-    if (onSelectionChange) {
-      const selected = Array.from(selectedRows).map((i) => data[i]);
-      onSelectionChange(selected);
+    console.log(" AttributeTable em modo MOCK");
+
+    const headers: TableHeader[] = Object.keys(
+      sampleFeatures.features[0].properties
+    ).map((key) => ({
+      name: key,
+      type: typeof sampleFeatures.features[0].properties[key],
+      sortable: true,
+    }));
+
+    const rows = sampleFeatures.features.map((f) => f.properties);
+
+    const mockResponse: AttributeTableResponse = {
+      headers,
+      rows,
+      pagination: {
+        page: 1,
+        page_size: rows.length,
+        total: rows.length,
+        next: null,
+        prev: null,
+      },
+    };
+
+    console.log(" Mock AttributeTable:", mockResponse);
+    setData(mockResponse);
+  }, []);*/
+
+  useEffect(() => {
+    if (!layerId) {
+      setData(null);
+      return;
     }
-  }, [selectedRows, data, onSelectionChange]);
 
-  // Ordenação
-  const processedData = useMemo(() => {
-    const filtered = [...data];
+    const controller = new AbortController();
 
-    if (sortConfig?.key) {
-      filtered.sort((a, b) => {
-        const aVal = a.properties[sortConfig.key];
-        const bVal = b.properties[sortConfig.key];
+    const fetchAttributeTable = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetch(`http://localhost:5000/layers/${layerId}/table`,
+          { signal: controller.signal }
+        );
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            throw new Error("Layer not found");
+          }
+          throw new Error("Error retrieving attribute table.");
+        }
+
+        const result: AttributeTableResponse = await response.json();
+
+
+        if (!result.headers || !Array.isArray(result.rows)) {
+          throw new Error("Invalid response from backend");
+        }
+
+        setData(result);
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError("Unexpected error");
+        }
+      }
+
+    };
+
+    fetchAttributeTable();
+
+    return () => controller.abort();
+  }, [layerId]);
+
+  /* Ordering  */
+
+  const processedRows = useMemo(() => {
+    if (!data) return [];
+
+    const rows = [...data.rows];
+
+    if (sortConfig) {
+      rows.sort((a, b) => {
+        const aVal = a[sortConfig.key];
+        const bVal = b[sortConfig.key];
 
         if (aVal == null) return sortConfig.direction === "asc" ? -1 : 1;
         if (bVal == null) return sortConfig.direction === "asc" ? 1 : -1;
@@ -63,84 +128,67 @@ const AttributeTable: React.FC<AttributeTableProps> = ({
         return 0;
       });
     }
-    return filtered;
+
+    return rows;
   }, [data, sortConfig]);
 
   const handleSort = (col: string) => {
-    setSortConfig((curr) => ({
+    setSortConfig((prev) => ({
       key: col,
       direction:
-        curr?.key === col && curr.direction === "asc" ? "desc" : "asc",
+        prev?.key === col && prev.direction === "asc" ? "desc" : "asc",
     }));
   };
-
   const handleCheckboxChange = (index: number) => {
     setSelectedRows((prev) => {
       const next = new Set(prev);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
+
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+
       return next;
     });
   };
 
+
   const handleSelectAll = () => {
-    if (selectedRows.size === processedData.length) {
+    if (!data) return;
+
+    if (selectedRows.size === processedRows.length) {
       setSelectedRows(new Set());
     } else {
-      setSelectedRows(new Set(processedData.map((_, i) => i)));
+      setSelectedRows(new Set(processedRows.map((_, i) => i)));
     }
   };
 
-  // Colunas dinâmicas
-  const columns = useMemo(() => {
-    if (data.length === 0) return [];
-    const keys = new Set<string>();
-    data.forEach((f) => Object.keys(f.properties).forEach((k) => keys.add(k)));
-    return Array.from(keys);
-  }, [data]);
 
-  if (!geoData || data.length === 0) {
-    return null;
-  }
+  /*COLLAPSED*/
 
-  // ---------- FECHADO: apenas header ----------
   if (!isOpen) {
     return (
       <div className="flex flex-col justify-end">
-        <div className="w-full mx-auto">
-          <div
-            className="flex items-center justify-between p-3 bg-gray-50 cursor-pointer hover:bg-gray-100 border-t border-x border-[#DADFE7] shadow-lg"
-            onClick={() => setIsOpen(true)}
-          >
-            <h3 className="text-sm font-semibold text-gray-800">
-              Attribute Table
-              {selectedRows.size > 0 && ` (${selectedRows.size} selected)`}
-            </h3>
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
-          </div>
+        <div
+          className="flex items-center justify-between p-3 bg-gray-50 cursor-pointer hover:bg-gray-100 border-t border-x border-[#DADFE7] shadow-lg"
+          onClick={() => setIsOpen(true)}
+        >
+          <h3 className="text-sm font-semibold text-gray-800">
+            Attribute Table
+            {selectedRows.size > 0 && ` (${selectedRows.size} selected)`}
+          </h3>
+          <span>▲</span>
         </div>
       </div>
     );
   }
 
-  // ---------- ABERTO: painel completo ----------
   return (
     <div className="flex justify-center">
       <div className="w-full h-full flex flex-col">
         <div className="border bg-white shadow-lg h-full flex flex-col max-h-72 border-[#DADFE7]">
-          {/* Header colapsável */}
+          {/* Header */}
           <div
             className="flex items-center justify-between px-3 py-2 bg-gray-50 cursor-pointer hover:bg-gray-100 border-b border-[#DADFE7]"
             onClick={() => setIsOpen(false)}
@@ -149,93 +197,98 @@ const AttributeTable: React.FC<AttributeTableProps> = ({
               Attribute Table
               {selectedRows.size > 0 && ` (${selectedRows.size} selected)`}
             </h3>
-            <svg
-              className="w-4 h-4 transform rotate-180"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
+            <span>▼</span>
           </div>
 
-          {/* Contador */}
+          {/* Counter */}
           <div className="px-3 py-1 bg-gray-50 border-b border-[#DADFE7]">
             <span className="text-xs text-gray-600">
-              {processedData.length} of {data.length} elements
+              {processedRows.length} elements
               {selectedRows.size > 0 && ` | ${selectedRows.size} selected`}
             </span>
           </div>
 
+          {/* Loading in progress */}
+          {loading && (
+            <div className="p-4 text-sm text-gray-500">
+              Loading attribute table…
+            </div>
+          )}
+          {/* Error handling */}
+          {error && (
+            <div className="p-4 text-sm text-red-600">
+              {error}
+            </div>
+          )}
+
           {/* TABLE */}
-          <div className="flex-1 overflow-auto">
-            <table className="w-full">
+          <div className="flex-1 overflow-x-auto overflow-y-auto">
+            <table className="w-full text-sm">
               <thead className="bg-gray-100 sticky top-0">
                 <tr>
-                  <th className="p-2 text-left text-sm font-medium border-b border-[#DADFE7] w-12">
-                    <input
-                      type="checkbox"
-                      checked={
-                        processedData.length > 0 &&
-                        selectedRows.size === processedData.length
-                      }
-                      onChange={handleSelectAll}
-                      className="h-4 w-4"
-                    />
+                  <th className="p-2 w-12 border-b border-[#DADFE7]">
+                    {processedRows.length > 0 && (
+                      <input
+                        type="checkbox"
+                        checked={selectedRows.size === processedRows.length}
+                        onChange={handleSelectAll}
+                      />
+                    )}
                   </th>
 
-                  {columns.map((col) => (
+                  {data?.headers.map((h) => (
                     <th
-                      key={col}
-                      onClick={() => handleSort(col)}
-                      className="p-2 text-left text-sm font-medium cursor-pointer hover:bg-gray-200 border-b border-[#DADFE7]"
+                      key={h.name}
+                      onClick={() => h.sortable && handleSort(h.name)}
+                      className="p-2 text-left cursor-pointer hover:bg-gray-200 border-b border-[#DADFE7]"
                     >
-                      <div className="flex items-center">
-                        {col}
-                        {sortConfig?.key === col && (
-                          <span className="ml-1 text-xs">
-                            {sortConfig.direction === "asc" ? "↑" : "↓"}
-                          </span>
-                        )}
-                      </div>
+                      {h.name}
+                      {sortConfig?.key === h.name && (
+                        <span className="ml-1 text-xs">
+                          {sortConfig.direction === "asc" ? "↑" : "↓"}
+                        </span>
+                      )}
                     </th>
                   ))}
                 </tr>
               </thead>
 
               <tbody>
-                {processedData.map((feature, idx) => (
-                  <tr
-                    key={idx}
-                    className={`border-b hover:bg-gray-50 cursor-pointer ${
-                      selectedRows.has(idx) ? "bg-blue-50" : ""
-                    }`}
-                    onClick={() => onRowSelect?.(feature)}
-                  >
-                    <td className="p-2 text-sm border-b border-[#DADFE7]">
-                      <input
-                        type="checkbox"
-                        checked={selectedRows.has(idx)}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          handleCheckboxChange(idx);
-                        }}
-                        className="h-4 w-4"
-                      />
+                {processedRows.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={(data?.headers.length ?? 0) + 1}
+                      className="p-4 text-center text-sm text-gray-500"
+                    >
+                      No layer selected or data available.
                     </td>
-
-                    {columns.map((col) => (
-                      <td key={col} className="p-2 text-sm border-b border-[#DADFE7]">
-                        {String(feature.properties[col] ?? "")}
-                      </td>
-                    ))}
                   </tr>
-                ))}
+                ) : (
+                  processedRows.map((row, idx) => (
+                    <tr
+                      key={idx}
+                      className={`border-b hover:bg-gray-50 ${selectedRows.has(idx) ? "bg-blue-50" : ""
+                        }`}
+                    >
+                      <td className="p-2 border-b border-[#DADFE7]">
+                        <input
+                          type="checkbox"
+                          checked={selectedRows.has(idx)}
+                          onChange={() => handleCheckboxChange(idx)}
+                        />
+                      </td>
+
+                      {data?.headers.map((h) => (
+                        <td
+                          key={h.name}
+                          className="p-2 border-b border-[#DADFE7]"
+                        >
+                          {String(row[h.name] ?? "")}
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

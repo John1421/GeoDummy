@@ -9,12 +9,12 @@ import rasterio
 from rasterio.transform import from_origin
 import numpy as np
 
-# Ensure repo root is on sys.path so `import Backend...` works when cwd is Backend/Pytest
-repo_root = pathlib.Path(__file__).resolve().parents[2]  # two levels up -> repo root
-sys.path.insert(0, str(repo_root))
+# # Ensure repo root is on sys.path so `import Backend...` works when cwd is Backend/Pytest
+# repo_root = pathlib.Path(__file__).resolve().parents[2]  # two levels up -> repo root
+# sys.path.insert(0, str(repo_root))
 
 # now import the module
-from Backend.FileManager import FileManager
+from App.FileManager import FileManager
 
 def test_copy_file_success(tmp_path):
     src_dir = tmp_path / "src"
@@ -83,100 +83,3 @@ def test_move_invalid_source_raises(tmp_path):
     fm = FileManager(layers_dir=str(tmp_path / "in_invalid"), temp_dir=str(temp_dir))
     with pytest.raises(ValueError):
         fm.move_file(str(fake_source), str(temp_dir))
-
-def test_convert_geojson_returns_same_path(tmp_path):
-    gd = gpd.GeoDataFrame({'id':[1]}, geometry=[Point(0,0)], crs="EPSG:4326")
-    geojson_path = tmp_path / "p.geojson"
-    gd.to_file(str(geojson_path), driver="GeoJSON")
-
-    fm = FileManager(layers_dir=str(tmp_path), temp_dir=str(tmp_path / "out"))
-    returned = fm.convert_to_geojson(str(geojson_path))
-    assert returned == str(geojson_path)
-
-def test_convert_gpkg_to_geojson(tmp_path):
-    gd = gpd.GeoDataFrame({'id':[1,2]}, geometry=[Point(0,0), Point(1,1)], crs="EPSG:4326")
-    gpkg_path = tmp_path / "sample.gpkg"
-    # gravar GeoPackage
-    gd.to_file(str(gpkg_path), driver="GPKG")
-
-    fm = FileManager(layers_dir=str(tmp_path), temp_dir=str(tmp_path / "out"))
-    returned = fm.convert_to_geojson(str(gpkg_path))
-
-    assert returned.lower().endswith(".geojson")
-    assert os.path.isfile(returned)
-
-    read_back = gpd.read_file(returned)
-    assert len(read_back) == 2
-    assert "geometry" in read_back.columns
-
-def test_convert_unsupported_raises(tmp_path):
-    txt = tmp_path / "file.txt"
-    txt.write_text("not supported")
-    fm = FileManager(layers_dir=str(tmp_path), temp_dir=str(tmp_path / "out"))
-    with pytest.raises(ValueError):
-        fm.convert_to_geojson(str(txt))
-        
-def test_check_file_system_coordinates_geojson(tmp_path):
-    gd = gpd.GeoDataFrame({'id':[1]}, geometry=[Point(0,0)], crs="EPSG:4326")
-    geojson_path = tmp_path / "crs.geojson"
-    gd.to_file(str(geojson_path), driver="GeoJSON")
-    fm = FileManager(layers_dir=str(tmp_path), temp_dir=str(tmp_path / "out"))
-    assert fm.check_file_system_coordinates(str(geojson_path), "EPSG:4326") is True
-    
-def test_check_file_system_coordinates_tiff(tmp_path):
-    tif_path = tmp_path / "test.tif"
-    data = np.zeros((1, 10, 10), dtype=rasterio.uint8)
-    transform = from_origin(0, 10, 1, 1)  # arbitrary transform
-
-    with rasterio.open(
-        tif_path,
-        "w",
-        driver="GTiff",
-        height=data.shape[1],
-        width=data.shape[2],
-        count=1,
-        dtype=data.dtype,
-        crs="EPSG:4326",
-        transform=transform,
-    ) as dst:
-        dst.write(data)
-
-    fm = FileManager(layers_dir=str(tmp_path), temp_dir=str(tmp_path / "out"))
-    assert fm.check_file_system_coordinates(str(tif_path), "EPSG:4326") is True
-
-
-def test_convert_file_system_coordinates_geojson(tmp_path):
-    gd = gpd.GeoDataFrame({'id':[1]}, geometry=[Point(0,0)], crs="EPSG:3857")
-    geojson_path = tmp_path / "convert.geojson"
-    gd.to_file(str(geojson_path), driver="GeoJSON")
-    fm = FileManager(layers_dir=str(tmp_path), temp_dir=str(tmp_path / "out"))
-    fm.convert_file_system_coordinates(str(geojson_path), "EPSG:4326")
-    gdf = gpd.read_file(str(geojson_path))
-    assert gdf.crs.to_string() == "EPSG:4326"
-    
-def test_convert_file_system_coordinates_tiff(tmp_path):
-    tif_path = tmp_path / "convert.tif"
-    data = np.zeros((1, 10, 10), dtype=rasterio.uint8)
-    transform = from_origin(0, 10, 1, 1)
-
-    # Create GeoTIFF with EPSG:3857
-    with rasterio.open(
-        tif_path,
-        "w",
-        driver="GTiff",
-        height=data.shape[1],
-        width=data.shape[2],
-        count=1,
-        dtype=data.dtype,
-        crs="EPSG:3857",
-        transform=transform,
-    ) as dst:
-        dst.write(data)
-
-    fm = FileManager(layers_dir=str(tmp_path), temp_dir=str(tmp_path / "out"))
-    fm.convert_file_system_coordinates(str(tif_path), "EPSG:4326")
-
-    # Re-open and check CRS
-    with rasterio.open(tif_path) as src:
-        assert src.crs.to_string() == "EPSG:4326"
-

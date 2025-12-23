@@ -1,52 +1,49 @@
 import { useState, type ReactNode } from "react";
-import { colors, typography, radii } from "../Design/DesignTokens";
+import { colors, typography, radii, icons } from "../Design/DesignTokens";
+import { Plus as PlusIcon } from "lucide-react";
 
 interface SidebarPanelProps {
   side: "left" | "right";
   title: string;
   icon: ReactNode;
   onAdd?: () => void;
-  expandedWidthClassName?: string; // kept only for compatibility
-  collapsedWidthClassName?: string; // kept only for compatibility
+  expandedWidthClassName?: string; // compatibility only
+  collapsedWidthClassName?: string; // compatibility only
+  headerActions?: ReactNode; // extra buttons on header
   children: ReactNode;
 }
 
 /**
- * FINAL VERSION WITH MINIMUM EXPANDED WIDTH
- *
- * - Collapsed width: fixed 60px
- * - Expanded width: 22vw but never below 260px
- *   width = max(22vw, 260px)
- * - Borders included in width (box-sizing)
+ * Sidebar panel with collapsible behavior.
+ * Widths are responsive and based on viewport width.
  */
 export default function SidebarPanel({
   side,
   title,
   icon,
   onAdd,
-  //expandedWidthClassName,
-  //collapsedWidthClassName,
+  // expandedWidthClassName,
+  // collapsedWidthClassName,
+  headerActions,
   children,
 }: SidebarPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const isLeft = side === "left";
 
-  // CONFIGURABLE VALUES:
-  const EXPANDED_WIDTH_VW = "18vw";   // expanded percentage
-  const MIN_EXPANDED_PX = "260px";    // minimum expanded width
-  const COLLAPSED_WIDTH = "60px";     // fixed collapsed width
+// Expanded width scales with viewport but has min and max
+const EXPANDED_WIDTH = "clamp(200px, 22vw, 360px)";
 
-  // final width expression using CSS max()
-  const expandedWidth = `max(${EXPANDED_WIDTH_VW}, ${MIN_EXPANDED_PX})`;
+// Collapsed width: icon rail, with clear min/max
+const COLLAPSED_WIDTH = "clamp(56px, 6vw, 72px)";
 
-  const panelWidth = isCollapsed ? COLLAPSED_WIDTH : expandedWidth;
+  const panelWidth = isCollapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH;
 
   return (
     <div
       style={{
         width: panelWidth,
-        boxSizing: "border-box", // ensures borders don't add extra width
+        boxSizing: "border-box",
         position: "relative",
         overflow: "hidden",
         flexShrink: 0,
@@ -57,14 +54,12 @@ export default function SidebarPanel({
         backgroundColor: colors.sidebarBackground,
         color: colors.sidebarForeground,
         fontFamily: typography.normalFont,
-
         borderRight: isLeft ? `0.1px solid ${colors.borderStroke}` : undefined,
         borderLeft: !isLeft ? `0.1px solid ${colors.borderStroke}` : undefined,
-
         transition: "width 0.3s ease",
       }}
     >
-      {/* ================= HEADER ================= */}
+      {/* Header with collapse toggle, title and actions */}
       <div
         style={{
           display: "flex",
@@ -72,12 +67,13 @@ export default function SidebarPanel({
           justifyContent: isCollapsed ? "center" : "space-between",
           height: 48,
           paddingInline: 8,
+          flexWrap: "nowrap", // do not allow header to wrap
         }}
       >
-        {/* COLLAPSE BUTTON (always visible) */}
+        {/* Collapse / expand toggle */}
         <button
           type="button"
-          onClick={() => setIsCollapsed(v => !v)}
+          onClick={() => setIsCollapsed((v) => !v)}
           aria-label={isCollapsed ? `Expand ${title}` : `Collapse ${title}`}
           style={{
             height: 32,
@@ -90,56 +86,77 @@ export default function SidebarPanel({
             border: "none",
             color: colors.sidebarForeground,
             cursor: "pointer",
+            flexShrink: 0, // keep toggle button visible
           }}
         >
           {icon}
         </button>
 
-        {/* TITLE + ADD BUTTON (only when expanded) */}
+        {/* Title and header buttons (only when expanded) */}
         {!isCollapsed && (
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 12,
+              gap: 0,
               paddingRight: 4,
+              minWidth: 0, // allow text area to shrink
+              flex: 1,
+              justifyContent: "flex-end", // group title and actions on the right
             }}
           >
             <h2
               style={{
                 margin: 0,
                 fontFamily: typography.titlesFont,
-                fontWeight: Number(typography.titlesStyle),
+                fontWeight: typography.titlesStyle,
                 fontSize: typography.sizeMd,
                 color: colors.sidebarForeground,
                 whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis", // keep title on one line
+                marginRight: 8, // small gap before the header icons
               }}
             >
               {title}
             </h2>
 
-            {onAdd && (
-              <button
-                type="button"
-                onClick={onAdd}
-                aria-label={`Add ${title}`}
-                style={{
-                  height: 28,
-                  width: 28,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: radii.md,
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: 20,
-                  color: colors.sidebarForeground,
-                }}
-              >
-                +
-              </button>
-            )}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                flexShrink: 0, // prevent icons from wrapping
+              }}
+            >
+              {onAdd && (
+                <button
+                  type="button"
+                  onClick={onAdd}
+                  aria-label={`Add ${title}`}
+                  style={{
+                    height: 28,
+                    width: 28,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: radii.md,
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: 20,
+                    color: colors.sidebarForeground,
+                  }}
+                >
+                  <PlusIcon
+                    size={icons.size}
+                    strokeWidth={icons.strokeWidth}
+                  />
+                </button>
+              )}
+
+              {headerActions}
+            </div>
           </div>
         )}
       </div>
@@ -154,7 +171,7 @@ export default function SidebarPanel({
         />
       )}
 
-      {/* ================= CONTENT ================= */}
+      {/* Content area */}
       {!isCollapsed && (
         <div
           style={{

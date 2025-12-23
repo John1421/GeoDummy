@@ -19,6 +19,7 @@ export const colors = {
 
   // Icons
   dragIcon: "#627084",
+  selectedIcon: "#0d567aff",
 
   // Brand colors
   primary: "#0D73A5",
@@ -30,7 +31,24 @@ export const colors = {
   // Gradients
   gradientStart: "#0D73A5",
   gradientEnd: "#99E0B9",
+
+  // Errors
+  error: "#e02b1bff",
+  errorForeground: "#ffffffff",
 };
+
+export const LAYER_COLOR_PALETTE: string[] = [
+  "#4B5563", // gray
+  "#0F172A", // slate
+  "#6936c3ff", // purple
+  "#1e52c1ff", // blue
+  "#0891B2", // cyan
+  "#49aa6dff", // green
+  "#CA8A04", // amber
+  "#F97316", // orange
+  "#ca5887ff", // pink
+  "#bf1717ff", // red
+];
 
 export const typography = {
   // Font families
@@ -74,6 +92,11 @@ export const transitions = {
   fast: "120ms ease",
   normal: "180ms ease",
   slow: "250ms ease",
+};
+
+export const icons = {
+  size : 18,
+  strokeWidth: 2,
 };
 
 export const designTokens = {
