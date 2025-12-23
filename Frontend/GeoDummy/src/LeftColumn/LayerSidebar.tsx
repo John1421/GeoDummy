@@ -56,11 +56,13 @@ export interface Layer {
 type BackendLayerMetadata =
   | {
     type: "vector";
+    layer_name: string;
     geometry_type: string;
     crs?: string;
   }
   | {
     type: "raster";
+    layer_name?: string;
     zoom_min?: number;
     zoom_max?: number;
     crs?: string;
@@ -401,33 +403,36 @@ export default function LayerSidebar({ layers, setLayers }: LayerSidebarProps) {
       //const { ids } = await postLayerFilePlaceholder(file);
 
       const { ids, metadata } = await postLayerFile(file);
-      const displayName = file.name.replace(/\.[^/.]+$/, "");
       console.log("Layer:", ids, metadata);
       // If the backend returns multiple ids, replace the temporary layer with one layer per id
       if (ids.length > 1) {
         setLayers((prev) => {
           const withoutTemp = prev.filter((l) => l.id !== tempId);
           const baseOrder = nextOrder;
-          const newOnes: Layer[] = ids.map((id, idx) => ({
-            id,
-            title: id,
-            order: baseOrder + idx,
-            fileName: file.name,
-            opacity: 1,
-            previousOpacity: 1,
-          }));
+          const newOnes: Layer[] = ids.map((id, idx) => {
+            const layerName = metadata[idx]?.layer_name || id;
+            return {
+              id,
+              title: layerName,
+              order: baseOrder + idx,
+              fileName: file.name,
+              opacity: 1,
+              previousOpacity: 1,
+            };
+          });
           return [...withoutTemp, ...newOnes];
         });
       } else {
         // Single id: update the temporary layer id -> backend id
         const backendId = ids[0];
+        const layerName = metadata[0]?.layer_name || file.name.replace(/\.[^/.]+$/, "");
         setLayers((prev) =>
           prev.map((l) =>
             l.id === tempId
               ? {
                 ...l,
                 id: backendId,
-                title: displayName,
+                title: layerName,
               }
               : l
           )
@@ -473,6 +478,7 @@ export default function LayerSidebar({ layers, setLayers }: LayerSidebarProps) {
                 l.id === id
                   ? {
                     ...l,
+                    title: meta.layer_name,
                     kind: "vector",
                     geometryType: meta.geometry_type,
                     vectorData: geojson,
@@ -505,6 +511,7 @@ export default function LayerSidebar({ layers, setLayers }: LayerSidebarProps) {
                 l.id === id
                   ? {
                     ...l,
+                    title: meta.layer_name || id,
                     kind: "raster",
                     rasterData: getRasterDescriptor(id, meta),
                     origin: "backend",
