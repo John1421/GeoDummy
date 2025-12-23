@@ -18,6 +18,7 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
     const [error, setError] = useState<string | null>(null);
     const [paramsOpen, setParamsOpen] = useState(false);
     const [selectedParams, setSelectedParams] = useState<string[]>([]);
+    const [layerType, setLayerType] = useState<string>("");
     const [description, setDescription] = useState("");
     const [isUploading, setIsUploading] = useState(false);
     const [saveStatus, setSaveStatus] = useState<SaveStatus>("unsaved");
@@ -30,6 +31,7 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
         setError(null);
         setParamsOpen(false);
         setSelectedParams([]);
+        setLayerType("");
         setDescription("");
         setSaveStatus("unsaved");
     }, []);
@@ -225,6 +227,7 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
                                 outline: "none",
                                 fontSize: typography.sizeSm,
                                 fontFamily: typography.normalFont,
+                                
                             }}
                             />
 
@@ -232,16 +235,20 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
                             {showDropdown && filteredCategories.length > 0 && (
                             <div
                                 style={{
-                                position: "absolute",
-                                top: "100%",
-                                left: 120,
-                                right: 0,
-                                background: colors.cardBackground,
-                                border: `1px solid ${colors.borderStroke}`,
-                                borderRadius: radii.md,
-                                marginTop: 4,
-                                zIndex: 10,
-                                }}
+                                        width: "100%",
+                                        paddingInline: 12,
+                                        paddingBlock: 8,
+                                        borderRadius: radii.md,
+                                        borderStyle: "solid",
+                                        borderWidth: 1,
+                                        backgroundColor: colors.borderStroke,
+                                        borderColor: colors.borderStroke,
+                                        outline: "none",
+                                        fontSize: typography.sizeSm,
+                                        fontFamily: typography.normalFont,
+                                        color: colors.foreground,
+                                        cursor: "pointer",
+                                    }}
                             >
                                 {filteredCategories.map((cat) => (
                                 <div
@@ -327,21 +334,45 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
                                 Number
                             </button>
 
-                            <button
-                                onClick={() => handleParamToggle("type")}
-                                style={{
-                                    padding: `${spacing.sm} ${spacing.md}`,
-                                    backgroundColor: selectedParams.includes("type") ? colors.primary : colors.cardBackground,
-                                    color: selectedParams.includes("type") ? colors.primaryForeground : colors.foreground,
-                                    border: `1px solid ${colors.borderStroke}`,
-                                    borderRadius: radii.md,
-                                    fontSize: typography.sizeSm,
-                                    fontFamily: typography.normalFont,
-                                    cursor: "pointer",
-                                }}
-                            >
-                                Type
-                            </button>
+                            <div style={{ display: "flex", flexDirection: "column", gap: spacing.sm }}>
+                                <label
+                                    style={{
+                                        fontSize: typography.sizeSm,
+                                        fontWeight: 600,
+                                        color: colors.foreground,
+                                        fontFamily: typography.normalFont,
+                                    }}
+                                >
+                                    Layer Type
+                                </label>
+                                <select
+                                    value={layerType}
+                                    onChange={(e) => {
+                                        setLayerType(e.target.value);
+                                        setSaveStatus("unsaved");
+                                    }}
+                                    style={{
+                                        width: "100%",
+                                        paddingInline: 12,
+                                        paddingBlock: 8,
+                                        borderRadius: radii.md,
+                                        borderStyle: "solid",
+                                        borderWidth: 1,
+                                        backgroundColor: colors.borderStroke,
+                                        borderColor: colors.borderStroke,
+                                        outline: "none",
+                                        fontSize: typography.sizeSm,
+                                        fontFamily: typography.normalFont,
+                                        color: colors.foreground,
+                                        cursor: "pointer",
+                                    }}
+                                >
+                                    <option value="">Select layer type...</option>
+                                    <option value="raster">Raster</option>
+                                    <option value="vetorial">Vetorial</option>
+                                    <option value="both">Ambos</option>
+                                </select>
+                            </div>
                         </div>
                     )}
                 </div>
