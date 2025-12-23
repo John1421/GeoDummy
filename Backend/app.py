@@ -502,7 +502,7 @@ def serve_tile(layer_id, z, x, y, tile_size=256):
     except Exception as e:
         raise ValueError(f"Error serving tile: {e}")
     
-@app.route('/layers/<layer_id>/preview.png', methods=['POST'])
+@app.route('/layers/<layer_id>/preview.png', methods=['GET'])
 def get_layer_preview(layer_id, tile_size=256):
     if not layer_id:
         raise BadRequest("layer_id is required")
@@ -536,7 +536,7 @@ def get_layer_preview(layer_id, tile_size=256):
             
             if width <= 0 or height <= 0:
                 # Tile outside raster
-                img = Image.new("RGBA", (tile_size, tile_size), (0, 0, 0, 0))
+                raise ValueError("Requested bounds are outside the raster extent")
             else:
                 # Read window and resample to 256x256
                 try:
@@ -552,7 +552,7 @@ def get_layer_preview(layer_id, tile_size=256):
                         img = Image.fromarray(data[0], mode="L")
                 except Exception as e:
                     # In case of any error reading the window, return transparent tile
-                    img = Image.new("RGBA", (tile_size, tile_size), (0, 0, 0, 0))        
+                    raise ValueError(f"Error reading raster window: {e}")        
             
             # Save to cache
             img.save(cache_file, format="PNG")
