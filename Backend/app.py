@@ -503,7 +503,7 @@ def serve_tile(layer_id, z, x, y, tile_size=256):
         raise ValueError(f"Error serving tile: {e}")
     
 @app.route('/layers/<layer_id>/preview.png', methods=['GET'])
-def get_layer_preview(layer_id, tile_size=256):
+def get_layer_preview(layer_id):
     if not layer_id:
         raise BadRequest("layer_id is required")
     
