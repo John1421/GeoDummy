@@ -26,4 +26,4 @@ USER user
 EXPOSE 5000
 
 # Comando genérico (substituir mais tarde pelo da tua app real)
-CMD ["python", "-m", "http.server", "5000"]
+CMD ["python", "-m", "http.server", "5050"]
