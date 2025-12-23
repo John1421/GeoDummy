@@ -1,0 +1,29 @@
+# Imagem base Python (leve)
+FROM python:3.12-slim
+
+# Diretório de trabalho
+WORKDIR /app
+
+# Copiar dependências (se existirem)
+COPY requirements.txt* ./
+
+# Instalar dependências (ignora se o ficheiro não existir)
+RUN if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi
+
+# Copiar o resto do código para dentro do container
+COPY . .
+
+# Create group and user before changing ownership
+RUN groupadd -r appgroup && useradd -r -g appgroup user
+
+# Change ownership of the /app folder
+RUN chown -R user:appgroup /app
+
+# Switch to the new user
+USER user
+
+# Expor a porta do backend
+EXPOSE 5000
+
+# Comando genérico (substituir mais tarde pelo da tua app real)
+CMD ["python", "-m", "http.server", "5000"]
