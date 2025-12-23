@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { FolderOpen, Plus } from "lucide-react";
 import WindowTemplate from "../TemplateModals/PopUpWindowModal";
-import { colors, typography, radii, spacing, icons } from "../Design/DesignTokens";
+import { colors, typography, radii, spacing, icons, shadows } from "../Design/DesignTokens";
 import { ThreeDot } from "react-loading-indicators"
 
 type AddNewScriptProps = {
@@ -255,7 +255,7 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
                                         fontSize: typography.sizeSm,
                                         fontFamily: typography.normalFont,
                                         color: colors.foreground,
-                                        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+                                        boxShadow: shadows.subtle,
                                         zIndex: 1000,
                                     }}
                             >
@@ -400,7 +400,7 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
                                                 fontSize: typography.sizeSm,
                                                 fontFamily: typography.normalFont,
                                                 color: colors.foreground,
-                                                boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+                                                boxShadow: shadows.subtle,
                                                 zIndex: 1000,
                                             }}
                                         >
