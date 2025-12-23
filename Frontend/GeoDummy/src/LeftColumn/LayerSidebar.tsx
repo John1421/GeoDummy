@@ -496,6 +496,7 @@ export default function LayerSidebar({ layers, setLayers }: LayerSidebarProps) {
                     ...l,
                     title: meta.layer_name || id,
                     kind: "raster",
+                    geometryType : "Raster",
                     rasterData: getRasterDescriptor(id, meta),
                     origin: "backend",
                     projection: meta.crs ?? "EPSG:4326",
