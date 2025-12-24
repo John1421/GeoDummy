@@ -6,7 +6,7 @@ import { ThreeDot } from "react-loading-indicators"
 
 type AddNewScriptProps = {
     onClose: () => void;
-    onAddScript: (name: string, category: string, description: string) => void;
+    onAddScript: (id: string, name: string, category: string, description: string) => void;
     existingCategories: string[];
 };
 type SaveStatus = "unsaved" | "saving" | "saved";
@@ -123,9 +123,11 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
             parameters: params.filter(p => p.name && p.type),
         };
         try{
-            await postScriptMock(scriptFile, metadata);
+            const savedScript = await postScriptMock(scriptFile, metadata);
             setSaveStatus("saved");
-            onAddScript(name, category, description);
+            
+            onAddScript(savedScript.id, savedScript.name, savedScript.category, savedScript.description);
+            //console.log("id:", savedScript.id);
             setTimeout(onClose, 500);
         } catch (err) {
             console.error("Upload error:", err);
@@ -169,6 +171,7 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
         console.log("📦 Mock upload script");
         console.log("File:", file);
         console.log("Metadata:", metadata);
+        
 
         // simula latência de rede
         await new Promise((r) => setTimeout(r, 800));
@@ -177,7 +180,8 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
         return {
             id: crypto.randomUUID(),
             name: metadata.name,
-            created_at: new Date().toISOString(),
+            category: metadata.category,
+            description: metadata.description,
         };
     }
 

@@ -46,7 +46,7 @@ export default function ScriptList() {
   const [scripts, setScripts] = useState<Script[]>(EXAMPLE_SCRIPTS);
 
   const handleAddScript = useCallback(
-    (name: string, category: string, description: string) => {
+    (id: string, name: string, category: string, description: string) => {
       const cleanCategory =
         category.trim().length > 0
           ? category.trim().replace(/\s+/g, " ").toLowerCase()
@@ -56,7 +56,7 @@ export default function ScriptList() {
         cleanCategory.charAt(0).toUpperCase() + cleanCategory.slice(1);
 
       const newScript: Script = {
-        id: crypto.randomUUID(),
+        id,
         name,
         description,
         category: formattedCategory,
@@ -102,6 +102,8 @@ const categories = Array.from(
           <ToolCategoryToggle key={category} title={category}>
             {scripts
               .filter((script) => script.category?.toLowerCase() === category.toLowerCase())
+              .slice()
+              .sort((a, b) => a.name.localeCompare(b.name, "pt", { sensitivity: "base" }))
               .map((script) => (
                 <ScriptCard
                   key={script.id}
