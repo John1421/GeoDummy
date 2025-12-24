@@ -5,11 +5,12 @@ import { ThreeDot } from "react-loading-indicators"
 import RunScriptWindow from "./RunScriptWindow";
 
 interface ScriptCardProps {
+  id: string;
   name: string;
   description: string;
 }
 
-function ScriptCard({ name, description }: ScriptCardProps) {
+function ScriptCard({ id, name, description }: ScriptCardProps) {
   const [loading, setLoading] = useState(false);
   const [isRunScriptWindowOpen, setIsRunScriptWindowOpen] = useState(false);
 
@@ -17,12 +18,31 @@ function ScriptCard({ name, description }: ScriptCardProps) {
     setIsRunScriptWindowOpen(true);
   };
 
-  const handleRunScriptFromWindow = () => {
+  // Mock de execução no backend recebendo o scriptId
+  async function runScriptMock(
+    scriptId: string,
+    payload: { inputFilePath: string; numberValue: number; listValue: number[] }
+  ): Promise<{ status: string; output: string }>{
+    console.log("▶️ Mock run: sending to backend", { scriptId, payload });
+    // Simula latência
+    await new Promise(r => setTimeout(r, 800));
+    // Simula resposta
+    return { status: "ok", output: `Script ${scriptId} executed with ${payload.listValue.length} items` };
+  }
+
+  const handleRunScriptFromWindow = async (
+    scriptId: string,
+    inputFilePath: string,
+    numberValue: number,
+    listValue: number[]
+  ) => {
     setLoading(true);
-    // Simulação de tempo de execução (substituir com lógica real)
-    setTimeout(() => {
+    try {
+      const res = await runScriptMock(scriptId, { inputFilePath, numberValue, listValue });
+      console.log("✅ Mock result:", res);
+    } finally {
       setLoading(false);
-    }, 2000);
+    }
   };
 
   return (
@@ -104,6 +124,7 @@ function ScriptCard({ name, description }: ScriptCardProps) {
       <RunScriptWindow
         isOpen={isRunScriptWindowOpen}
         onClose={() => setIsRunScriptWindowOpen(false)}
+        scriptId={id}
         onRunScript={handleRunScriptFromWindow}
       />
     </div>

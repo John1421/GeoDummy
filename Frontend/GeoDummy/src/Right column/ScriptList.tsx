@@ -107,6 +107,7 @@ const categories = Array.from(
               .map((script) => (
                 <ScriptCard
                   key={script.id}
+                  id={script.id}
                   name={script.name}
                   description={script.description || ""}
                 />

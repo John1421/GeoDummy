@@ -6,10 +6,16 @@ import { Play, FolderOpen } from "lucide-react";
 interface RunScriptWindowProps {
   isOpen: boolean;
   onClose: () => void;
-  onRunScript: (inputFilePath: string, numberValue: number, listValue: number[]) => void;
+  scriptId: string;
+  onRunScript: (
+    scriptId: string,
+    inputFilePath: string,
+    numberValue: number,
+    listValue: number[]
+  ) => void;
 }
 
-const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, onRunScript }) => {
+const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scriptId, onRunScript }) => {
   const [inputFilePath, setInputFilePath] = useState<string | null>(null);
   const [numberValue, setNumberValue] = useState<number>(0);
   const [listValue, setListValue] = useState<string>(''); // Store as string, parse on submit
@@ -24,7 +30,7 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, onRu
     // For now, listValue is a string, and we'll just split it by commas.
     // In a real application, you might want more robust parsing and error handling.
     const parsedList = listValue.split(',').map(item => parseInt(item.trim())).filter(item => !isNaN(item));
-    onRunScript(inputFilePath || '', numberValue, parsedList);
+    onRunScript(scriptId, inputFilePath || '', numberValue, parsedList);
     onClose();
   };
 
