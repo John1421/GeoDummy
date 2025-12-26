@@ -9,4 +9,3 @@ rioxarray
 xenon
 radon
 fiona
-threading
