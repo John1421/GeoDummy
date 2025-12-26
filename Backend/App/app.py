@@ -16,6 +16,7 @@ from flask_cors import CORS
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 import uuid
+from threading import Lock
 
 import rasterio
 from rasterio.warp import transform_bounds
@@ -35,6 +36,9 @@ basemap_manager = BasemapManager()
 layer_manager = LayerManager()
 script_manager = ScriptManager()
 data_manager = DataManager()
+
+running_scripts = {}
+running_scripts_lock = Lock()
 
 
 
@@ -158,41 +162,63 @@ def run_script(script_id):
     if not script_id:
         raise BadRequest("script_id is required")
     
-    # Parse JSON body
-    data = request.get_json()
-    if not data:
-        raise BadRequest("Request body must be JSON")
+    # Begin script execution workflow
+    with running_scripts_lock:
+        # Check if another script is already running
+        if script_id in running_scripts and running_scripts[script_id]["status"] == "running":
+            raise BadRequest(f"Script '{script_id}' is already running")
 
-    parameters = data.get("parameters", {})
-    if not isinstance(parameters, dict):
-        raise BadRequest("'parameters' must be a JSON object")
+        execution_id = str(uuid.uuid4())
+        running_scripts[script_id] = {
+            "execution_id": execution_id,
+            "start_time": datetime.now(timezone.utc),
+            "status": "running"
+        }
 
-    # Construct file path
-    script_path = os.path.join(file_manager.scripts_dir, f"{script_id}.py")
+    try:
+        # Parse JSON body
+        data = request.get_json()
+        if not data:
+            raise BadRequest("Request body must be JSON")
 
-    if not os.path.isfile(script_path):
-        raise BadRequest(f"Script '{script_id}' does not exist")
+        parameters = data.get("parameters", {})
+        if not isinstance(parameters, dict):
+            raise BadRequest("'parameters' must be a JSON object")
+
+        # Construct file path
+        script_path = os.path.join(file_manager.scripts_dir, f"{script_id}.py")
+
+        if not os.path.isfile(script_path):
+            raise BadRequest(f"Script '{script_id}' does not exist")
+
+        # Execute the script
+        output = script_manager.run_script(
+            script_path=script_path,
+            scriptid=script_id,
+            executionid=execution_id,
+            parameters=parameters,
+        )
+
+        # Mark as finished
+        with running_scripts_lock:
+            running_scripts[script_id]["status"] = "finished"
+
+        # Check the kind of output
+        if isinstance(output, str) and os.path.isfile(output):
+            file_name, file_extension = os.path.splitext(output)
+            layer_id = os.path.basename(file_name)
+            return send_file(output, as_attachment=True, download_name=f"{layer_id}{file_extension}")
+        
+        elif output != None:        
+            return jsonify({"message": f"Run script {script_id}", "output": output}), 200
+        else:
+            raise ValueError(f"script {script_id} did not return a output") 
     
-
-    execution_id = str(uuid.uuid4())
-    
-    output = script_manager.run_script(
-        script_path=script_path,
-        scriptid=script_id,
-        executionid=execution_id,
-        parameters=parameters,
-    )
-
-
-    if isinstance(output, str) and os.path.isfile(output):
-        file_name, file_extension = os.path.splitext(output)
-        layer_id = os.path.basename(file_name)
-        return send_file(output, as_attachment=True, download_name=f"{layer_id}{file_extension}")
-            
-    elif output != None:        
-        return jsonify({"message": f"Run script {script_id}", "output": output}), 200
-    else:
-        raise ValueError(f"script {script_id} did not return a output") 
+    except Exception as e:
+        # If any errors arise before the script execution marks as failed
+        with running_scripts_lock:
+            running_scripts[script_id]["status"] = "failed"
+        raise
 
 @app.route('/execute_script/<script_id>', methods=['DELETE'])
 def stop_script(script_id):
@@ -208,6 +234,28 @@ def stop_script(script_id):
 def get_script_status(script_id):    
     if not script_id:
         raise BadRequest("script_id parameter is required")
+    
+    '''
+    Implementação proposta por Esteves:
+
+def get_script_status(script_id):
+    with running_scripts_lock:
+        info = running_scripts.get(script_id)
+
+    if not info:
+        return jsonify({
+            "script_id": script_id,
+            "status": "not running"
+        }), 200
+
+    return jsonify({
+        "script_id": script_id,
+        "execution_id": info["execution_id"],
+        "status": info["status"],
+        "start_time": info["start_time"].isoformat()
+    }), 200
+
+    '''
 
     # TODO: check execution status
 
