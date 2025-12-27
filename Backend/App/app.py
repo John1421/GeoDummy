@@ -1,6 +1,6 @@
 
 import json
-from flask import Flask, request, after_this_request, jsonify, send_file
+from flask import Flask, request, after_this_request, jsonify, send_file, abort
 from werkzeug.exceptions import HTTPException, BadRequest, NotFound, InternalServerError
 import geopandas as gpd
 import shutil
@@ -166,7 +166,13 @@ def run_script(script_id):
     with running_scripts_lock:
         # Check if another script is already running
         if script_id in running_scripts and running_scripts[script_id]["status"] == "running":
-            raise BadRequest(f"Script '{script_id}' is already running")
+            return jsonify({
+                    "error": "Conflict",
+                    "message": f"Script '{script_id}' is already running. Only one script can be run at a time.",
+                    "script_id": script_id,
+                    "execution_id": running_scripts[script_id]["execution_id"]
+                }), 409
+
 
         execution_id = str(uuid.uuid4())
         running_scripts[script_id] = {
@@ -199,26 +205,103 @@ def run_script(script_id):
             parameters=parameters,
         )
 
-        # Mark as finished
-        with running_scripts_lock:
-            running_scripts[script_id]["status"] = "finished"
+        exec_status = output.get("status")
+        outputs = output.get("outputs", [])
+        log_path = output.get("log_path")
 
-        # Check the kind of output
-        if isinstance(output, str) and os.path.isfile(output):
-            file_name, file_extension = os.path.splitext(output)
-            layer_id = os.path.basename(file_name)
-            return send_file(output, as_attachment=True, download_name=f"{layer_id}{file_extension}")
+        # Handle timeout (504 Gateway Timeout)
+        if exec_status == "timeout":
+            with running_scripts_lock:
+                running_scripts[script_id]["status"] = "failed"
+            
+            return jsonify({
+                "error": "Gateway Timeout",
+                "message": "Script execution exceeded the maximum allowed time of 30 seconds",
+                "script_id": script_id,
+                "execution_id": execution_id,
+                "timeout_seconds": 30,
+                "log_path": log_path
+            }), 504
         
-        elif output != None:        
-            return jsonify({"message": f"Run script {script_id}", "output": output}), 200
+        # Handle failure (500 Internal Server Error)
+        elif exec_status == "failure":
+            with running_scripts_lock:
+                running_scripts[script_id]["status"] = "failed"
+            
+            return jsonify({
+                "error": "Internal Server Error",
+                "message": "Script execution failed with errors",
+                "script_id": script_id,
+                "execution_id": execution_id,
+                "log_path": log_path,
+                "details": "Check log file for error details"
+            }), 500
+        
+        # Handle success
+        elif exec_status == "success":
+            # Mark as finished
+            with running_scripts_lock:
+                running_scripts[script_id]["status"] = "finished"
+            
+            # Check if output is a file
+            if outputs and isinstance(outputs[0], str) and os.path.isfile(outputs[0]):
+                file_path = outputs[0]
+                file_name, file_extension = os.path.splitext(file_path)
+                layer_id = os.path.basename(file_name)
+                return send_file(file_path, as_attachment=True, download_name=f"{layer_id}{file_extension}")
+            
+            # Return JSON response
+            elif outputs and outputs[0] is not None:
+                return jsonify({
+                    "message": f"Script '{script_id}' executed successfully",
+                    "execution_id": execution_id,
+                    "output": outputs,
+                    "log_path": log_path
+                }), 200
+            
+            # No output produced
+            else:
+                return jsonify({
+                    "message": f"Script '{script_id}' executed successfully with no output",
+                    "execution_id": execution_id,
+                    "log_path": log_path
+                }), 200
+
+        # Unknown status (shouldn't happen, but handle anyway)
         else:
-            raise ValueError(f"script {script_id} did not return a output") 
+            with running_scripts_lock:
+                running_scripts[script_id]["status"] = "failed"
+            
+            return jsonify({
+                "error": "Internal Server Error",
+                "message": f"Unknown execution status: {exec_status}",
+                "script_id": script_id,
+                "execution_id": execution_id,
+                "log_path": log_path
+            }), 500
+        
     
-    except Exception as e:
-        # If any errors arise before the script execution marks as failed
+    except BadRequest as e:
+        # Client errors (4xx) - re-raise to be handled by Flask
         with running_scripts_lock:
             running_scripts[script_id]["status"] = "failed"
         raise
+    
+    except Exception as e:
+        # Generic server errors - 500 Internal Server Error
+        with running_scripts_lock:
+            running_scripts[script_id]["status"] = "failed"
+        
+        # Log the full error server-side for debugging
+        app.logger.error(f"Script execution failed: {script_id} (execution_id: {execution_id})", exc_info=True)
+        
+        # Return sanitized error to client
+        return jsonify({
+            "error": "Internal Server Error",
+            "message": "Script execution failed. Please contact the administrator.",
+            "script_id": script_id,
+            "execution_id": execution_id
+        }), 500
 
 @app.route('/execute_script/<script_id>', methods=['DELETE'])
 def stop_script(script_id):
