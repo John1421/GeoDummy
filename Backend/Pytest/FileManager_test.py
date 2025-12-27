@@ -1,85 +1,77 @@
-import os
-import json
 import pytest
 import geopandas as gpd
+from pathlib import Path
 from shapely.geometry import Point
-import sys
-import pathlib
-import rasterio
-from rasterio.transform import from_origin
-import numpy as np
-
-# # Ensure repo root is on sys.path so `import Backend...` works when cwd is Backend/Pytest
-# repo_root = pathlib.Path(__file__).resolve().parents[2]  # two levels up -> repo root
-# sys.path.insert(0, str(repo_root))
-
-# now import the module
 from App.FileManager import FileManager
 
-def test_copy_file_success(tmp_path):
-    src_dir = tmp_path / "src"
-    temp_dir = tmp_path / "dest"
-    src_dir.mkdir()
-    temp_dir.mkdir()
+class TestFileManager:
+    """
+    Test suite for the FileManager class, covering file operations 
+    such as copying, moving, and exception handling for invalid paths.
+    """
 
-    src_file = src_dir / f"test.geojson"
+    @pytest.fixture(autouse=True)
+    def setup_fm(self, tmp_path: Path) -> None:
+        """
+        Fixture to initialize directories and the FileManager instance.
+        Executed automatically before each test method.
+        """
+        self.src_dir = tmp_path / "src"
+        self.dest_dir = tmp_path / "dest"
+        self.src_dir.mkdir()
+        self.dest_dir.mkdir()
+        
+        # Initialize FileManager with string paths as required by its constructor
+        self.fm = FileManager(layers_dir=str(self.src_dir), temp_dir=str(self.dest_dir))
 
-    # create valid file content
-    gdf = gpd.GeoDataFrame({"id": [1]}, geometry=[Point(0, 0)], crs="EPSG:4326")
-    gdf.to_file(src_file)
+    def _create_dummy_geojson(self, filename: str) -> Path:
+        """Helper method to create a valid GeoJSON file for testing."""
+        file_path = self.src_dir / filename
+        gdf = gpd.GeoDataFrame({"id": [1]}, geometry=[Point(0, 0)], crs="EPSG:4326")
+        gdf.to_file(file_path, driver='GeoJSON')
+        return file_path
 
-    fm = FileManager(layers_dir=str(src_dir), temp_dir=str(temp_dir))
-    assert fm.copy_file(str(src_file), str(temp_dir)) is True
+    def test_copy_file_success(self) -> None:
+        """Test that a file is successfully copied and the source remains intact."""
+        src_file = self._create_dummy_geojson("test_copy.geojson")
+        
+        # Execution
+        result = self.fm.copy_file(str(src_file), str(self.dest_dir))
+        
+        # Assertions
+        assert result is True
+        assert (self.dest_dir / "test_copy.geojson").exists()
+        assert src_file.exists()
 
-    dest_file = temp_dir / f"test.geojson"
-    assert dest_file.exists()
+    def test_move_file_success(self) -> None:
+        """Test that a file is successfully moved and the source is deleted."""
+        src_file = self._create_dummy_geojson("test_move.geojson")
+        
+        # Execution
+        result = self.fm.move_file(str(src_file), str(self.dest_dir))
+        
+        # Assertions
+        assert result is True
+        assert (self.dest_dir / "test_move.geojson").exists()
+        assert not src_file.exists()
 
-    # ensure original file still exists after copying
-    assert src_file.exists()
+    def test_copy_existing_destination_raises(self) -> None:
+        """Edge Case: Test that copying fails if the destination file already exists."""
+        filename = "conflict.txt"
+        src_file = self.src_dir / filename
+        src_file.write_text("source content")
+        
+        existing_file = self.dest_dir / filename
+        existing_file.write_text("existing content")
 
+        # Assertion: Should raise ValueError on conflict
+        with pytest.raises(ValueError):
+            self.fm.copy_file(str(src_file), str(self.dest_dir))
 
-def test_move_file_success(tmp_path):
-    src_dir = tmp_path / "src_move"
-    temp_dir = tmp_path / "dest_move"
-    src_dir.mkdir()
-    temp_dir.mkdir()
+    def test_move_invalid_source_raises(self) -> None:
+        """Edge Case: Test that moving a non-existent source file raises a ValueError."""
+        fake_source = self.src_dir / "does_not_exist.txt"
 
-    src_file = src_dir / f"test.geojson"
-
-    # create valid file content
-    gdf = gpd.GeoDataFrame({"id": [1]}, geometry=[Point(0, 0)], crs="EPSG:4326")
-    gdf.to_file(src_file)
-
-    fm = FileManager(layers_dir=str(src_dir), temp_dir=str(temp_dir))
-    assert fm.move_file(str(src_file), str(temp_dir)) is True
-
-    dest_file = temp_dir / f"test.geojson"
-    assert dest_file.exists()
-
-    # source file must be removed
-    assert not src_file.exists()
-
-
-def test_copy_existing_destination_raises(tmp_path):
-    src_dir = tmp_path / "src_conflict"
-    temp_dir = tmp_path / "dest_conflict"
-    src_dir.mkdir()
-    temp_dir.mkdir()
-
-    src_file = src_dir / "conflict.txt"
-    src_file.write_text("one")
-    existing = temp_dir / "conflict.txt"
-    existing.write_text("already here")
-
-    fm = FileManager(layers_dir=str(src_dir), temp_dir=str(temp_dir))
-    with pytest.raises(ValueError):
-        fm.copy_file(str(src_file), str(temp_dir))
-
-def test_move_invalid_source_raises(tmp_path):
-    temp_dir = tmp_path / "dest_invalid"
-    temp_dir.mkdir()
-    fake_source = tmp_path / "does_not_exist.txt"
-
-    fm = FileManager(layers_dir=str(tmp_path / "in_invalid"), temp_dir=str(temp_dir))
-    with pytest.raises(ValueError):
-        fm.move_file(str(fake_source), str(temp_dir))
+        # Assertion: Should raise ValueError for missing source
+        with pytest.raises(ValueError):
+            self.fm.move_file(str(fake_source), str(self.dest_dir))
