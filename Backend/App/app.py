@@ -598,12 +598,31 @@ def export_layer(layer_id):
 
 @app.route('/layers/<layer_id>', methods=['DELETE'])
 def remove_layer(layer_id):    
-    data = request.get_json()
     if not layer_id:
         raise BadRequest("layer_id is required")
 
-    # TODO: remove layer
+    metadata_path = os.path.join(file_manager.layers_dir, f"{layer_id}_metadata.json")
 
+    layer_path = None
+    for ext in [".gpkg", ".tif", ".tiff", ".GPKG", ".TIF", ".TIFF"]:
+        candidate = os.path.join(file_manager.layers_dir, f"{layer_id}{ext}")
+        if os.path.isfile(candidate):
+            layer_path = candidate
+            break
+
+    if not layer_path and not os.path.isfile(metadata_path):
+        raise NotFound(f"Layer {layer_id} does not exist")
+
+    try:
+        if layer_path:
+            os.remove(layer_path)
+
+        if os.path.isfile(metadata_path):
+            os.remove(metadata_path)
+
+    except OSError as e:
+        raise InternalServerError(f"Failed to remove layer {layer_id}: {str(e)}")
+    
     return jsonify({"message": f"Layer {layer_id} removed"}), 200
 
 @app.route('/layers/<layer_id>/<priority>', methods=['POST'])
