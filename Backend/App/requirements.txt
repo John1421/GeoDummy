@@ -10,4 +10,4 @@ rioxarray
 xenon
 radon
 fiona
-PIL
+Pillow
