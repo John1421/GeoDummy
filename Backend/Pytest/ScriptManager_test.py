@@ -68,7 +68,7 @@ class TestScriptManager:
             ScriptManager._validate_script_integrity(str(script_file))
         
         # Use description or a partial match to avoid formatting issues
-        assert "must define a function named 'main'" in str(excinfo.value)
+        assert "must define a function named 'main(params)'" in str(excinfo.value)
 
     # --- Execution Tests ---
 
@@ -460,7 +460,7 @@ class TestScriptManager:
         mock_lm.export_geopackage_layer_to_geojson.side_effect = ["/tmp/l1.json", "/tmp/l2.json"]
         
         test_path = "/tmp/input.gpkg"
-        expected_zip = f"{mock_fm.temp_dir}/input_export.zip"
+        expected_zip = f"{mock_fm.temp_dir}\\input_export.zip"
         
         # Mocking context manager for zipfile
         zip_instance = mock_zip.return_value.__enter__.return_value

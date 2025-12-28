@@ -146,7 +146,7 @@ class TestApp:
         """Test behavior: Returns cached data if available to save computation."""
         cached_response = {"headers": [], "rows": [], "total_rows": 0, "warnings": []}
         mock_managers["data"].check_cache.return_value = cached_response
-        mock_managers["layer"]._LayerManager__is_raster.return_value = False
+        mock_managers["layer"]._LayerManager__is_raster.side_effect = lambda layer_id: False
 
         response = client.get('/layers/layer_id/table')
         assert response.status_code == 200
