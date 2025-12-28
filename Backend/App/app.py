@@ -370,6 +370,30 @@ def list_basemaps():
     return jsonify(basemap_manager.list_basemaps()), 200
 
 # Layer Management Endpoints
+@app.route('/layers', methods=['GET'])
+def list_layers():
+
+    layer_ids = []
+    metadata = []
+
+    for filename in os.listdir(file_manager.layers_dir):
+        # We only care about metadata files
+        if filename.endswith("_metadata.json"):
+            layer_id = filename.replace("_metadata.json", "")
+            metadata_path = os.path.join(file_manager.layers_dir, filename)
+
+            # Read metadata file
+            try:
+                with open(metadata_path, "r") as f:
+                    layer_metadata = json.load(f)
+            except Exception:
+                layer_metadata = None
+                layer_id = None  
+            layer_ids.append(layer_id)
+            metadata.append(layer_metadata)
+
+    return jsonify({ "layer_id": layer_ids, "metadata": metadata}), 200
+
 
 '''
 Use Case: UC-B-01
