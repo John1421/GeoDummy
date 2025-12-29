@@ -6,6 +6,7 @@ import numpy as np
 from unittest.mock import MagicMock, patch
 from flask import Flask
 from werkzeug.exceptions import BadRequest, NotFound
+from flask.testing import FlaskClient
 
 # Import the app instance. Assuming the structure allows 'from app import app'
 from App.app import app
@@ -437,3 +438,126 @@ class TestApp:
             # Verify the route caught the read error and generated a transparent tile
             assert response.status_code == 200
             mock_new_img.assert_called_with("RGBA", (256, 256), (0, 0, 0, 0))
+
+
+    @pytest.mark.parametrize("exec_status, expected_code, expected_msg", [
+        ("timeout", 504, "Script execution exceeded"),
+        ("failure", 500, "Script execution failed with errors"),
+        ("unknown_code", 500, "Unknown execution status"),
+    ])
+    def test_run_script_execution_statuses(
+        self, 
+        client: FlaskClient, 
+        mock_managers: dict, 
+        exec_status: str, 
+        expected_code: int, 
+        expected_msg: str
+    ) -> None:
+        """
+        Covers the timeout, failure, and unknown status branches.
+        """
+        mock_sm = mock_managers["script"]
+        mock_sm.run_script.return_value = {
+            "status": exec_status,
+            "outputs": [],
+            "log_path": "/logs/test.log"
+        }
+
+        with patch('os.path.isfile', return_value=True):
+            response = client.post('/scripts/test_script', json={"parameters": {"val": 1}})
+            
+        assert response.status_code == expected_code
+        assert expected_msg in response.get_json().get("message", response.get_json().get("error", ""))
+
+    def test_run_script_success_file_output(self, client: FlaskClient, mock_managers: dict) -> None:
+        """
+        Path: exec_status == "success" AND output is a valid physical file.
+        Covers the send_file branch.
+        """
+        output_file = "/tmp/results/output_layer.geojson"
+        mock_managers["script"].run_script.return_value = {
+            "status": "success",
+            "outputs": [output_file],
+            "log_path": "/logs/success.log"
+        }
+
+        # We need to mock isfile for: 1. The script check, 2. The output file check
+        with patch('os.path.isfile', side_effect=[True, True]), \
+             patch('App.app.send_file') as mock_send:
+            
+            mock_send.return_value = "file_sent"
+            client.post('/scripts/script_name', json={"parameters": {}})
+            
+            # Verify file download was triggered
+            args, kwargs = mock_send.call_args
+            assert args[0] == output_file
+            assert kwargs['download_name'] == "output_layer.geojson"
+
+    def test_run_script_success_json_output(self, client: FlaskClient, mock_managers: dict) -> None:
+        """
+        Path: exec_status == "success" AND output is data/objects (not a file).
+        """
+        mock_managers["script"].run_script.return_value = {
+            "status": "success",
+            "outputs": [{"stats": [1, 2, 3]}],
+            "log_path": "/logs/success.log"
+        }
+
+        with patch('os.path.isfile', side_effect=[True, False]):
+            response = client.post('/scripts/script_name', json={"parameters": {}})
+            
+        assert response.status_code == 200
+        data = response.get_json()
+        assert "executed successfully" in data["message"]
+        assert data["output"][0]["stats"] == [1, 2, 3]
+
+    def test_run_script_success_no_output(self, client: FlaskClient, mock_managers: dict) -> None:
+        """
+        Edge Case: Script succeeds but returns an empty output list.
+        """
+        mock_managers["script"].run_script.return_value = {
+            "status": "success",
+            "outputs": [],
+            "log_path": "/logs/empty.log"
+        }
+
+        with patch('os.path.isfile', return_value=True):
+            response = client.post('/scripts/script_name', json={"parameters": {}})
+            
+        assert response.status_code == 200
+        assert "no output" in response.get_json()["message"]
+
+    def test_run_script_bad_request_exception(self, client: FlaskClient, mock_managers: dict) -> None:
+        """
+        Fixes the reported test issue. Triggers BadRequest via invalid parameter type
+        to ensure the internal 'except BadRequest' handler is exercised.
+        """
+        # Sending 'parameters' as a string instead of a dict triggers the 400 branch
+        with patch('os.path.isfile', return_value=True):
+            response = client.post('/scripts/script_name', json={"parameters": "invalid_type"})
+            
+        assert response.status_code == 400
+        # Verify the state was updated to failed
+        from App.app import running_scripts
+        assert running_scripts["script_name"]["status"] == "failed"
+
+    def test_run_script_generic_exception(self, client: FlaskClient, mock_managers: dict) -> None:
+        """
+        Exception Path: Catches unexpected internal errors during execution.
+        """
+        mock_managers["script"].run_script.side_effect = RuntimeError("System Crash")
+
+        with patch('os.path.isfile', return_value=True):
+            response = client.post('/scripts/crash_script', json={"parameters": {}})
+            
+        assert response.status_code == 500
+        assert "Please contact the administrator" in response.get_json()["message"]
+
+    def test_run_script_non_dict_parameters(self, client: FlaskClient) -> None:
+        """
+        Edge Case: Validation for the 'parameters' type in the JSON body.
+        """
+        response = client.post('/scripts/some_id', json={"parameters": "should_be_a_dict"})
+        
+        assert response.status_code == 400
+        assert "'parameters' must be a JSON object" in response.get_json()["error"]["description"]
