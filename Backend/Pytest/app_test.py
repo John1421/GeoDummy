@@ -146,7 +146,7 @@ class TestApp:
         """Test behavior: Returns cached data if available to save computation."""
         cached_response = {"headers": [], "rows": [], "total_rows": 0, "warnings": []}
         mock_managers["data"].check_cache.return_value = cached_response
-        mock_managers["layer"]._LayerManager__is_raster.side_effect = lambda layer_id: False
+        mock_managers["layer"].is_raster.return_value = False
 
         response = client.get('/layers/layer_id/table')
         assert response.status_code == 200
@@ -158,11 +158,21 @@ class TestApp:
 
     def test_run_script_already_running(self, client, mock_managers):
         """Edge case: Prevents running a script that is already in 'running' status."""
-        from App.app import running_scripts
-        with patch('App.app.running_scripts', {"script1": {"status": "running"}}):
+        
+        # Mock data must include all keys the route accesses during a conflict
+        mock_running_state = {
+            "script1": {
+                "status": "running",
+                "execution_id": "test-uuid-123" # Added to prevent KeyError
+            }
+        }
+        
+        with patch('App.app.running_scripts', mock_running_state):
             response = client.post('/scripts/script1', json={"parameters": {}})
-            assert response.status_code == 400
+            
+            assert response.status_code == 409 
             assert b"already running" in response.data
+            assert b"test-uuid-123" in response.data
 
     def test_run_script_not_found(self, client, mock_managers):
         """Error handling: Rejects execution of scripts that don't exist on disk."""
@@ -311,42 +321,73 @@ class TestApp:
     @patch('os.path.exists', return_value=False)
     @patch('rasterio.open')
     @patch('numpy.dstack')
-    def test_serve_tile_rgb_raster_success(self, mock_dstack, mock_rasterio, mock_exists, client, mock_managers):
+    @patch('PIL.Image.Image.save') # Add this patch to prevent physical file I/O
+    def test_serve_tile_rgb_raster_success(self, mock_save, mock_dstack, mock_rasterio, mock_exists, client, mock_managers):
         """
         Tests rendering a 3-band (RGB) raster tile.
-        Covers: src.count >= 3 branch and coordinate index logic.
+        Fixes Errno 2 by mocking the physical file save operation.
         """
         mock_lm = mock_managers["layer"]
+        mock_fm = mock_managers["file"]
+        
+        # Setup Manager paths and attributes
         mock_lm.tile_bounds.return_value = (-9, 40, -8, 41)
+        mock_lm.export_raster_layer.return_value = "dummy.tif"
+        mock_fm.raster_cache_dir = "/tmp/cache"
+        
+        # Satisfy rasterio nested attributes
+        mock_rasterio.enums.Resampling.bilinear = 1 
         
         mock_src = MagicMock()
         mock_src.count = 3
-        mock_src.index.side_effect = [(0, 0), (256, 256)] # width=256, height=256
+        mock_src.index.side_effect = [(0, 0), (256, 256)] 
         mock_src.read.return_value = np.zeros((3, 256, 256), dtype=np.uint8)
         mock_rasterio.return_value.__enter__.return_value = mock_src
+
+        # Ensure dstack returns an array compatible with Image.fromarray
+        mock_dstack.return_value = np.zeros((256, 256, 3), dtype=np.uint8)
 
         response = client.get('/layers/L1/tiles/5/10/10.png')
         
         assert response.status_code == 200
-        mock_src.read.assert_called_once()
-        # Verify cleaning was triggered
+        assert response.mimetype == "image/png"
+        
+        # Verify the image was "saved" to the cache path without hitting the disk
+        assert any(call.args[0].endswith("L1_5_10_10.png") for call in mock_save.call_args_list)
         mock_lm.clean_raster_cache.assert_called_once()
 
     @patch('os.path.exists', return_value=False)
     @patch('rasterio.open')
-    def test_serve_tile_single_band_raster(self, mock_rasterio, mock_exists, client, mock_managers):
+    @patch('PIL.Image.Image.save') # Prevent actual disk I/O
+    def test_serve_tile_single_band_raster(self, mock_save, mock_rasterio, mock_exists, client, mock_managers):
         """
         Tests rendering a single-band raster tile.
-        Covers: src.count == 1 branch.
+        Fixes unpacking error by providing the expected 4-tuple from tile_bounds.
         """
+        mock_lm = mock_managers["layer"]
+        mock_fm = mock_managers["file"]
+        
+        # 1. FIX: Provide the 4-tuple that the route expects to unpack
+        mock_lm.tile_bounds.return_value = (-9.0, 40.0, -8.0, 41.0)
+        mock_lm.export_raster_layer.return_value = "dummy.tif"
+        mock_fm.raster_cache_dir = "/tmp/cache"
+        
+        # Setup Rasterio and nested Resampling enum
+        mock_rasterio.enums.Resampling.bilinear = 1 
+        
         mock_src = MagicMock()
         mock_src.count = 1
-        mock_src.index.side_effect = [(0, 0), (10, 10)]
+        # Simulate valid width/height calculation from index
+        mock_src.index.side_effect = [(0, 0), (256, 256)] 
         mock_src.read.return_value = np.zeros((1, 256, 256), dtype=np.uint8)
         mock_rasterio.return_value.__enter__.return_value = mock_src
 
         response = client.get('/layers/L1/tiles/1/0/0.png')
+        
         assert response.status_code == 200
+        assert response.mimetype == "image/png"
+        # Verify the code reached the single-band 'L' mode branch
+        mock_src.read.assert_called_once()
 
     @patch('os.path.exists', return_value=False)
     @patch('rasterio.open', side_effect=Exception("File Corrupt"))
@@ -361,19 +402,38 @@ class TestApp:
         assert response.status_code in [400, 500]
         assert b"Error serving tile" in response.data
 
+
     @patch('os.path.exists', return_value=False)
     @patch('rasterio.open')
-    def test_serve_tile_read_window_exception(self, mock_rasterio, mock_exists, client, mock_managers):
+    @patch('PIL.Image.Image.save') # Prevent disk I/O
+    def test_serve_tile_read_window_exception(self, mock_save, mock_rasterio, mock_exists, client, mock_managers):
         """
         Tests internal error handling when reading a specific window fails.
-        Covers: inner try-except Exception branch (returns transparent tile).
+        Fixes the 500 error by satisfying all unpacking and path requirements.
         """
+        mock_lm = mock_managers["layer"]
+        mock_fm = mock_managers["file"]
+        
+        # 1. Provide the 4-tuple for tile_bounds unpacking
+        mock_lm.tile_bounds.return_value = (-9.0, 40.0, -8.0, 41.0)
+        mock_lm.export_raster_layer.return_value = "dummy.tif"
+        mock_fm.raster_cache_dir = "/tmp/cache"
+        
         mock_src = MagicMock()
-        mock_src.index.return_value = (0, 10)
+        # 2. Provide two pairs for the two index() calls in the route
+        mock_src.index.side_effect = [(0, 0), (256, 256)] 
+        
+        # 3. Trigger the exception during the read operation
         mock_src.read.side_effect = Exception("Read error")
         mock_rasterio.return_value.__enter__.return_value = mock_src
 
         with patch('PIL.Image.new') as mock_new_img:
-            client.get('/layers/L1/tiles/1/0/0.png')
-            # Verify transparent image fallback was called
+            # Create a mock image object that supports the .save() method
+            mock_fallback_img = MagicMock()
+            mock_new_img.return_value = mock_fallback_img
+            
+            response = client.get('/layers/L1/tiles/1/0/0.png')
+            
+            # Verify the route caught the read error and generated a transparent tile
+            assert response.status_code == 200
             mock_new_img.assert_called_with("RGBA", (256, 256), (0, 0, 0, 0))
