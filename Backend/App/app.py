@@ -1,6 +1,6 @@
 
 import json
-from flask import Flask, request, after_this_request, jsonify, send_file
+from flask import Flask, request, after_this_request, jsonify, send_file, abort
 from werkzeug.exceptions import HTTPException, BadRequest, NotFound, InternalServerError
 import geopandas as gpd
 import shutil
@@ -16,6 +16,7 @@ from flask_cors import CORS
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 import uuid
+from threading import Lock
 
 import rasterio
 from rasterio.warp import transform_bounds
@@ -35,6 +36,9 @@ basemap_manager = BasemapManager()
 layer_manager = LayerManager()
 script_manager = ScriptManager()
 data_manager = DataManager()
+
+running_scripts = {}
+running_scripts_lock = Lock()
 
 
 
@@ -158,41 +162,146 @@ def run_script(script_id):
     if not script_id:
         raise BadRequest("script_id is required")
     
-    # Parse JSON body
-    data = request.get_json()
-    if not data:
-        raise BadRequest("Request body must be JSON")
-
-    parameters = data.get("parameters", {})
-    if not isinstance(parameters, dict):
-        raise BadRequest("'parameters' must be a JSON object")
-
-    # Construct file path
-    script_path = os.path.join(file_manager.scripts_dir, f"{script_id}.py")
-
-    if not os.path.isfile(script_path):
-        raise BadRequest(f"Script '{script_id}' does not exist")
-    
-
-    execution_id = str(uuid.uuid4())
-    
-    output = script_manager.run_script(
-        script_path=script_path,
-        scriptid=script_id,
-        executionid=execution_id,
-        parameters=parameters,
-    )
+    # Begin script execution workflow
+    with running_scripts_lock:
+        # Check if another script is already running
+        if script_id in running_scripts and running_scripts[script_id]["status"] == "running":
+            return jsonify({
+                    "error": "Conflict",
+                    "message": f"Script '{script_id}' is already running. Only one script can be run at a time.",
+                    "script_id": script_id,
+                    "execution_id": running_scripts[script_id]["execution_id"]
+                }), 409
 
 
-    if isinstance(output, str) and os.path.isfile(output):
-        file_name, file_extension = os.path.splitext(output)
-        layer_id = os.path.basename(file_name)
-        return send_file(output, as_attachment=True, download_name=f"{layer_id}{file_extension}")
+        execution_id = str(uuid.uuid4())
+        running_scripts[script_id] = {
+            "execution_id": execution_id,
+            "start_time": datetime.now(timezone.utc),
+            "status": "running"
+        }
+
+    try:
+        # Parse JSON body
+        data = request.get_json()
+        if not data:
+            raise BadRequest("Request body must be JSON")
+
+        parameters = data.get("parameters", {})
+        if not isinstance(parameters, dict):
+            raise BadRequest("'parameters' must be a JSON object")
+
+        # Construct file path
+        script_path = os.path.join(file_manager.scripts_dir, f"{script_id}.py")
+
+        if not os.path.isfile(script_path):
+            raise BadRequest(f"Script '{script_id}' does not exist")
+
+        # Execute the script
+        output = script_manager.run_script(
+            script_path=script_path,
+            scriptid=script_id,
+            executionid=execution_id,
+            parameters=parameters,
+        )
+
+        exec_status = output.get("status")
+        outputs = output.get("outputs", [])
+        log_path = output.get("log_path")
+
+        # Handle timeout (504 Gateway Timeout)
+        if exec_status == "timeout":
+            with running_scripts_lock:
+                running_scripts[script_id]["status"] = "failed"
             
-    elif output != None:        
-        return jsonify({"message": f"Run script {script_id}", "output": output}), 200
-    else:
-        raise ValueError(f"script {script_id} did not return a output") 
+            return jsonify({
+                "error": "Gateway Timeout",
+                "message": "Script execution exceeded the maximum allowed time of 30 seconds",
+                "script_id": script_id,
+                "execution_id": execution_id,
+                "timeout_seconds": 30,
+                "log_path": log_path
+            }), 504
+        
+        # Handle failure (500 Internal Server Error)
+        elif exec_status == "failure":
+            with running_scripts_lock:
+                running_scripts[script_id]["status"] = "failed"
+            
+            return jsonify({
+                "error": "Internal Server Error",
+                "message": "Script execution failed with errors",
+                "script_id": script_id,
+                "execution_id": execution_id,
+                "log_path": log_path,
+                "details": "Check log file for error details"
+            }), 500
+        
+        # Handle success
+        elif exec_status == "success":
+            # Mark as finished
+            with running_scripts_lock:
+                running_scripts[script_id]["status"] = "finished"
+            
+            # Check if output is a file
+            if outputs and isinstance(outputs[0], str) and os.path.isfile(outputs[0]):
+                file_path = outputs[0]
+                file_name, file_extension = os.path.splitext(file_path)
+                layer_id = os.path.basename(file_name)
+                return send_file(file_path, as_attachment=True, download_name=f"{layer_id}{file_extension}")
+            
+            # Return JSON response
+            elif outputs and outputs[0] is not None:
+                return jsonify({
+                    "message": f"Script '{script_id}' executed successfully",
+                    "execution_id": execution_id,
+                    "output": outputs,
+                    "log_path": log_path
+                }), 200
+            
+            # No output produced
+            else:
+                return jsonify({
+                    "message": f"Script '{script_id}' executed successfully with no output",
+                    "execution_id": execution_id,
+                    "log_path": log_path
+                }), 200
+
+        # Unknown status (shouldn't happen, but handle anyway)
+        else:
+            with running_scripts_lock:
+                running_scripts[script_id]["status"] = "failed"
+            
+            return jsonify({
+                "error": "Internal Server Error",
+                "message": f"Unknown execution status: {exec_status}",
+                "script_id": script_id,
+                "execution_id": execution_id,
+                "log_path": log_path
+            }), 500
+        
+    
+    except BadRequest as e:
+        # Client errors (4xx) - re-raise to be handled by Flask
+        with running_scripts_lock:
+            running_scripts[script_id]["status"] = "failed"
+        raise
+    
+    except Exception as e:
+        # Generic server errors - 500 Internal Server Error
+        with running_scripts_lock:
+            running_scripts[script_id]["status"] = "failed"
+        
+        # Log the full error server-side for debugging
+        app.logger.error(f"Script execution failed: {script_id} (execution_id: {execution_id})", exc_info=True)
+        
+        # Return sanitized error to client
+        return jsonify({
+            "error": "Internal Server Error",
+            "message": "Script execution failed. Please contact the administrator.",
+            "script_id": script_id,
+            "execution_id": execution_id
+        }), 500
 
 @app.route('/execute_script/<script_id>', methods=['DELETE'])
 def stop_script(script_id):
@@ -208,6 +317,28 @@ def stop_script(script_id):
 def get_script_status(script_id):    
     if not script_id:
         raise BadRequest("script_id parameter is required")
+    
+    '''
+    Implementação proposta por Esteves:
+
+def get_script_status(script_id):
+    with running_scripts_lock:
+        info = running_scripts.get(script_id)
+
+    if not info:
+        return jsonify({
+            "script_id": script_id,
+            "status": "not running"
+        }), 200
+
+    return jsonify({
+        "script_id": script_id,
+        "execution_id": info["execution_id"],
+        "status": info["status"],
+        "start_time": info["start_time"].isoformat()
+    }), 200
+
+    '''
 
     # TODO: check execution status
 
@@ -239,6 +370,30 @@ def list_basemaps():
     return jsonify(basemap_manager.list_basemaps()), 200
 
 # Layer Management Endpoints
+@app.route('/layers', methods=['GET'])
+def list_layers():
+
+    layer_ids = []
+    metadata = []
+
+    for filename in os.listdir(file_manager.layers_dir):
+        # We only care about metadata files
+        if filename.endswith("_metadata.json"):
+            layer_id = filename.replace("_metadata.json", "")
+            metadata_path = os.path.join(file_manager.layers_dir, filename)
+
+            # Read metadata file
+            try:
+                with open(metadata_path, "r") as f:
+                    layer_metadata = json.load(f)
+            except Exception:
+                layer_metadata = None
+                layer_id = None  
+            layer_ids.append(layer_id)
+            metadata.append(layer_metadata)
+
+    return jsonify({ "layer_id": layer_ids, "metadata": metadata}), 200
+
 
 '''
 Use Case: UC-B-01
@@ -467,12 +622,31 @@ def export_layer(layer_id):
 
 @app.route('/layers/<layer_id>', methods=['DELETE'])
 def remove_layer(layer_id):    
-    data = request.get_json()
     if not layer_id:
         raise BadRequest("layer_id is required")
 
-    # TODO: remove layer
+    metadata_path = os.path.join(file_manager.layers_dir, f"{layer_id}_metadata.json")
 
+    layer_path = None
+    for ext in [".gpkg", ".tif", ".tiff", ".GPKG", ".TIF", ".TIFF"]:
+        candidate = os.path.join(file_manager.layers_dir, f"{layer_id}{ext}")
+        if os.path.isfile(candidate):
+            layer_path = candidate
+            break
+
+    if not layer_path and not os.path.isfile(metadata_path):
+        raise NotFound(f"Layer {layer_id} does not exist")
+
+    try:
+        if layer_path:
+            os.remove(layer_path)
+
+        if os.path.isfile(metadata_path):
+            os.remove(metadata_path)
+
+    except OSError as e:
+        raise InternalServerError(f"Failed to remove layer {layer_id}: {str(e)}")
+    
     return jsonify({"message": f"Layer {layer_id} removed"}), 200
 
 @app.route('/layers/<layer_id>/<priority>', methods=['POST'])
