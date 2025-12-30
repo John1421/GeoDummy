@@ -42,7 +42,7 @@ function BaseMapSettings({
 
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
                 try {
-                    const response = await fetch("http://localhost:5000/basemaps");
+                    const response = await fetch("http://localhost:5050/basemaps");
                     if (!response.ok) {
                         throw new Error(`Failed to fetch basemap: ${response.statusText}`);
                     }
