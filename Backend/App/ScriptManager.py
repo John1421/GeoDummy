@@ -66,14 +66,14 @@ class ScriptManager:
         """
         Adds a script entry if it doesn't already exist.
         """
-        for key, value in parameters.items():
-            try:
-                parsed_value = json.loads(value)
-                parameters[key] = parsed_value
-            except (json.JSONDecodeError, TypeError):
-                # Keep original string if not valid JSON
-                pass
-
+        # for key, value in parameters.items():
+        #     try:
+        #         parsed_value = json.loads(value)
+        #         parameters[key] = parsed_value
+        #     except (json.JSONDecodeError, TypeError):
+        #         # Keep original string if not valid JSON
+        #         pass
+        
         parameters = {}
         for key in parameters_form:
             try:
@@ -81,8 +81,10 @@ class ScriptManager:
                 parameters[key] = json.loads(parameters_form[key])
             except (json.JSONDecodeError, TypeError):
                 # Keep as string if not JSON
-                parameters[key] = v[key]
-
+                # parameters[key] = v[key]
+                pass
+        # Store the script metadata
+        self.metadata["scripts"][script_id] = parameters
         self._save_metadata()
 
     def run_script(self, script_path, script_id, execution_id, parameters):
@@ -296,11 +298,9 @@ class ScriptManager:
         with open(self.metadata_path, 'w') as f:
             json.dump(self.metadata, f, indent=4)
             
-            
     def _load_metadata(self):
         with open(self.metadata_path, 'r') as f:
             self.metadata = json.load(f)
-    
         return self.metadata
     
     def get_metadata(self, script_id):

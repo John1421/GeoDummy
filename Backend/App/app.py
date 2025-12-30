@@ -103,7 +103,7 @@ def add_script():
     if script_manager.check_script_name_exists(script_id):
         if os.path.exists(temp_path):
             os.remove(temp_path)
-        raise BadRequest("A Layer with the same name already exists")
+        raise BadRequest("A Script with the same name already exists")
     
 
     file_manager.move_file(temp_path, file_manager.scripts_dir)

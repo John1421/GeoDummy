@@ -36,20 +36,29 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
     const [showDropdown, setShowDropdown] = useState(false);
 
     // Backend Communication
-    /*async function postScript(
+    async function postScript(
         file: File,
         metadata: {
             name: string;
             category: string;
             description: string;
-            layer_type: string;
+            layers: string[];
             parameters: Array<{ name: string; type: string }>;
         }
-        ) {
+    ) {
         const formData = new FormData();
 
+        // file field expected by backend
         formData.append("file", file);
-        formData.append("metadata", JSON.stringify(metadata));
+
+        // include metadata as individual form fields so backend's request.form is not empty
+        formData.append("name", metadata.name);
+        formData.append("category", metadata.category);
+        formData.append("description", metadata.description || "");
+
+        // include arrays/objects as JSON strings
+        formData.append("layers", JSON.stringify(metadata.layers || []));
+        formData.append("parameters", JSON.stringify(metadata.parameters || []));
 
         const res = await fetch("http://localhost:5050/scripts", {
             method: "POST",
@@ -57,11 +66,12 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
         });
 
         if (!res.ok) {
-            throw new Error("Error saving script");
+            const text = await res.text();
+            throw new Error(`Error saving script: ${res.status} ${text}`);
         }
-
+        console.log(res)
         return res.json();
-    }*/
+    }
 
     
     useEffect(() => {
@@ -123,11 +133,13 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
             parameters: params.filter(p => p.name && p.type),
         };
         try{
-            const savedScript = await postScriptMock(scriptFile, metadata);
+            const saved = await postScript(scriptFile, metadata);
             setSaveStatus("saved");
-            
-            onAddScript(savedScript.id, savedScript.name, savedScript.category, savedScript.description);
-            //console.log("id:", savedScript.id);
+
+            // backend returns { message, script_id }
+            const fallbackId = scriptFile ? scriptFile.name.replace(/\.[^/.]+$/, '') : crypto.randomUUID();
+            const scriptId = saved?.script_id || (saved?.id) || fallbackId;
+            onAddScript(scriptId, name, category, description);
             setTimeout(onClose, 500);
         } catch (err) {
             console.error("Upload error:", err);
@@ -155,34 +167,34 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
         setTimeout(() => {
             onClose();
         }, 600);*/
-    };
-
-    // Mock function to simulate backend upload
-    async function postScriptMock(
-        file: File,
-        metadata: {
-            name: string;
-            category: string;
-            description: string;
-            layers: string[];
-            parameters: Parameter[];
-        }
+        /*
+        // Mock function to simulate backend upload (commented out - kept for reference)
+        async function postScriptMock(
+            file: File,
+            metadata: {
+                name: string;
+                category: string;
+                description: string;
+                layers: string[];
+                parameters: Parameter[];
+            }
         ) {
-        console.log("📦 Mock upload script");
-        console.log("File:", file);
-        console.log("Metadata:", metadata);
-        
+            console.log("📦 Mock upload script");
+            console.log("File:", file);
+            console.log("Metadata:", metadata);
 
-        // simula latência de rede
-        await new Promise((r) => setTimeout(r, 800));
+            // simula latência de rede
+            await new Promise((r) => setTimeout(r, 800));
 
-        // simula resposta do backend
-        return {
-            id: crypto.randomUUID(),
-            name: metadata.name,
-            category: metadata.category,
-            description: metadata.description,
-        };
+            // simula resposta do backend
+            return {
+                id: crypto.randomUUID(),
+                name: metadata.name,
+                category: metadata.category,
+                description: metadata.description,
+            };
+        }
+        */
     }
 
     const filteredCategories = existingCategories.filter((cat) =>

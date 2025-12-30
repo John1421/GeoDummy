@@ -19,31 +19,31 @@ function ScriptCard({ id, name, description }: ScriptCardProps) {
   };
 
   // Mock de execução no backend recebendo o scriptId
-  async function runScriptMock(
-    scriptId: string,
-    payload: { inputFilePath: string; numberValue: number; listValue: number[] }
-  ): Promise<{ status: string; output: string }>{
-    console.log("▶️ Mock run: sending to backend", { scriptId, payload });
-    // Simula latência
-    await new Promise(r => setTimeout(r, 800));
-    // Simula resposta
-    return { status: "ok", output: `Script ${scriptId} executed with ${payload.listValue.length} items` };
-  }
+  // async function runScriptMock(
+  //   scriptId: string,
+  //   payload: { inputFilePath: string; numberValue: number; listValue: number[] }
+  // ): Promise<{ status: string; output: string }>{
+  //   console.log("▶️ Mock run: sending to backend", { scriptId, payload });
+  //   // Simula latência
+  //   await new Promise(r => setTimeout(r, 800));
+  //   // Simula resposta
+  //   return { status: "ok", output: `Script ${scriptId} executed with ${payload.listValue.length} items` };
+  // }
 
-  const handleRunScriptFromWindow = async (
-    scriptId: string,
-    inputFilePath: string,
-    numberValue: number,
-    listValue: number[]
-  ) => {
-    setLoading(true);
-    try {
-      const res = await runScriptMock(scriptId, { inputFilePath, numberValue, listValue });
-      console.log("✅ Mock result:", res);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // const handleRunScriptFromWindow = async (
+  //   scriptId: string,
+  //   inputFilePath: string,
+  //   numberValue: number,
+  //   listValue: number[]
+  // ) => {
+  //   setLoading(true);
+  //   try {
+  //     const res = await runScriptMock(scriptId, { inputFilePath, numberValue, listValue });
+  //     console.log("✅ Mock result:", res);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   return (
     <div
@@ -125,7 +125,6 @@ function ScriptCard({ id, name, description }: ScriptCardProps) {
         isOpen={isRunScriptWindowOpen}
         onClose={() => setIsRunScriptWindowOpen(false)}
         scriptId={id}
-        onRunScript={handleRunScriptFromWindow}
       />
     </div>
   );

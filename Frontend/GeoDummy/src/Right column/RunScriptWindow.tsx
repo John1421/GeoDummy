@@ -1,24 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import PopUpWindowModal from '../TemplateModals/PopUpWindowModal';
 import { Play, FolderOpen } from "lucide-react";
-
 
 interface RunScriptWindowProps {
   isOpen: boolean;
   onClose: () => void;
   scriptId: string;
-  onRunScript: (
-    scriptId: string,
-    inputFilePath: string,
-    numberValue: number,
-    listValue: number[]
-  ) => void;
 }
+type Layer = {
+  id: string;
+  type: "raster" | "vetorial" | "both";
+};
 
-const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scriptId, onRunScript }) => {
+type Parameter = {
+  name: string;
+  type: string;
+};
+
+type Metadata = {
+  layers: Layer[];
+  parameters: Parameter[];
+};
+
+const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scriptId}) => {
   const [inputFilePath, setInputFilePath] = useState<string | null>(null);
   const [numberValue, setNumberValue] = useState<number>(0);
   const [listValue, setListValue] = useState<string>(''); // Store as string, parse on submit
+  const [metadata, setMetadata] = useState<Metadata| null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -26,13 +34,38 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
     setInputFilePath(file.name);
   };
 
-  const handleRunScript = () => {
-    // For now, listValue is a string, and we'll just split it by commas.
-    // In a real application, you might want more robust parsing and error handling.
-    const parsedList = listValue.split(',').map(item => parseInt(item.trim())).filter(item => !isNaN(item));
-    onRunScript(scriptId, inputFilePath || '', numberValue, parsedList);
-    onClose();
-  };
+  // const handleRunScript = () => {
+  //   // For now, listValue is a string, and we'll just split it by commas.
+  //   // In a real application, you might want more robust parsing and error handling.
+  //   const parsedList = listValue.split(',').map(item => parseInt(item.trim())).filter(item => !isNaN(item));
+  //   onRunScript(scriptId, inputFilePath || '', numberValue, parsedList);
+  //   onClose();
+  // };
+
+  useEffect(() => {
+    if (!isOpen || !scriptId) return;
+
+    const fetchMetadata = async () => {
+      try {
+        const res = await fetch(`http://localhost:5050/scripts/${scriptId}`);
+        if (!res.ok) {
+          console.error('Failed to fetch script metadata', res.status);
+          setMetadata(null);
+          return;
+        }
+        const data = await res.json();
+        // backend returns { script_id, output }
+        setMetadata(data?.output ?? data);
+        console.log('Script metadata fetched:', data?.output ?? data);
+        console.log(typeof data);
+      } catch (err) {
+        console.error('Error fetching script metadata:', err);
+        setMetadata(null);
+      }
+    };
+
+    fetchMetadata();
+  }, [isOpen, scriptId]);
 
   return (
     <PopUpWindowModal
@@ -76,13 +109,13 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
               id="number-input"
               value={numberValue}
               onChange={(e) => setNumberValue(parseInt(e.target.value))}
-              className="ml-40 flex-grow p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 bg-[#DADFE7] focus:ring-blue-500"
+              className="ml-40 grow p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 bg-[#DADFE7] focus:ring-blue-500"
             />
           </div>
 
           <div className="flex items-center space-x-2">
             <label htmlFor="list-input" className="w-20 text-sm font-medium text-gray-700">List</label>
-            <div className="flex-grow flex items-center relative">
+            <div className="grow flex items-center relative">
               <input
                 type="text"
                 id="list-input"
@@ -97,7 +130,7 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
         </div>
 
         <button
-          onClick={handleRunScript}
+
           className="mt-4 flex items-center justify-center py-2 px-4 bg-[#0D73A5] text-white font-semibold rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200"
         >
           <Play size={16} className="mr-2" />
