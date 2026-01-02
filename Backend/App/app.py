@@ -200,11 +200,10 @@ def run_script(script_id):
         # Execute the script
         output = script_manager.run_script(
             script_path=script_path,
-            scriptid=script_id,
-            executionid=execution_id,
+            script_id=script_id,
+            execution_id=execution_id,
             parameters=parameters,
         )
-
         exec_status = output.get("status")
         outputs = output.get("outputs", [])
         log_path = output.get("log_path")

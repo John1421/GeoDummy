@@ -433,7 +433,8 @@ class ScriptManager:
                  os.remove(arg) 
 
 
-    def _validate_script_integrity(script_path):
+    def _validate_script_integrity(self,script_path):
+        
         """
         Validates the integrity of a Python script without executing it.
 

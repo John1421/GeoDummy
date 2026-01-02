@@ -69,7 +69,6 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
             const text = await res.text();
             throw new Error(`Error saving script: ${res.status} ${text}`);
         }
-        console.log(res)
         return res.json();
     }
 
