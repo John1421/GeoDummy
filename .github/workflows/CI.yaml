@@ -145,25 +145,11 @@ jobs:
         run: |
           printf "%s" "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
 
-      - name: Get version number
-        id: version
-        run: |
-          VERSION=$(git tag --sort=-v:refname | head -n 1)
-          if [ -z "$VERSION" ]; then
-            VERSION="0.1.0"
-          else
-            IFS='.' read -r major minor patch <<< "${VERSION//v/}"
-            patch=$((patch+1))
-            VERSION="$major.$minor.$patch"
-          fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
       - name: Build and Push Backend Image
         run: |
-          docker build -t $DOCKERHUB_USERNAME/backend:${{ steps.version.outputs.version }} ./Backend/App
-          docker push $DOCKERHUB_USERNAME/backend:${{ steps.version.outputs.version }}
-          docker tag $DOCKERHUB_USERNAME/backend:${{ steps.version.outputs.version }} $DOCKERHUB_USERNAME/backend:dev-latest
+          docker build -t $DOCKERHUB_USERNAME/backend:dev-latest ./Backend/App
           docker push $DOCKERHUB_USERNAME/backend:dev-latest
+          
 
       - name: Build and Push Frontend Image
         run: |
@@ -171,8 +157,6 @@ jobs:
           npm ci
           npm run build
           cd ../../
-          docker build -t $DOCKERHUB_USERNAME/frontend:${{ steps.version.outputs.version }} ./Frontend/GeoDummy
-          docker push $DOCKERHUB_USERNAME/frontend:${{ steps.version.outputs.version }}
-          docker tag $DOCKERHUB_USERNAME/frontend:${{ steps.version.outputs.version }} $DOCKERHUB_USERNAME/frontend:dev-latest
+          docker build -t $DOCKERHUB_USERNAME/frontend:dev-latest ./Frontend/GeoDummy
           docker push $DOCKERHUB_USERNAME/frontend:dev-latest
 
