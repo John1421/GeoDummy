@@ -19,10 +19,11 @@ type Parameter = {
 };
 
 const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scriptId}) => {
-  const [selectedLayerId, setSelectedLayerId] = useState<string>('');
   const [availableLayers, setAvailableLayers] = useState<string[]>([]);
-  const [availableLayersMetadata, setAvailableLayersMetadata] = useState<unknown[]>([]);
+  const [availableLayersMetadata, setAvailableLayersMetadata] = useState<any[]>([]);
   const [metadata, setMetadata] = useState<Metadata| null>(null);
+  const [selectedLayers, setSelectedLayers] = useState<Record<string, string>>({});
+  const [parameterValues, setParameterValues] = useState<Record<string, any>>({});
 
 
   // const handleRunScript = () => {
@@ -47,7 +48,7 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
         }
         const data = await res.json();
         setMetadata(data?.output ?? data);
-        console.log('Script metadata fetched:', data?.output ?? data);
+        // console.log('Script metadata fetched:', data?.output ?? data);
       } catch (err) {
         console.error('Error fetching script metadata:', err);
         setMetadata(null);
@@ -65,7 +66,7 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
         // backend returns { layer_id: [...], metadata: [...] }
         setAvailableLayers(data.layer_id || []);
         setAvailableLayersMetadata(data.metadata || []);
-        console.log('Available layers fetched:', data);
+        // console.log('Available layers fetched:', data);
       } catch (err) {
         console.error('Error fetching layers:', err);
         setAvailableLayers([]);
@@ -82,96 +83,127 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
       onClose={onClose}
     >
       <div className="flex flex-col p-4 space-y-4">
-        <div className="flex items-center space-x-4">
-          <label htmlFor="layer-select" className="w-20 text-sm font-medium text-gray-700">Input</label>
-          <div className="flex-1">
-            {availableLayers.length > 0 ? (
-              <select
-                id="layer-select"
-                value={selectedLayerId}
-                onChange={(e) => setSelectedLayerId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-[#DADFE7] text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select a layer...</option>
-                {availableLayers.map((layerId) => (
-                  <option key={layerId} value={layerId}>
-                    {layerId}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <div className="w-full px-3 py-2 border border-red-300 rounded-md text-sm bg-red-50 text-red-700 flex items-center">
-                No layers available
-              </div>
-            )}
+        {/* Layer Selections Section */}
+        {metadata?.layers && metadata.layers.length > 0 && (
+          <>
+            <h3 className="text-lg font-semibold text-gray-800">Layers</h3>
+            <div className="flex flex-col space-y-3">
+              {metadata.layers.map((layerName, index) => (
+                <div key={index} className="flex items-center space-x-4">
+                  <label className="w-32 text-sm font-medium text-gray-700">{layerName}</label>
+                  <div className="flex-1">
+                    {availableLayers.length > 0 ? (
+                      <select
+                        value={selectedLayers[layerName] || ''}
+                        onChange={(e) => setSelectedLayers({ ...selectedLayers, [layerName]: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-[#DADFE7] text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select a layer...</option>
+                        {availableLayers.map((layerId, idx) => {
+                          const layerMeta = availableLayersMetadata[idx] || {};
+                          const displayName = layerMeta.layer_name || layerId;
+                          
+                          // Check if this layer is already selected in a different dropdown
+                          const isAlreadySelected = Object.entries(selectedLayers).some(
+                            ([key, value]) => key !== layerName && value === layerId
+                          );
+
+                          return (
+                            <option key={layerId} value={layerId} disabled={isAlreadySelected}>
+                              {displayName}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    ) : (
+                      <div className="w-full px-3 py-2 border border-red-300 rounded-md text-sm bg-red-50 text-red-700 flex items-center">
+                        No layers available
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Parameters Section */}
+        {metadata?.parameters && metadata.parameters.length > 0 && (
+          <>
+            <h3 className="text-lg font-semibold text-gray-800 pt-2">Parameters</h3>
+            <div className="flex flex-col space-y-3">
+              {metadata.parameters.map((param, index) => (
+                <div key={index} className="flex items-center space-x-4">
+                  <label className="w-32 text-sm font-medium text-gray-700">{param.name}</label>
+                  <input
+                    type={param.type === 'int' || param.type === 'float' ? 'number' : 'text'}
+                    placeholder={`Enter ${param.type}`}
+                    value={parameterValues[param.name] || ''}
+                    onChange={(e) => setParameterValues({ ...parameterValues, [param.name]: e.target.value })}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm bg-[#DADFE7] text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Show empty state if no metadata */}
+        {(!metadata || ((!metadata.layers || metadata.layers.length === 0) && (!metadata.parameters || metadata.parameters.length === 0))) && (
+          <div className="text-sm text-gray-500 italic">
+            No parameters or layers required for this script
           </div>
-        </div>
-
-        {/* <div className="flex items-center space-x-4">
-          <label htmlFor="output-display" className="w-20 text-sm font-medium text-gray-700">Output</label>
-          <div id="output-display" className="flex-1 p-2 h-10 border border-gray-300 rounded-md bg-[#DADFE7] flex items-center text-sm text-gray-500">
-          </div>
-        </div> */}
-
-        <h3 className="text-lg font-semibold text-gray-800 pb-2 mb-2">Parameters</h3>
-
-        <div className="flex flex-col space-y-2">
-          {/* Display Layers */}
-          {metadata?.layers && metadata.layers.length > 0 && (
-            <div className="flex items-center space-x-2">
-              <label className="w-20 text-sm font-medium text-gray-700">Layer</label>
-              <div className="ml-40 grow p-2 border border-gray-300 rounded-md bg-[#DADFE7] flex items-center text-sm text-gray-700">
-                {metadata.layers[0]}
-              </div>
-            </div>
-          )}
-
-          {/* Display Parameters */}
-          {metadata?.parameters && metadata.parameters.length > 0 && metadata.parameters.map((param, index) => (
-            <div key={index} className="flex items-center space-x-2">
-              <label className="w-20 text-sm font-medium text-gray-700">{param.type}</label>
-              <div className="ml-40 grow p-2 border border-gray-300 rounded-md bg-[#DADFE7] flex items-center text-sm text-gray-700">
-                {param.name}
-              </div>
-            </div>
-          ))}
-
-          {/* Show empty state if no metadata */}
-          {(!metadata || ((!metadata.layers || metadata.layers.length === 0) && (!metadata.parameters || metadata.parameters.length === 0))) && (
-            <div className="text-sm text-gray-500 italic">
-              No parameters or layers available
-            </div>
-          )}
-        </div>
+        )}
 
         <button
           onClick={async () => {
-            // Determine selected layer type from metadata (if available)
-            const idx = availableLayers.indexOf(selectedLayerId);
-            const layerMeta = availableLayersMetadata[idx] as { type?: string } | undefined;
-            const layerType = layerMeta?.type ?? '';
+            // Prepare parameters object for backend
+            const paramsObj: Record<string, any> = {};
 
-
-            // Prepare parameters: include script metadata parameters (if any)
-            // We'll pass them under the `parameters` object expected by the backend.
-            const paramsObj: Record<string, unknown> = {};
-            if (metadata?.parameters && metadata.parameters.length > 0) {
-              // No UI to edit parameter values yet; include names with null values
-              metadata.parameters.forEach((p) => {
-                paramsObj[p.name] = null;
+            // Add all layer selections
+            if (metadata?.layers && metadata.layers.length > 0) {
+              metadata.layers.forEach((layerName) => {
+                const selectedLayerId = selectedLayers[layerName];
+                if (selectedLayerId) {
+                  // Find layer metadata
+                  const idx = availableLayers.indexOf(selectedLayerId);
+                  const layerMeta = availableLayersMetadata[idx] || {};
+                  
+                  paramsObj[layerName] = {
+                    layer_id: selectedLayerId,
+                    layer_type: layerMeta.type || ''
+                  };
+                }
               });
             }
 
-            // Attach layer info
-            paramsObj['layer_id'] = selectedLayerId || null;
-            paramsObj['layer_type'] = layerType || null;
+            // Add all parameter values
+            if (metadata?.parameters && metadata.parameters.length > 0) {
+              metadata.parameters.forEach((param) => {
+                let value = parameterValues[param.name];
+                // Convert to appropriate type
+                if (param.type === 'int' && value) {
+                  value = parseInt(value);
+                } else if (param.type === 'float' && value) {
+                  value = parseFloat(value);
+                }
+                paramsObj[param.name] = value !== undefined && value !== '' ? value : null;
+              });
+            }
 
             try {
-              await fetch(`http://localhost:5050/scripts/${scriptId}`, {
+              const response = await fetch(`http://localhost:5050/scripts/${scriptId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ parameters: paramsObj }),
               });
+              
+              if (response.ok) {
+                console.log('Script executed successfully');
+                onClose();
+              } else {
+                console.error('Script execution failed:', response.status);
+              }
             } catch (err) {
               console.error('Error running script:', err);
             }
