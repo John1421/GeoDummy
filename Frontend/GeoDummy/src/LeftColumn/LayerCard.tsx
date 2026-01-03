@@ -4,15 +4,18 @@ import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Eye, EyeOff } from "lucide-react";
 import type { Layer } from "./LayerSidebar";
 import { colors, typography, radii, shadows } from "../Design/DesignTokens";
+//import { Select } from "@mui/material";
 
 interface LayerCardProps {
   layer: Layer;
+  selected: boolean;
+  onSelect: () => void;
   onSettings: (layerId: string, rect: DOMRect) => void;
   onToggleVisibility: (layerId: string) => void;
   onRename: (layerId: string, newTitle: string) => void;
 }
 
-function LayerCardComponent({ layer, onSettings, onToggleVisibility, onRename }: LayerCardProps) {
+function LayerCardComponent({ layer, selected, onSelect, onSettings, onToggleVisibility, onRename }: LayerCardProps) {
   const {
     setNodeRef,
     attributes,
@@ -97,7 +100,13 @@ function LayerCardComponent({ layer, onSettings, onToggleVisibility, onRename }:
         setNodeRef(node);
         cardRef.current = node;
       }}
-      style={cardStyle}
+      style={{
+        ...cardStyle,
+        borderColor: selected ? colors.primary : colors.borderStroke,
+        boxShadow: selected ? shadows.medium : shadows.none,
+      }}
+
+      onClick={onSelect}
       {...attributes}
       onContextMenu={(e) => {
         e.preventDefault();      // evita o menu do browser
@@ -178,7 +187,10 @@ function LayerCardComponent({ layer, onSettings, onToggleVisibility, onRename }:
         {/* Visibility icon (eye or eye-off) */}
         <button
           aria-label={isHidden ? "Show layer" : "Hide layer"}
-          onClick={handleToggleVisibilityClick}
+          onClick={(e) => {
+            e.stopPropagation();          // prevents the click from moving up to the card.
+            handleToggleVisibilityClick(); // It only deals with visibility.
+          }}
           style={{
             padding: 4,
             borderRadius: radii.sm,

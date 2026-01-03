@@ -98,7 +98,7 @@ const detectGeometryTypeFromFC = (fc: GeoJSON.FeatureCollection): string | undef
  * Demo GeoJSON data (kept inline to avoid extra files/config).
  * Typed as FeatureCollection so TS knows "features" exists.
  */
-const DEMO_POINTS: GeoJSON.FeatureCollection = {
+/*const DEMO_POINTS: GeoJSON.FeatureCollection = {
   type: "FeatureCollection",
   features: [
     {
@@ -156,10 +156,10 @@ const DEMO_POLYGONS: GeoJSON.FeatureCollection = {
     },
   ],
 };
-
+*/
 // Demo layers to show on first app open
 const DEMO_LAYERS: Layer[] = [
-  {
+/*  {
     id: "demo_raster_osm",
     title: "Demo Raster (Satellite)",
     order: 0,
@@ -174,7 +174,7 @@ const DEMO_LAYERS: Layer[] = [
     },
     // raster ignores color for now
   },
-  {
+ {
     id: "demo_points",
     title: "Demo Points",
     order: 1,
@@ -194,11 +194,14 @@ const DEMO_LAYERS: Layer[] = [
     vectorData: DEMO_POLYGONS,
     color: defaultColorForGeometryType("Polygon"),
   },
+  */
 ];
 
 interface LayerSidebarProps {
   layers: Layer[];
   setLayers: React.Dispatch<React.SetStateAction<Layer[]>>;
+  selectedLayerId: string | null;
+  setSelectedLayerId: (id: string) => void;
 }
 
 
@@ -224,6 +227,7 @@ async function postLayerFile(
 }
 
 async function getVectorLayerData(id: string): Promise<GeoJSON.FeatureCollection> {
+console.log("Fetching vector layer data for id:", id);
   const res = await fetch(`http://localhost:5050/layers/${id}`);
   if (!res.ok) throw new Error("Error fetching GeoJSON");
   return res.json();
@@ -250,7 +254,7 @@ function getRasterDescriptor(
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
-export default function LayerSidebar({ layers, setLayers }: LayerSidebarProps) {
+export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSelectedLayerId }: LayerSidebarProps) {
   const [isWindowOpen, setIsWindowOpen] = useState(false);
 
   const [settingsLayerId, setSettingsLayerId] = useState<string | null>(null);
@@ -685,6 +689,8 @@ export default function LayerSidebar({ layers, setLayers }: LayerSidebarProps) {
           onSettings={handleSettings}
           onToggleVisibility={handleToggleVisibility}
           onRename={handleRenameLayer}
+          selectedLayerId={selectedLayerId}
+          onSelectLayer={setSelectedLayerId}
         />
       </SidebarPanel>
 

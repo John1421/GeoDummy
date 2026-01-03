@@ -16,7 +16,7 @@ function App() {
 
   const [layers, setLayers] = useState<Layer[]>([]);
 
-  const [selectedLayerId] = useState<string | null>(null);
+  const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
 
   return (
     <div
@@ -33,7 +33,8 @@ function App() {
             borderRight: `1px solid ${colors.borderStroke}`,
           }}
         >
-          <LayerSidebar layers={layers} setLayers={setLayers} />
+          <LayerSidebar layers={layers} setLayers={setLayers} selectedLayerId={selectedLayerId}
+            setSelectedLayerId={setSelectedLayerId} />
         </div>
 
         <div className="flex-1 flex flex-col min-h-0 min-w-0 relative z-0">

@@ -26,6 +26,8 @@ interface Props {
   onSettings: (layerId: string, rect: DOMRect) => void;
   onToggleVisibility: (layerId: string) => void;
   onRename: (layerId: string, newTitle: string) => void;
+  selectedLayerId: string | null;
+  onSelectLayer: (id: string) => void;
 }
 
 export default function LayerCardList({
@@ -34,6 +36,8 @@ export default function LayerCardList({
   onSettings,
   onToggleVisibility,
   onRename,
+  selectedLayerId,
+  onSelectLayer,
 }: Props) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -105,6 +109,8 @@ export default function LayerCardList({
             onSettings={onSettings}
             onToggleVisibility={onToggleVisibility}
             onRename={onRename}
+            selected={layer.id === selectedLayerId}
+            onSelect={() => onSelectLayer(layer.id)}
           />
         ))}
       </SortableContext>
