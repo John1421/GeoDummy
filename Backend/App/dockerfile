@@ -10,8 +10,11 @@ COPY requirements.txt* ./
 # Instalar dependências (ignora se o ficheiro não existir)
 RUN if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi
 
+
+RUN mkdir gdb
+
 # Copiar o resto do código para dentro do container
-COPY . .
+COPY . ./gdb/
 
 # Create group and user before changing ownership
 RUN groupadd -r appgroup && useradd -r -g appgroup user
@@ -23,7 +26,7 @@ RUN chown -R user:appgroup /app
 USER user
 
 # Expor a porta do backend
-EXPOSE 5000
+EXPOSE 5050
 
 # Comando genérico (substituir mais tarde pelo da tua app real)
-CMD ["python", "-m", "http.server", "5050"]
+CMD ["python", "-m", "gdb.app", "5050"]
