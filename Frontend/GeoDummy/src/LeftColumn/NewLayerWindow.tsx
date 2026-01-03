@@ -13,6 +13,7 @@ export default function NewLayerWindow({ isOpen, onClose, onSelect }: NewLayerWi
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const allowedExtensions = [".geojson", ".zip", ".tiff", ".tif", ".gpkg"];
+  const MAX_UPLOAD_SIZE = 5 * 1024 * 1024; // 5 MB
 
   // Reset fields every time modal opens
   useEffect(() => {
@@ -29,6 +30,11 @@ export default function NewLayerWindow({ isOpen, onClose, onSelect }: NewLayerWi
     if (!allowedExtensions.includes(ext)) {
       setSelectedFile(null);
       setError("Only .geojson, .zip, .tiff, .tif, or .gpkg files are supported.");
+      return;
+    }
+    if( file.size > MAX_UPLOAD_SIZE ) {
+      setSelectedFile(null);
+      setError("File size exceeds the 5 MB limit.");
       return;
     }
 

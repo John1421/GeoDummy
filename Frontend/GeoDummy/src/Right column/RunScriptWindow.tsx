@@ -21,7 +21,7 @@ type Parameter = {
 const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scriptId}) => {
   const [selectedLayerId, setSelectedLayerId] = useState<string>('');
   const [availableLayers, setAvailableLayers] = useState<string[]>([]);
-  const [availableLayersMetadata, setAvailableLayersMetadata] = useState<any[]>([]);
+  const [availableLayersMetadata, setAvailableLayersMetadata] = useState<unknown[]>([]);
   const [metadata, setMetadata] = useState<Metadata| null>(null);
 
 
@@ -148,12 +148,13 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
           onClick={async () => {
             // Determine selected layer type from metadata (if available)
             const idx = availableLayers.indexOf(selectedLayerId);
-            const layerMeta = availableLayersMetadata[idx] || {};
-            const layerType = layerMeta.type || '';
+            const layerMeta = availableLayersMetadata[idx] as { type?: string } | undefined;
+            const layerType = layerMeta?.type ?? '';
+
 
             // Prepare parameters: include script metadata parameters (if any)
             // We'll pass them under the `parameters` object expected by the backend.
-            const paramsObj: Record<string, any> = {};
+            const paramsObj: Record<string, unknown> = {};
             if (metadata?.parameters && metadata.parameters.length > 0) {
               // No UI to edit parameter values yet; include names with null values
               metadata.parameters.forEach((p) => {

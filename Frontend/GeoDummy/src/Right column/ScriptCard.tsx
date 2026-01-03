@@ -11,7 +11,7 @@ interface ScriptCardProps {
 }
 
 function ScriptCard({ id, name, description }: ScriptCardProps) {
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
   const [isRunScriptWindowOpen, setIsRunScriptWindowOpen] = useState(false);
 
   const handleRun = () => {
