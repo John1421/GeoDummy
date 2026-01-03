@@ -4,7 +4,7 @@ import AttributeTable from "./Central column/AttributeTable";
 import ScriptList from "./Right column/ScriptList";
 import LayerSidebar, { type Layer } from "./LeftColumn/LayerSidebar";
 import { colors } from "./Design/DesignTokens";
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 function App() {
   const [baseMapUrl, setBaseMapUrl] = useState(
@@ -17,6 +17,8 @@ function App() {
   const [layers, setLayers] = useState<Layer[]>([]);
 
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
+  
+  const addLayerRef = useRef<((file: File) => Promise<void>) | null>(null);
 
   return (
     <div
@@ -34,7 +36,9 @@ function App() {
           }}
         >
           <LayerSidebar layers={layers} setLayers={setLayers} selectedLayerId={selectedLayerId}
-            setSelectedLayerId={setSelectedLayerId} />
+            setSelectedLayerId={setSelectedLayerId} 
+            onAddLayerRef={(fn) => { addLayerRef.current = fn; }}
+          />
         </div>
 
         <div className="flex-1 flex flex-col min-h-0 min-w-0 relative z-0">
@@ -58,7 +62,11 @@ function App() {
             borderLeft: `1px solid ${colors.borderStroke}`,
           }}
         >
-          <ScriptList />
+          <ScriptList onAddLayer={async (file) => {
+            if (addLayerRef.current) {
+              await addLayerRef.current(file);
+            }
+          }} />
         </div>
       </div>
     </div>

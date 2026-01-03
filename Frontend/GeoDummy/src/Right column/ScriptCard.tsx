@@ -8,10 +8,12 @@ interface ScriptCardProps {
   id: string;
   name: string;
   description: string;
+  loading: boolean;
+  setLoading: (loading: boolean) => void;
+  onAddLayer: (file: File) => Promise<void>;
 }
 
-function ScriptCard({ id, name, description }: ScriptCardProps) {
-  const [loading] = useState(false);
+function ScriptCard({ id, name, description, loading, setLoading, onAddLayer }: ScriptCardProps) {
   const [isRunScriptWindowOpen, setIsRunScriptWindowOpen] = useState(false);
 
   const handleRun = () => {
@@ -125,6 +127,9 @@ function ScriptCard({ id, name, description }: ScriptCardProps) {
         isOpen={isRunScriptWindowOpen}
         onClose={() => setIsRunScriptWindowOpen(false)}
         scriptId={id}
+        onAddLayer={onAddLayer}
+        onScriptStart={() => setLoading(true)}
+        onScriptEnd={() => setLoading(false)}
       />
     </div>
   );

@@ -6,6 +6,9 @@ interface RunScriptWindowProps {
   isOpen: boolean;
   onClose: () => void;
   scriptId: string;
+  onAddLayer: (file: File) => Promise<void>;
+  onScriptStart: () => void;
+  onScriptEnd: () => void;
 }
 
 type Metadata = {
@@ -18,12 +21,23 @@ type Parameter = {
   type: string;
 };
 
-const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scriptId}) => {
+interface LayerMetadata {
+  attributes?: string[];
+  bounding_box?: number[];
+  crs?: string;
+  crs_original?: string;
+  feature_count?: number;
+  geometry_type?: string;
+  layer_name?: string;
+  type?: string;
+}
+
+const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scriptId, onAddLayer, onScriptStart, onScriptEnd }) => {
   const [availableLayers, setAvailableLayers] = useState<string[]>([]);
-  const [availableLayersMetadata, setAvailableLayersMetadata] = useState<any[]>([]);
+  const [availableLayersMetadata, setAvailableLayersMetadata] = useState<LayerMetadata[]>([]);
   const [metadata, setMetadata] = useState<Metadata| null>(null);
   const [selectedLayers, setSelectedLayers] = useState<Record<string, string>>({});
-  const [parameterValues, setParameterValues] = useState<Record<string, any>>({});
+  const [parameterValues, setParameterValues] = useState<Record<string, string | number>>({});
 
 
   // const handleRunScript = () => {
@@ -157,22 +171,16 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
 
         <button
           onClick={async () => {
-            // Prepare parameters object for backend
-            const paramsObj: Record<string, any> = {};
+            // Prepare parameters object for backend (strings/numbers/null)
+            const paramsObj: Record<string, string | number | null> = {};
 
             // Add all layer selections
             if (metadata?.layers && metadata.layers.length > 0) {
               metadata.layers.forEach((layerName) => {
                 const selectedLayerId = selectedLayers[layerName];
                 if (selectedLayerId) {
-                  // Find layer metadata
-                  const idx = availableLayers.indexOf(selectedLayerId);
-                  const layerMeta = availableLayersMetadata[idx] || {};
-                  
-                  paramsObj[layerName] = {
-                    layer_id: selectedLayerId,
-                    layer_type: layerMeta.type || ''
-                  };
+                  // Backend expects layer IDs directly; ScriptManager resolves to file paths
+                  paramsObj[layerName] = selectedLayerId;
                 }
               });
             }
@@ -180,18 +188,23 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
             // Add all parameter values
             if (metadata?.parameters && metadata.parameters.length > 0) {
               metadata.parameters.forEach((param) => {
-                let value = parameterValues[param.name];
+                const value = parameterValues[param.name];
                 // Convert to appropriate type
                 if (param.type === 'int' && value) {
-                  value = parseInt(value);
+                  paramsObj[param.name] = parseInt(String(value));
                 } else if (param.type === 'float' && value) {
-                  value = parseFloat(value);
+                  paramsObj[param.name] = parseFloat(String(value));
+                } else {
+                  paramsObj[param.name] = value !== undefined && value !== '' ? value : null;
                 }
-                paramsObj[param.name] = value !== undefined && value !== '' ? value : null;
               });
             }
 
             try {
+              // Start loading animation and close window
+              onScriptStart();
+              onClose();
+
               const response = await fetch(`http://localhost:5050/scripts/${scriptId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -199,13 +212,40 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
               });
               
               if (response.ok) {
-                console.log('Script executed successfully');
-                onClose();
+                const contentType = response.headers.get('Content-Type');
+                
+                // Check if response is a file (backend sends files with appropriate content-type)
+                if (contentType && !contentType.includes('application/json')) {
+                  // Extract filename from Content-Disposition header or use default
+                  const contentDisposition = response.headers.get('Content-Disposition');
+                  let filename = 'output.geojson';
+                  if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename="?(.+?)"?$/i);
+                    if (filenameMatch) filename = filenameMatch[1];
+                  }
+
+                  // Convert response to blob and create File object
+                  const blob = await response.blob();
+                  const file = new File([blob], filename, { type: blob.type });
+                  
+                  // Add the layer to the map
+                  await onAddLayer(file);
+                  console.log('Script executed successfully and layer added');
+                } else {
+                  // Handle JSON response (no file output)
+                  const data = await response.json();
+                  console.log('Script executed successfully:', data);
+                }
               } else {
                 console.error('Script execution failed:', response.status);
+                const errorData = await response.json().catch(() => null);
+                if (errorData) console.error('Error details:', errorData);
               }
             } catch (err) {
               console.error('Error running script:', err);
+            } finally {
+              // Stop loading animation
+              onScriptEnd();
             }
           }}
           className="mt-4 flex items-center justify-center py-2 px-4 bg-[#0D73A5] text-white font-semibold rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200"

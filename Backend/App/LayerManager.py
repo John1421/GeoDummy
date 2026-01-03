@@ -19,6 +19,9 @@ file_manager = FileManager()
 class LayerManager:
     MAX_LAYER_FILE_SIZE = 1000 * 1024 * 1024 # 1000 MB
     def __init__(self):
+        # Default GeoPackage path for vector layers
+        self.default_gpkg_path = os.path.join(file_manager.layers_dir, "default.gpkg")
+        
         # Supported layer formats
         supported_ext = {'.gpkg', '.tif', '.tiff'}
 
@@ -467,7 +470,6 @@ class LayerManager:
 
         if raster_path:
             return raster_path
-
         # Check if the layer_id matches a vector layer in the GeoPackage
         if os.path.isfile(self.default_gpkg_path):
             try:
