@@ -63,7 +63,7 @@ def handle_generic_exception(e):
     return jsonify({
         "error": {
             "code": 500,
-            "message": "Internal Server Error",
+            "message": f"Internal Server Error: {str(e)}",
             "details": str(e)
         }
     }), 500
@@ -247,7 +247,12 @@ def run_script(script_id):
                 file_path = outputs[0]
                 file_name, file_extension = os.path.splitext(file_path)
                 layer_id = os.path.basename(file_name)
-                return send_file(file_path, as_attachment=True, download_name=f"{layer_id}{file_extension}")
+
+                file_path_abs = os.path.abspath(file_path)
+                if not os.path.isfile(file_path_abs):
+                    raise InternalServerError(f"Exported file not found: {file_path_abs}")
+
+                return send_file(file_path_abs, as_attachment=True, download_name=f"{layer_id}{file_extension}")
             
             # Return JSON response
             elif outputs and outputs[0] is not None:
@@ -470,7 +475,19 @@ def get_layer(layer_id):
         extension = ".geojson"
     else:
         export_file = layer_manager.export_raster_layer(layer_id)
-    return send_file(export_file, as_attachment=True, download_name=f"{layer_id}{extension}")
+
+    export_file_abs = os.path.abspath(export_file)
+    if not os.path.isfile(export_file_abs):
+        raise InternalServerError(f"Exported file not found: {export_file_abs}")
+    
+    return send_file(export_file_abs, as_attachment=True, download_name=f"{layer_id}{extension}")
+
+@app.route('/layers', methods=['GET'])
+def list_layer_ids_endpoint():
+    ids, metadata = layer_manager.list_layer_ids()
+    return jsonify({"layer_ids": ids, "metadata": metadata}), 200
+
+
 
 '''
 UC-B-16
@@ -484,7 +501,10 @@ def serve_tile(layer_id, z, x, y, tile_size=256):
 
     # Serve from cache if it exists
     if os.path.exists(cache_file):
-        return send_file(cache_file, mimetype="image/png")
+        cache_file_abs = os.path.abspath(cache_file)
+        if not os.path.isfile(cache_file_abs):
+            raise InternalServerError(f"Cached tile file not found: {cache_file_abs}")
+        return send_file(cache_file_abs, mimetype="image/png")
 
     raster_path = layer_manager.export_raster_layer(layer_id)  # Update with your raster path
 
@@ -559,7 +579,10 @@ def get_layer_preview(layer_id):
 
     # Serve from cache if it exists
     if os.path.exists(cache_file):
-        return send_file(cache_file, mimetype="image/png")
+        cache_file_abs = os.path.abspath(cache_file)
+        if not os.path.isfile(cache_file_abs):
+            raise InternalServerError(f"Cached preview file not found: {cache_file_abs}")
+        return send_file(cache_file_abs, mimetype="image/png")
 
     raster_path = layer_manager.export_raster_layer(layer_id)  # Update with your raster path
 
@@ -698,7 +721,7 @@ def extract_data_from_layer_for_table_view(layer_id):
     if not layer_id:
         raise BadRequest("layer_id parameter is required")
     
-    if layer_manager.__is_raster(layer_id):
+    if layer_manager.is_raster(layer_id):
         raise BadRequest("Raster doesn't have attributes") 
     
     

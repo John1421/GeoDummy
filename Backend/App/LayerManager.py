@@ -378,7 +378,7 @@ class LayerManager:
         Raises:
             ValueError: If the raster does not exist.
         """
-        raster_path = self.__is_raster(layer_name)
+        raster_path = self.is_raster(layer_name)
         if raster_path:
             return raster_path
        
@@ -406,7 +406,7 @@ class LayerManager:
             pass
         
 
-        if self.__is_raster(new_name):
+        if self.is_raster(new_name):
             exists = True
 
         return exists
@@ -431,7 +431,7 @@ class LayerManager:
         layers_dir = os.path.join(file_manager.layers_dir)
         gpkg_path = os.path.join(layers_dir, layer_id + ".gpkg")
 
-        raster_path = self.__is_raster(layer_id)
+        raster_path = self.is_raster(layer_id)
         if raster_path:
             with rasterio.open(raster_path) as src:
                 return {
@@ -463,7 +463,7 @@ class LayerManager:
         raise ValueError(f"Layer '{layer_id}' not found in rasters or GeoPackage")
     
     def get_layer_for_script(self, layer_id):
-        raster_path = self.__is_raster(layer_id)
+        raster_path = self.is_raster(layer_id)
 
         if raster_path:
             return raster_path
@@ -588,6 +588,35 @@ class LayerManager:
     #=====================================================================================
     #                               HELPER METHODS
     #=====================================================================================    
+
+    def list_layer_ids(self):
+        """
+        Devolve todos os layer_ids existentes, com o respetivo metadata JSON.
+        """
+        layer_ids = []
+        metadata_list = []
+
+        try:
+            for filename in os.listdir(self.file_manager.layers_dir):
+                if not filename.endswith("_metadata.json"):
+                    continue
+
+                layer_id = filename.replace("_metadata.json", "")
+                metadata_path = os.path.join(self.file_manager.layers_dir, filename)
+
+                try:
+                    with open(metadata_path, "r", encoding="utf-8") as f:
+                        meta = json.load(f)
+                except Exception:
+                    meta = None
+
+                layer_ids.append(layer_id)
+                metadata_list.append(meta)
+        except FileNotFoundError:
+            return [], []
+
+        return layer_ids, metadata_list
+
 
     @staticmethod
     def __check_raster_system_coordinates(raster_path, target_crs="EPSG:4326"):
@@ -744,10 +773,9 @@ class LayerManager:
 
         return
     
-    @staticmethod
-    def __is_raster(layer_id):
+    def is_raster(self, layer_id):
         """
-        Docstring for __is_raster
+        Docstring for is_raster
         
         :param layer_id: Description
 

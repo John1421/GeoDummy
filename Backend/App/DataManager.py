@@ -20,7 +20,7 @@ cache = {}
 class DataManager:
 
 
-    def format_value_for_table_view(value):
+    def format_value_for_table_view(self, value):
         '''
         Formats data as per use case UC-B-022, used in the endpoint:
         '/layers/<layer_id>/table', methods=['GET']
@@ -59,7 +59,7 @@ class DataManager:
         # Fallback safe string
         return str(value)
 
-    def detect_type(value):
+    def detect_type(self, value):
         '''
         Infers data type of the value passed as argument.
         
@@ -82,7 +82,7 @@ class DataManager:
             return "string"
         return "string"
 
-    def check_cache(cache_key):
+    def check_cache(self, cache_key):
         if cache_key in cache:
             cached = cache[cache_key]
             if datetime.now(timezone.utc) < cached["expires"]:
@@ -92,7 +92,7 @@ class DataManager:
         else:
             return None
         
-    def insert_to_cache(cache_key, data, ttl_minutes):
+    def insert_to_cache(self, cache_key, data, ttl_minutes):
         # Caching the data
         cache[cache_key] = {
             "data": data,
