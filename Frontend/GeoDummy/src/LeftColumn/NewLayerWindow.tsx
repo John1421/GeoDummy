@@ -1,17 +1,23 @@
 import { useEffect, useState, useCallback } from "react";
-import { FolderOpen } from "lucide-react";
+import { FolderOpen, Layers } from "lucide-react";
 import WindowTemplate from "../TemplateModals/PopUpWindowModal";
 import { colors, typography, radii, spacing } from "../Design/DesignTokens";
+import GpkgLayerSelectionWindow from "./GpkgLayerSelectionWindow";
 
 interface NewLayerWindowProps {
   isOpen: boolean;
   onClose: () => void;
   onSelect: (file: File) => void;
+  onSelectGpkgLayer?: (layerNames: string[]) => void;
 }
 
-export default function NewLayerWindow({ isOpen, onClose, onSelect }: NewLayerWindowProps) {
+const DUMMY_GPKG_LAYERS = ["roads", "buildings", "elevation", "points_of_interest"];
+
+export default function NewLayerWindow({ isOpen, onClose, onSelect, onSelectGpkgLayer }: NewLayerWindowProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isGpkgWindowOpen, setIsGpkgWindowOpen] = useState(false);
+  const [selectedGpkgLayers, setSelectedGpkgLayers] = useState<string[]>([]);
   const allowedExtensions = [".geojson", ".zip", ".tiff", ".tif", ".gpkg"];
   const MAX_UPLOAD_SIZE = 200 * 1024 * 1024; // 5 MB
 
@@ -20,6 +26,8 @@ export default function NewLayerWindow({ isOpen, onClose, onSelect }: NewLayerWi
     if (!isOpen) return;
     setSelectedFile(null);
     setError(null);
+    setIsGpkgWindowOpen(false);
+    setSelectedGpkgLayers([]);
   }, [isOpen]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -39,6 +47,10 @@ export default function NewLayerWindow({ isOpen, onClose, onSelect }: NewLayerWi
     }
 
     setSelectedFile(file);
+    if (ext !== ".gpkg") {
+      setSelectedGpkgLayers([]);
+      setIsGpkgWindowOpen(false);
+    }
     setError(null);
   };
 
@@ -52,6 +64,7 @@ export default function NewLayerWindow({ isOpen, onClose, onSelect }: NewLayerWi
   }, [selectedFile, onSelect, onClose]);
 
   const isCreateDisabled = !selectedFile || !!error;
+  const isGpkgFile = selectedFile?.name?.toLowerCase().endsWith(".gpkg") ?? false;
 
   // Allow pressing Enter to create the layer
   useEffect(() => {
@@ -139,6 +152,43 @@ export default function NewLayerWindow({ isOpen, onClose, onSelect }: NewLayerWi
           </div>
         </div>
 
+        {isGpkgFile && (
+          <div style={{ display: "flex", alignItems: "center", gap: spacing.sm }}>
+            <button
+              type="button"
+              onClick={() => setIsGpkgWindowOpen(true)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: spacing.xs,
+                paddingInline: spacing.md,
+                paddingBlock: spacing.sm,
+                borderRadius: radii.md,
+                border: `1px solid ${colors.borderStroke}`,
+                backgroundColor: colors.cardBackground,
+                color: colors.foreground,
+                fontFamily: typography.normalFont,
+                fontSize: typography.sizeSm,
+                cursor: "pointer",
+              }}
+            >
+              <Layers size={16} strokeWidth={2} />
+              Pick GeoPackage layers
+            </button>
+            {selectedGpkgLayers.length > 0 && (
+              <span
+                style={{
+                  fontSize: typography.sizeSm,
+                  color: colors.dragIcon,
+                  fontFamily: typography.normalFont,
+                }}
+              >
+                Selected: {selectedGpkgLayers.join(", ")}
+              </span>
+            )}
+          </div>
+        )}
+
         <p
           style={{
             fontSize: typography.sizeSm,
@@ -163,6 +213,17 @@ export default function NewLayerWindow({ isOpen, onClose, onSelect }: NewLayerWi
           </p>
         )}
       </div>
+
+      <GpkgLayerSelectionWindow
+        isOpen={isGpkgWindowOpen}
+        onClose={() => setIsGpkgWindowOpen(false)}
+        onSelect={(layerNames) => {
+          setSelectedGpkgLayers(layerNames);
+          onSelectGpkgLayer?.(layerNames);
+          setIsGpkgWindowOpen(false);
+        }}
+        gpkgLayers={DUMMY_GPKG_LAYERS}
+      />
     </WindowTemplate>
   );
 }
