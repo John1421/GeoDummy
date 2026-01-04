@@ -7,11 +7,12 @@ interface GpkgLayerSelectionWindowProps {
   onClose: () => void;
   onSelect: (layerNames: string[]) => void;
   gpkgLayers: string[];
+  isLoading?: boolean;
 }
 
-const FALLBACK_LAYERS = ["roads", "buildings", "landuse", "elevation"];
+// const FALLBACK_LAYERS = ["roads", "buildings", "landuse", "elevation"]; // replaced by backend retrieval
 
-export default function GpkgLayerSelectionWindow({ isOpen, onClose, onSelect, gpkgLayers }: GpkgLayerSelectionWindowProps) {
+export default function GpkgLayerSelectionWindow({ isOpen, onClose, onSelect, gpkgLayers, isLoading }: GpkgLayerSelectionWindowProps) {
   const [selectedLayers, setSelectedLayers] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,7 +41,7 @@ export default function GpkgLayerSelectionWindow({ isOpen, onClose, onSelect, gp
     onClose();
   }, [selectedLayers, onClose, onSelect]);
 
-  const layersToShow = gpkgLayers?.length ? gpkgLayers : FALLBACK_LAYERS;
+  const layersToShow = gpkgLayers ?? [];
   const isConfirmDisabled = !selectedLayers.length;
 
   return (
@@ -99,54 +100,78 @@ export default function GpkgLayerSelectionWindow({ isOpen, onClose, onSelect, gp
             color: colors.dragIcon,
           }}
         >
-          Pick the layers from this GeoPackage you want to send to the backend. Using dummy layers for now.
+          Pick the layers from this GeoPackage you want to send to the backend.
         </p>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
-            gap: spacing.sm,
-          }}
-        >
-          {layersToShow.map((layer) => {
-            const isActive = selectedLayers.includes(layer);
-            return (
-              <button
-                key={layer}
-                type="button"
-                onClick={() => toggleLayerSelect(layer)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  paddingInline: spacing.md,
-                  paddingBlock: spacing.sm,
-                  borderRadius: radii.md,
-                  border: `1px solid ${isActive ? colors.primary : colors.borderStroke}`,
-                  backgroundColor: isActive ? colors.primary : colors.cardBackground,
-                  color: colors.foreground,
-                  fontFamily: typography.normalFont,
-                  fontSize: typography.sizeSm,
-                  cursor: "pointer",
-                  transition: "background-color 120ms ease, border-color 120ms ease",
-                }}
-              >
-                <span>{layer}</span>
-                <span
-                  aria-hidden
+        {isLoading ? (
+          <p
+            style={{
+              margin: 0,
+              fontSize: typography.sizeSm,
+              fontFamily: typography.normalFont,
+              color: colors.dragIcon,
+            }}
+          >
+            Loading layers...
+          </p>
+        ) : layersToShow.length === 0 ? (
+          <p
+            style={{
+              margin: 0,
+              fontSize: typography.sizeSm,
+              fontFamily: typography.normalFont,
+              color: colors.dragIcon,
+            }}
+          >
+            No layers found in this GeoPackage.
+          </p>
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+              gap: spacing.sm,
+            }}
+          >
+            {layersToShow.map((layer) => {
+              const isActive = selectedLayers.includes(layer);
+              return (
+                <button
+                  key={layer}
+                  type="button"
+                  onClick={() => toggleLayerSelect(layer)}
                   style={{
-                    width: 12,
-                    height: 12,
-                    borderRadius: "50%",
-                    border: `2px solid ${isActive ? colors.primary : colors.borderStroke}`,
-                    backgroundColor: isActive ? colors.primary : "transparent",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    paddingInline: spacing.md,
+                    paddingBlock: spacing.sm,
+                    borderRadius: radii.md,
+                    border: `1px solid ${isActive ? colors.primary : colors.borderStroke}`,
+                    backgroundColor: isActive ? colors.primary : colors.cardBackground,
+                    color: colors.foreground,
+                    fontFamily: typography.normalFont,
+                    fontSize: typography.sizeSm,
+                    cursor: "pointer",
+                    transition: "background-color 120ms ease, border-color 120ms ease",
                   }}
-                />
-              </button>
-            );
-          })}
-        </div>
+                >
+                  <span>{layer}</span>
+                  <span
+                    aria-hidden
+                    style={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: "50%",
+                      border: `2px solid ${isActive ? colors.primary : colors.borderStroke}`,
+                      backgroundColor: isActive ? colors.primary : "transparent",
+                    }}
+                  />
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {error && (
           <p

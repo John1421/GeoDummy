@@ -11,13 +11,13 @@ interface NewLayerWindowProps {
   onSelectGpkgLayer?: (layerNames: string[]) => void;
 }
 
-const DUMMY_GPKG_LAYERS = ["roads", "buildings", "elevation", "points_of_interest"];
-
 export default function NewLayerWindow({ isOpen, onClose, onSelect, onSelectGpkgLayer }: NewLayerWindowProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isGpkgWindowOpen, setIsGpkgWindowOpen] = useState(false);
   const [selectedGpkgLayers, setSelectedGpkgLayers] = useState<string[]>([]);
+  const [gpkgLayers, setGpkgLayers] = useState<string[]>([]);
+  const [isLoadingLayers, setIsLoadingLayers] = useState(false);
   const allowedExtensions = [".geojson", ".zip", ".tiff", ".tif", ".gpkg"];
   const MAX_UPLOAD_SIZE = 200 * 1024 * 1024; // 5 MB
 
@@ -28,7 +28,33 @@ export default function NewLayerWindow({ isOpen, onClose, onSelect, onSelectGpkg
     setError(null);
     setIsGpkgWindowOpen(false);
     setSelectedGpkgLayers([]);
+    setGpkgLayers([]);
+    setIsLoadingLayers(false);
   }, [isOpen]);
+
+  const fetchGpkgLayers = useCallback(async (file: File) => {
+    setIsLoadingLayers(true);
+    setGpkgLayers([]);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("http://localhost:5050/layers/gpkg/layers", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) {
+        throw new Error("Failed to retrieve layers from GeoPackage.");
+      }
+      const data = await res.json();
+      setGpkgLayers(Array.isArray(data.layers) ? data.layers : []);
+    } catch (err) {
+      console.error(err);
+      setError("Could not read layers from the GeoPackage.");
+      setGpkgLayers([]);
+    } finally {
+      setIsLoadingLayers(false);
+    }
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -50,8 +76,13 @@ export default function NewLayerWindow({ isOpen, onClose, onSelect, onSelectGpkg
     if (ext !== ".gpkg") {
       setSelectedGpkgLayers([]);
       setIsGpkgWindowOpen(false);
+      setGpkgLayers([]);
     }
     setError(null);
+
+    if (ext === ".gpkg") {
+      fetchGpkgLayers(file);
+    }
   };
 
   const handleCreate = useCallback(() => {
@@ -222,7 +253,8 @@ export default function NewLayerWindow({ isOpen, onClose, onSelect, onSelectGpkg
           onSelectGpkgLayer?.(layerNames);
           setIsGpkgWindowOpen(false);
         }}
-        gpkgLayers={DUMMY_GPKG_LAYERS}
+        gpkgLayers={gpkgLayers}
+        isLoading={isLoadingLayers}
       />
     </WindowTemplate>
   );
