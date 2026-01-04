@@ -701,7 +701,6 @@ def extract_data_from_layer_for_table_view(layer_id):
     if layer_manager.is_raster(layer_id):
         raise BadRequest("Raster doesn't have attributes")
 
-    print("cheguei aqui\n")
     response = data_manager.check_cache(layer_id)
     if response:
         return jsonify(response), 200
