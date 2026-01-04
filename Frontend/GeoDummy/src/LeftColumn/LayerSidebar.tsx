@@ -657,6 +657,7 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
 
   const headerActions = (
     <button
+      data-testid="layers-reorder-button"
       type="button"
       onClick={handleReorderByGeometry}
       title="Reorder layers by geometry type"
