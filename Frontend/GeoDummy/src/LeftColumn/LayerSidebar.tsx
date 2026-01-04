@@ -706,6 +706,8 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
         isOpen={isWindowOpen}
         onClose={() => setIsWindowOpen(false)}
         onSelect={handleAddLayer}
+        existingFileNames={layers.map(l => l.fileName || '').filter(Boolean)}
+        existingFileLastModified={layers.map(l => l.fileLastModified || 0).filter(Boolean)}
       />
 
       <LayerSettingsWindow

@@ -9,17 +9,26 @@ interface NewLayerWindowProps {
   onClose: () => void;
   onSelect: (file: File) => void;
   onSelectGpkgLayer?: (layerNames: string[]) => void;
+  existingFileNames?: string[];
+  existingFileLastModified?: number[];
 }
 
-export default function NewLayerWindow({ isOpen, onClose, onSelect, onSelectGpkgLayer }: NewLayerWindowProps) {
+export default function NewLayerWindow({ isOpen, onClose, onSelect, onSelectGpkgLayer, existingFileNames = [], existingFileLastModified = [] }: NewLayerWindowProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isGpkgWindowOpen, setIsGpkgWindowOpen] = useState(false);
   const [selectedGpkgLayers, setSelectedGpkgLayers] = useState<string[]>([]);
   const [gpkgLayers, setGpkgLayers] = useState<string[]>([]);
   const [isLoadingLayers, setIsLoadingLayers] = useState(false);
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const allowedExtensions = [".geojson", ".zip", ".tiff", ".tif", ".gpkg"];
   const MAX_UPLOAD_SIZE = 200 * 1024 * 1024; // 5 MB
+
+  // Helper function to check if file is duplicate
+  const isDuplicateFile = (file: File): boolean => {
+    return existingFileNames.includes(file.name) &&
+           existingFileLastModified.includes(file.lastModified);
+  };
 
   // Reset fields every time modal opens
   useEffect(() => {
@@ -30,6 +39,7 @@ export default function NewLayerWindow({ isOpen, onClose, onSelect, onSelectGpkg
     setSelectedGpkgLayers([]);
     setGpkgLayers([]);
     setIsLoadingLayers(false);
+    setShowDuplicateWarning(false);
   }, [isOpen]);
 
   const fetchGpkgLayers = useCallback(async (file: File) => {
@@ -79,6 +89,13 @@ export default function NewLayerWindow({ isOpen, onClose, onSelect, onSelectGpkg
       setGpkgLayers([]);
     }
     setError(null);
+    
+    // Check for duplicates
+    if (isDuplicateFile(file)) {
+      setShowDuplicateWarning(true);
+    } else {
+      setShowDuplicateWarning(false);
+    }
 
     if (ext === ".gpkg") {
       fetchGpkgLayers(file);
@@ -90,9 +107,16 @@ export default function NewLayerWindow({ isOpen, onClose, onSelect, onSelectGpkg
       setError("Please choose a file for this layer.");
       return;
     }
+    
+    // Check if duplicate and not confirmed
+    if (showDuplicateWarning ) {
+      setError("A layer with this file name and modification date already exists.");
+      return;
+    }
+    
     onSelect(selectedFile);
     onClose();
-  }, [selectedFile, onSelect, onClose]);
+  }, [selectedFile, onSelect, onClose, showDuplicateWarning]);
 
   const isCreateDisabled = !selectedFile || !!error;
   const isGpkgFile = selectedFile?.name?.toLowerCase().endsWith(".gpkg") ?? false;
@@ -230,6 +254,7 @@ export default function NewLayerWindow({ isOpen, onClose, onSelect, onSelectGpkg
         >
           Accepted: .geojson, .zip, .tiff, .tif, .gpkg
         </p>
+
 
         {error && (
           <p
