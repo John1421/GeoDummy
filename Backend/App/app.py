@@ -63,7 +63,7 @@ def handle_generic_exception(e):
     return jsonify({
         "error": {
             "code": 500,
-            "message": f"Internal Server Error: {str(e)}",
+            "message": "Internal Server Error",
             "details": str(e)
         }
     }), 500

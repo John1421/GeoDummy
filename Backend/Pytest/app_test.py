@@ -303,9 +303,10 @@ class TestApp:
     
     # --- Tests for GET /layers/<layer_id>/tiles/<z>/<x>/<y>.png ---
 
+    @patch('os.path.isfile')
     @patch('os.path.exists')
     @patch('App.app.send_file')
-    def test_serve_tile_cache_hit(self, mock_send, mock_exists, client, mock_managers):
+    def test_serve_tile_cache_hit(self, mock_send, mock_exists, mock_isfile, client, mock_managers):
         """
         Tests the hot path where the tile already exists in the cache.
         Covers: Cache hit branch.
@@ -313,15 +314,17 @@ class TestApp:
         mock_fm = mock_managers["file"]
         mock_fm.raster_cache_dir = "/tmp/cache"
         mock_exists.return_value = True
+        mock_isfile.return_value = True 
         
         response = client.get('/layers/L1/tiles/1/2/3.png')
         
         # Verify it attempts to serve the specific cached file
-        expected_cache_path = os.path.join("/tmp/cache", "L1_1_2_3.png")
+        expected_cache_path = os.path.join(os.path.abspath("/tmp/cache"), "L1_1_2_3.png")
         mock_send.assert_called_once()
         args, kwargs = mock_send.call_args
         assert args[0] == expected_cache_path
         assert kwargs['mimetype'] == "image/png"
+
 
     @patch('os.path.exists', return_value=False)
     @patch('rasterio.open')
@@ -593,12 +596,12 @@ class TestApp:
     def test_extract_data_from_layer_raster_error(self, client: FlaskClient, mock_managers: dict):
         """
         Test that a BadRequest is raised when attempting to get table data for a raster layer.
-        Covers the 'if layer_manager.__is_raster' exception branch.
+        Covers the 'if layer_manager.is_raster' exception branch.
         """
         mock_lm = mock_managers["layer"]
         # Mocking the private method (name mangling might apply if it's a real class, 
         # but as a mock attribute we set it directly)
-        mock_lm._LayerManager__is_raster.return_value = True 
+        mock_lm.is_raster.return_value = True 
         
         response = client.get('/layers/raster_01/table')
         
@@ -613,9 +616,8 @@ class TestApp:
         mock_dm = mock_managers["data"]
         mock_lm = mock_managers["layer"]
 
-        mock_lm.__is_raster = lambda layer_id: False
-        assert mock_lm.__is_raster("x") is False
-
+        mock_lm.is_raster = lambda layer_id: False
+        assert mock_lm.is_raster("x") is False
 
         cached_data = {
             "headers": [{"name": "id", "type": "int", "sortable": True}],
@@ -646,7 +648,7 @@ class TestApp:
         mock_dm = mock_managers["data"]
         
         # 1. Setup Mock Data
-        mock_lm._LayerManager.is_raster.return_value = False
+        mock_lm.is_raster.return_value = False
         mock_dm.check_cache.return_value = None
         
         # Create a GeoDataFrame with mixed data and a Null value
@@ -688,7 +690,7 @@ class TestApp:
         mock_lm = mock_managers["layer"]
         mock_dm = mock_managers["data"]
         
-        mock_lm._LayerManager.is_raster.return_value = False
+        mock_lm.is_raster.return_value = False
         mock_dm.check_cache.return_value = None
         
         # Empty GeoDataFrame with columns
@@ -719,3 +721,22 @@ class TestApp:
             # If the route matches but ID is whitespace/empty
             if response.status_code == 400:
                 assert "layer_id parameter is required" in response.get_json()["error"]["description"]
+    
+    # Commented because it is not implemented.
+    # def test_stop_script_success(self, client: FlaskClient) -> None:
+    #     """
+    #     Test the successful execution path of the stop_script route.
+        
+    #     Ensures that when a valid script_id is provided via DELETE and 
+    #     a valid JSON body is present, the logic proceeds past the validation.
+    #     """
+    #     # Arrange
+    #     script_id = "test_script_001"
+    #     payload = {"force": True}
+        
+    #     # Act
+    #     # We target the route defined in the snippet: /execute_script/<script_id>
+    #     response = client.delete(f'/execute_script/{script_id}', json=payload)
+        
+    #     # Assert - Assuming the route returns 200 or 204 on success after the snippet logic
+    #     assert response.status_code in [200, 204]
