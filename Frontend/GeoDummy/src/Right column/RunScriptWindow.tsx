@@ -38,6 +38,7 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
   const [metadata, setMetadata] = useState<Metadata| null>(null);
   const [selectedLayers, setSelectedLayers] = useState<Record<string, string>>({});
   const [parameterValues, setParameterValues] = useState<Record<string, string | number>>({});
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
 
   // const handleRunScript = () => {
@@ -47,6 +48,35 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
   //   onRunScript(scriptId, inputFilePath || '', numberValue, parsedList);
   //   onClose();
   // };
+
+  const validateParameters = (params: Record<string, string | number>, metadataParams: Parameter[]): Record<string, string> => {
+    const errors: Record<string, string> = {};
+
+    metadataParams.forEach((param) => {
+      const value = params[param.name];
+
+      // Check if parameter is provided
+      if (value === undefined || value === '' || value === null) {
+        errors[param.name] = `${param.name} is required`;
+        return;
+      }
+
+      const stringValue = String(value).trim();
+
+      // Validate based on type
+      if (param.type === 'int') {
+        if (!Number.isInteger(Number(stringValue))) {
+          errors[param.name] = `${param.name} must be an integer`;
+        }
+      } else if (param.type === 'float') {
+        if (isNaN(Number(stringValue))) {
+          errors[param.name] = `${param.name} must be a number`;
+        }
+      }
+    });
+
+    return errors;
+  };
 
   useEffect(() => {
     if (!isOpen || !scriptId) return;
@@ -149,13 +179,28 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
               {metadata.parameters.map((param, index) => (
                 <div key={index} className="flex items-center space-x-4">
                   <label className="w-32 text-sm font-medium text-gray-700">{param.name}</label>
-                  <input
-                    type={param.type === 'int' || param.type === 'float' ? 'number' : 'text'}
-                    placeholder={`Enter ${param.type}`}
-                    value={parameterValues[param.name] || ''}
-                    onChange={(e) => setParameterValues({ ...parameterValues, [param.name]: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm bg-[#DADFE7] text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <div className="flex-1">
+                    <input
+                      type={param.type === 'int' || param.type === 'float' ? 'number' : 'text'}
+                      placeholder={`Enter ${param.type}`}
+                      value={parameterValues[param.name] || ''}
+                      onChange={(e) => {
+                        const newValues = { ...parameterValues, [param.name]: e.target.value };
+                        setParameterValues(newValues);
+                        // Validate on change
+                        const errors = validateParameters(newValues, metadata.parameters);
+                        setValidationErrors(errors);
+                      }}
+                      className={`w-full px-3 py-2 border rounded-md text-sm bg-[#DADFE7] text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors ${
+                        validationErrors[param.name]
+                          ? 'border-red-500 focus:ring-red-500'
+                          : 'border-gray-300 focus:ring-blue-500'
+                      }`}
+                    />
+                    {validationErrors[param.name] && (
+                      <p className="mt-1 text-sm text-red-600">{validationErrors[param.name]}</p>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -170,6 +215,7 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
         )}
 
         <button
+          disabled={Object.keys(validationErrors).length > 0}
           onClick={async () => {
             // Prepare parameters object for backend (strings/numbers/null)
             const paramsObj: Record<string, string | number | null> = {};
@@ -248,7 +294,11 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
               onScriptEnd();
             }
           }}
-          className="mt-4 flex items-center justify-center py-2 px-4 bg-[#0D73A5] text-white font-semibold rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200"
+          className={`mt-4 flex items-center justify-center py-2 px-4 font-semibold rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200 ${
+            Object.keys(validationErrors).length > 0
+              ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+              : 'bg-[#0D73A5] text-white hover:bg-blue-700 focus:ring-blue-500'
+          }`}
         >
           <Play size={16} className="mr-2" />
           Run Script
