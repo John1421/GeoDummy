@@ -159,42 +159,42 @@ const DEMO_POLYGONS: GeoJSON.FeatureCollection = {
 */
 // Demo layers to show on first app open
 const DEMO_LAYERS: Layer[] = [
-/*  {
-    id: "demo_raster_osm",
-    title: "Demo Raster (Satellite)",
-    order: 0,
-    opacity: 1,
-    kind: "raster",
-    rasterData: {
-      kind: "xyz",
-      urlTemplate:
-        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      minZoom: 0,
-      maxZoom: 19,
+  /*  {
+      id: "demo_raster_osm",
+      title: "Demo Raster (Satellite)",
+      order: 0,
+      opacity: 1,
+      kind: "raster",
+      rasterData: {
+        kind: "xyz",
+        urlTemplate:
+          "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        minZoom: 0,
+        maxZoom: 19,
+      },
+      // raster ignores color for now
     },
-    // raster ignores color for now
-  },
- {
-    id: "demo_points",
-    title: "Demo Points",
-    order: 1,
-    opacity: 1,
-    kind: "vector",
-    geometryType: "Point",
-    vectorData: DEMO_POINTS,
-    color: defaultColorForGeometryType("Point"),
-  },
-  {
-    id: "demo_polygons",
-    title: "Demo Polygons",
-    order: 2,
-    opacity: 1,
-    kind: "vector",
-    geometryType: "Polygon",
-    vectorData: DEMO_POLYGONS,
-    color: defaultColorForGeometryType("Polygon"),
-  },
-  */
+   {
+      id: "demo_points",
+      title: "Demo Points",
+      order: 1,
+      opacity: 1,
+      kind: "vector",
+      geometryType: "Point",
+      vectorData: DEMO_POINTS,
+      color: defaultColorForGeometryType("Point"),
+    },
+    {
+      id: "demo_polygons",
+      title: "Demo Polygons",
+      order: 2,
+      opacity: 1,
+      kind: "vector",
+      geometryType: "Polygon",
+      vectorData: DEMO_POLYGONS,
+      color: defaultColorForGeometryType("Polygon"),
+    },
+    */
 ];
 
 interface LayerSidebarProps {
@@ -228,7 +228,7 @@ async function postLayerFile(
 }
 
 async function getVectorLayerData(id: string): Promise<GeoJSON.FeatureCollection> {
-console.log("Fetching vector layer data for id:", id);
+  console.log("Fetching vector layer data for id:", id);
   const res = await fetch(`http://localhost:5050/layers/${id}`);
   if (!res.ok) throw new Error("Error fetching GeoJSON");
   return res.json();
