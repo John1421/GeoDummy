@@ -381,7 +381,7 @@ class LayerManager:
         Raises:
             ValueError: If the raster does not exist.
         """
-        raster_path = self.__is_raster(layer_name)
+        raster_path = self.is_raster(layer_name)
         if raster_path:
             return raster_path
        
@@ -409,7 +409,7 @@ class LayerManager:
             pass
         
 
-        if self.__is_raster(new_name):
+        if self.is_raster(new_name):
             exists = True
 
         return exists
@@ -434,7 +434,7 @@ class LayerManager:
         layers_dir = os.path.join(file_manager.layers_dir)
         gpkg_path = os.path.join(layers_dir, layer_id + ".gpkg")
 
-        raster_path = self.__is_raster(layer_id)
+        raster_path = self.is_raster(layer_id)
         if raster_path:
             with rasterio.open(raster_path) as src:
                 return {
@@ -466,7 +466,7 @@ class LayerManager:
         raise ValueError(f"Layer '{layer_id}' not found in rasters or GeoPackage")
     
     def get_layer_for_script(self, layer_id):
-        raster_path = self.__is_raster(layer_id)
+        raster_path = self.is_raster(layer_id)
 
         if raster_path:
             return raster_path
@@ -747,7 +747,7 @@ class LayerManager:
         return
     
     @staticmethod
-    def __is_raster(layer_id):
+    def is_raster(layer_id):
         """
         Docstring for __is_raster
         

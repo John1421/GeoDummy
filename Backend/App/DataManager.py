@@ -15,12 +15,14 @@ from flask_cors import CORS
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 
-cache = {}
 
 class DataManager:
+    
+    def __init__(self):
+        self.cache = {}
 
-
-    def format_value_for_table_view(value):
+    
+    def format_value_for_table_view(self, value):
         '''
         Formats data as per use case UC-B-022, used in the endpoint:
         '/layers/<layer_id>/table', methods=['GET']
@@ -58,8 +60,9 @@ class DataManager:
 
         # Fallback safe string
         return str(value)
-
-    def detect_type(value):
+    
+    
+    def detect_type(self, value):
         '''
         Infers data type of the value passed as argument.
         
@@ -81,20 +84,22 @@ class DataManager:
         if isinstance(value, str):
             return "string"
         return "string"
-
-    def check_cache(cache_key):
-        if cache_key in cache:
-            cached = cache[cache_key]
+    
+    
+    def check_cache(self, cache_key):
+        if cache_key in self.cache:
+            cached = self.cache[cache_key]
             if datetime.now(timezone.utc) < cached["expires"]:
                 return cached["data"]
-            del cache[cache_key]
+            del self.cache[cache_key]
             return None
         else:
             return None
         
-    def insert_to_cache(cache_key, data, ttl_minutes):
+        
+    def insert_to_cache(self, cache_key, data, ttl_minutes):
         # Caching the data
-        cache[cache_key] = {
+        self.cache[cache_key] = {
             "data": data,
             "expires": datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes)
         }
