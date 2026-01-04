@@ -116,8 +116,8 @@ class TestLayerManager:
         layer_id = "test_raster"
         mock_path = "/tmp/layers/test_raster.tif"
         
-        # Setup mock for __is_raster and rasterio
-        with patch.object(layer_manager, '_LayerManager__is_raster', return_value=mock_path):
+        # Setup mock for is_raster and rasterio
+        with patch.object(layer_manager, 'is_raster', return_value=mock_path):
             mock_src = MagicMock()
             mock_src.count = 3
             mock_src.width = 100
@@ -161,7 +161,7 @@ class TestLayerManager:
         mock_gdf.__len__.return_value = 50
         mock_read_file.return_value = mock_gdf
 
-        with patch.object(layer_manager, '_LayerManager__is_raster', return_value=None):
+        with patch.object(layer_manager, 'is_raster', return_value=None):
             info = layer_manager.get_layer_information(layer_id)
 
             assert info["type"] == "vector"
@@ -172,7 +172,7 @@ class TestLayerManager:
 
     def test_get_layer_information_not_found(self, layer_manager: LayerManager) -> None:
         """Test that ValueError is raised if the layer exists in neither raster nor vector form."""
-        with patch.object(layer_manager, '_LayerManager__is_raster', return_value=None), \
+        with patch.object(layer_manager, 'is_raster', return_value=None), \
              patch('os.path.isfile', return_value=False):
             
             with pytest.raises(ValueError, match="not found in rasters or GeoPackage"):
@@ -182,7 +182,7 @@ class TestLayerManager:
     @patch('os.path.isfile', return_value=True)
     def test_get_layer_information_gpkg_error(self, mock_isfile: MagicMock, mock_list: MagicMock, layer_manager: LayerManager) -> None:
         """Test error handling when the GeoPackage is unreadable."""
-        with patch.object(layer_manager, '_LayerManager__is_raster', return_value=None):
+        with patch.object(layer_manager, 'is_raster', return_value=None):
             with pytest.raises(ValueError, match="Error reading GeoPackage: Disk Error"):
                 layer_manager.get_layer_information("corrupt_layer")
 
@@ -191,7 +191,7 @@ class TestLayerManager:
     def test_get_layer_for_script_raster(self, layer_manager: LayerManager) -> None:
         """Test that it returns the raster path immediately if the ID is a raster."""
         mock_path = "/path/to/raster.tif"
-        with patch.object(layer_manager, '_LayerManager__is_raster', return_value=mock_path):
+        with patch.object(layer_manager, 'is_raster', return_value=mock_path):
             result = layer_manager.get_layer_for_script("my_raster")
             assert result == mock_path
 
@@ -223,7 +223,7 @@ class TestLayerManager:
             MagicMock(__enter__=MagicMock(return_value=mock_dst))
         ]
 
-        with patch.object(layer_manager, '_LayerManager__is_raster', return_value=None):
+        with patch.object(layer_manager, 'is_raster', return_value=None):
             result = layer_manager.get_layer_for_script(layer_id)
 
             assert f"{layer_id}.gpkg" in result
@@ -238,7 +238,7 @@ class TestLayerManager:
         layer_manager.default_gpkg_path = "/db/main.gpkg"
         mock_list.return_value = ["other_layer"]
         
-        with patch.object(layer_manager, '_LayerManager__is_raster', return_value=None):
+        with patch.object(layer_manager, 'is_raster', return_value=None):
             result = layer_manager.get_layer_for_script("missing_vector")
             assert result is None
     

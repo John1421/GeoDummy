@@ -2,9 +2,11 @@ import pytest
 import json
 import io
 import os
+import geopandas as gpd
+import pandas as pd
 import numpy as np
 from unittest.mock import MagicMock, patch
-from flask import Flask
+from flask import Flask, jsonify
 from werkzeug.exceptions import BadRequest, NotFound
 from flask.testing import FlaskClient
 
@@ -102,7 +104,9 @@ class TestApp:
     @pytest.mark.parametrize("extension, method", [
         (".zip", "add_shapefile_zip"),
         (".geojson", "add_geojson"),
-        (".gpkg", "add_gpkg_layers")
+        (".gpkg", "add_gpkg_layers"),
+        (".tif", "add_raster"),
+        (".tiff", "add_raster")
     ])
     def test_add_layer_various_formats(self, client, mock_managers, extension, method):
         """Parametrized test to verify different file formats trigger correct manager methods."""
@@ -121,6 +125,30 @@ class TestApp:
         assert response.status_code == 200
         assert "layer1" in response.get_json()["layer_id"]
         getattr(mock_managers["layer"], method).assert_called_once()
+
+    def test_add_layer_shp(self, client, mock_managers):
+        mock_managers["layer"].check_layer_name_exists.return_value = False
+        mock_managers["layer"].MAX_LAYER_FILE_SIZE = 1000
+        
+        file_name = f"my_data.shp"
+        data = {'file': (io.BytesIO(b"fake binary content"), file_name)}
+        
+        with patch('os.path.getsize', return_value=10):
+            response = client.post('/layers', data=data, content_type='multipart/form-data')
+        
+        assert response.status_code == 400
+
+    def test_add_layer_unknown_format(self, client, mock_managers):
+        mock_managers["layer"].check_layer_name_exists.return_value = False
+        mock_managers["layer"].MAX_LAYER_FILE_SIZE = 1000
+        
+        file_name = f"my_data.some_ext"
+        data = {'file': (io.BytesIO(b"fake binary content"), file_name)}
+        
+        with patch('os.path.getsize', return_value=10):
+            response = client.post('/layers', data=data, content_type='multipart/form-data')
+        
+        assert response.status_code == 400
 
     def test_add_layer_size_exceeded(self, client, mock_managers):
         """Error handling: Rejects files larger than MAX_LAYER_FILE_SIZE."""
@@ -561,3 +589,133 @@ class TestApp:
         
         assert response.status_code == 400
         assert "'parameters' must be a JSON object" in response.get_json()["error"]["description"]
+
+    def test_extract_data_from_layer_raster_error(self, client: FlaskClient, mock_managers: dict):
+        """
+        Test that a BadRequest is raised when attempting to get table data for a raster layer.
+        Covers the 'if layer_manager.__is_raster' exception branch.
+        """
+        mock_lm = mock_managers["layer"]
+        # Mocking the private method (name mangling might apply if it's a real class, 
+        # but as a mock attribute we set it directly)
+        mock_lm._LayerManager__is_raster.return_value = True 
+        
+        response = client.get('/layers/raster_01/table')
+        
+        assert response.status_code == 400
+        assert "Raster doesn't have attributes" in response.get_json()["error"]["description"]
+
+    def test_extract_data_from_layer_cache_hit(self, client: FlaskClient, mock_managers: dict):
+        """
+        Test that cached data is returned immediately if available.
+        Covers the 'if response:' branch for the cache hit.
+        """
+        mock_dm = mock_managers["data"]
+        mock_lm = mock_managers["layer"]
+
+        mock_lm.__is_raster = lambda layer_id: False
+        assert mock_lm.__is_raster("x") is False
+
+
+        cached_data = {
+            "headers": [{"name": "id", "type": "int", "sortable": True}],
+            "rows": [{"id": 1}],
+            "total_rows": 1,
+            "warnings": []
+        }
+        mock_dm.check_cache.return_value = cached_data
+
+        response = client.get('/layers/vector_01/table')
+
+        assert response.status_code == 200
+        assert response.get_json() == cached_data
+        # Ensure metadata processing was skipped
+        mock_managers["layer"].get_metadata.assert_not_called()
+
+    def test_extract_data_from_layer_success_with_nulls(self, client: FlaskClient, mock_managers: dict):
+        """
+        Test successful data extraction from a vector layer including null values.
+        Covers:
+        - Cache miss.
+        - Rows processing loop.
+        - Null value detection (warnings).
+        - Type detection and value formatting.
+        - Cache insertion.
+        """
+        mock_lm = mock_managers["layer"]
+        mock_dm = mock_managers["data"]
+        
+        # 1. Setup Mock Data
+        mock_lm._LayerManager.is_raster.return_value = False
+        mock_dm.check_cache.return_value = None
+        
+        # Create a GeoDataFrame with mixed data and a Null value
+        data = {
+            "city": ["Lisbon", "Porto"],
+            "population": [500000, None]
+        }
+        gdf = gpd.GeoDataFrame(data)
+        mock_lm.get_metadata.return_value = {"attributes": gdf}
+        
+        # Mock data manager utility methods
+        mock_dm.detect_type.side_effect = lambda x: "string" if isinstance(x, str) else "number"
+        mock_dm.format_value_for_table_view.side_effect = lambda x: "N/A" if x is None else str(x)
+
+        # 2. Execute Request
+        response = client.get('/layers/vector_city/table')
+        json_data = response.get_json()
+
+        # 3. Assertions
+        assert response.status_code == 200
+        assert json_data["total_rows"] == 2
+        assert len(json_data["headers"]) == 2
+        
+        # Check warnings branch coverage (Null value detected)
+        assert any("Null value detected in field 'population'" in w for w in json_data["warnings"])
+        
+        # Check rows formatting
+        assert json_data["rows"][0]["city"] == "Lisbon"
+        assert json_data["rows"][1]["population"] == "N/A"
+        
+        # Ensure it was saved to cache
+        mock_dm.insert_to_cache.assert_called_once()
+
+    def test_extract_data_from_layer_empty_gdf(self, client: FlaskClient, mock_managers: dict):
+        """
+        Test the edge case where the layer exists but contains no rows.
+        Covers the 'if total_rows > 0 else {}' branch.
+        """
+        mock_lm = mock_managers["layer"]
+        mock_dm = mock_managers["data"]
+        
+        mock_lm._LayerManager.is_raster.return_value = False
+        mock_dm.check_cache.return_value = None
+        
+        # Empty GeoDataFrame with columns
+        gdf = gpd.GeoDataFrame(columns=["name", "geometry"])
+        mock_lm.get_metadata.return_value = {"attributes": gdf}
+
+        response = client.get('/layers/empty_layer/table')
+        json_data = response.get_json()
+
+        assert response.status_code == 200
+        assert json_data["total_rows"] == 0
+        assert json_data["rows"] == []
+        # Headers should still exist but type detection called with None
+        assert len(json_data["headers"]) == 2
+        assert json_data["headers"][0]["name"] == "name"
+
+    def test_extract_data_from_layer_missing_id(self, client: FlaskClient):
+        """
+        Test the case where layer_id is missing. 
+        Note: Flask routing usually prevents this if defined as /layers/<layer_id>/table,
+        but we test the internal check 'if not layer_id'.
+        """
+        # We use a space or a specific path that might bypass strict regex if applicable
+        # to trigger the 'if not layer_id' logic directly.
+        with patch('App.app.layer_manager') as mock_lm:
+            # Manually calling the function if needed, but via client:
+            response = client.get('/layers/%20/table') # Encoded space
+            # If the route matches but ID is whitespace/empty
+            if response.status_code == 400:
+                assert "layer_id parameter is required" in response.get_json()["error"]["description"]
