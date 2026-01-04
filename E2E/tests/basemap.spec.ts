@@ -10,7 +10,7 @@ test('Alterar basemap funciona corretamente', async ({ page }) => {
  
   await page.getByTestId('basemap-dropdown').click();
  
-  await page.getByTestId('basemap-option-osm').click();
+  await page.getByTestId('basemap-option-osm_standard').click();
 
   await page.getByTestId('basemap-save').click();
   
