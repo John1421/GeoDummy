@@ -5,19 +5,19 @@ import ScriptList from "./Right column/ScriptList";
 import LayerSidebar, { type Layer } from "./LeftColumn/LayerSidebar";
 import { colors } from "./Design/DesignTokens";
 import { useState, useRef } from "react";
+import { useInitializeBasemap } from "./hooks/useInitializeBasemap";
 
 function App() {
-  const [baseMapUrl, setBaseMapUrl] = useState(
-    "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-  );
-  const [baseMapAttribution, setBaseMapAttribution] = useState(
-    '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-  );
+  const [baseMapUrl, setBaseMapUrl] = useState<string | null>(null);
+  const [baseMapAttribution, setBaseMapAttribution] = useState<string | null>(null);
+  useInitializeBasemap(setBaseMapUrl, setBaseMapAttribution);
+
+
 
   const [layers, setLayers] = useState<Layer[]>([]);
 
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
-  
+
   const addLayerRef = useRef<((file: File) => Promise<void>) | null>(null);
 
   return (
@@ -36,18 +36,20 @@ function App() {
           }}
         >
           <LayerSidebar layers={layers} setLayers={setLayers} selectedLayerId={selectedLayerId}
-            setSelectedLayerId={setSelectedLayerId} 
+            setSelectedLayerId={setSelectedLayerId}
             onAddLayerRef={(fn) => { addLayerRef.current = fn; }}
           />
         </div>
 
         <div className="flex-1 flex flex-col min-h-0 min-w-0 relative z-0">
           <div className="flex-1 min-h-0">
-            <BaseMap
-              initialUrl={baseMapUrl}
-              initialAttribution={baseMapAttribution}
-              layers={layers}
-            />
+            {baseMapUrl && baseMapAttribution && (
+              <BaseMap
+                initialUrl={baseMapUrl}
+                initialAttribution={baseMapAttribution}
+                layers={layers}
+              />
+            )}
           </div>
 
           <div className="flex-none">
