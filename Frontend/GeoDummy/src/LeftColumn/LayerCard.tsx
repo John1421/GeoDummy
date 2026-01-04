@@ -96,6 +96,7 @@ function LayerCardComponent({ layer, selected, onSelect, onSettings, onToggleVis
 
   return (
     <div
+      data-testid={`layer-card-${layer.id}`}
       ref={(node) => {
         setNodeRef(node);
         cardRef.current = node;

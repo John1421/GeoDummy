@@ -1,4 +1,4 @@
-import {useState, useRef, useEffect} from "react";
+import { useState, useRef, useEffect } from "react";
 import BaseMapSettings from "./BaseMapSettings";
 
 function EditMenu({ open, setBaseMapUrl, setBaseMapAttribution, setOpen }: { open: boolean; setBaseMapUrl: (url: string) => void; setBaseMapAttribution: (attribution: string) => void; setOpen: (open: boolean) => void }) {
@@ -22,7 +22,7 @@ function EditMenu({ open, setBaseMapUrl, setBaseMapAttribution, setOpen }: { ope
     };
   }, [setOpen, openBaseMapSet]); // add openBaseMapSet to the dependency list
 
-  if (!open){
+  if (!open) {
     return null;
   }
 
@@ -31,13 +31,15 @@ function EditMenu({ open, setBaseMapUrl, setBaseMapAttribution, setOpen }: { ope
       className="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg w-40 z-9999"
       ref={menuRef}
     >
-      <button onClick={()=>setOpenBaseMapSet(!openBaseMapSet)}className="w-full text-black text-left px-4 py-2 hover:bg-gray-100">
+      <button 
+      data-testid="edit-basemap-button" 
+      onClick={() => setOpenBaseMapSet(!openBaseMapSet)} className="w-full text-black text-left px-4 py-2 hover:bg-gray-100">
         Edit Base Map
       </button>
       <button className="w-full text-black text-left px-4 py-2 hover:bg-gray-100">
         Settings
       </button>
-      <BaseMapSettings openBaseMapSet={openBaseMapSet} onClose={() => setOpenBaseMapSet(false)} setBaseMapUrl={setBaseMapUrl} setBaseMapAttribution={setBaseMapAttribution}/>
+      <BaseMapSettings openBaseMapSet={openBaseMapSet} onClose={() => setOpenBaseMapSet(false)} setBaseMapUrl={setBaseMapUrl} setBaseMapAttribution={setBaseMapAttribution} />
     </div>
 
   );

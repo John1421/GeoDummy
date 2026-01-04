@@ -19,6 +19,9 @@ file_manager = FileManager()
 class LayerManager:
     MAX_LAYER_FILE_SIZE = 1000 * 1024 * 1024 # 1000 MB
     def __init__(self):
+        # Default GeoPackage path for vector layers
+        self.default_gpkg_path = os.path.join(file_manager.layers_dir, "default.gpkg")
+        
         # Supported layer formats
         supported_ext = {'.gpkg', '.tif', '.tiff'}
 
@@ -379,6 +382,7 @@ class LayerManager:
             ValueError: If the raster does not exist.
         """
         raster_path = self.is_raster(layer_name)
+        raster_path = self.is_raster(layer_name)
         if raster_path:
             return raster_path
        
@@ -432,6 +436,7 @@ class LayerManager:
         gpkg_path = os.path.join(layers_dir, layer_id + ".gpkg")
 
         raster_path = self.is_raster(layer_id)
+        raster_path = self.is_raster(layer_id)
         if raster_path:
             with rasterio.open(raster_path) as src:
                 return {
@@ -464,10 +469,10 @@ class LayerManager:
     
     def get_layer_for_script(self, layer_id):
         raster_path = self.is_raster(layer_id)
+        raster_path = self.is_raster(layer_id)
 
         if raster_path:
             return raster_path
-
         # Check if the layer_id matches a vector layer in the GeoPackage
         if os.path.isfile(self.default_gpkg_path):
             try:

@@ -466,7 +466,7 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
                         </div>
                     </div>
                 {/* Parameters and Layers Toggle */}
-                <div style={{ borderBottom: `1px solid ${colors.borderStroke}` }}>
+                <div style={{  }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <h4 style={{ margin: 0, fontSize: typography.sizeMd, fontWeight: 600, color: colors.foreground, fontFamily: typography.normalFont }}>Parameters</h4>
 
@@ -540,7 +540,7 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
                         <div style={{ padding: `${spacing.md} 0`, display: "flex", flexDirection: "column", gap: spacing.sm }}>
                             {/* Layers Section */}
                             {layers.length > 0 && (
-                                <div style={{ display: "flex", flexDirection: "column", gap: spacing.sm, paddingBottom: spacing.sm, borderBottom: `1px solid ${colors.borderStroke}` }}>
+                                <div style={{ display: "flex", flexDirection: "column", gap: spacing.sm, paddingBottom: spacing.sm }}>
                                     <p style={{ margin: 0, fontSize: typography.sizeSm, fontWeight: 600, color: colors.foreground, fontFamily: typography.normalFont }}>Layers</p>
                                     {layers.map((layer) => (
                                         <div key={layer.id} style={{ display: "flex", alignItems: "center", columnGap: 8 }}>
@@ -637,7 +637,7 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
                             
                             {/* Parameters Section */}
                             {params.length > 0 && (
-                                <div style={{ display: "flex", flexDirection: "column", gap: spacing.sm, paddingBottom: spacing.sm, borderBottom: `1px solid ${colors.borderStroke}` }}>
+                                <div style={{ display: "flex", flexDirection: "column", gap: spacing.sm, paddingBottom: spacing.sm}}>
                                     <p style={{ margin: 0, fontSize: typography.sizeSm, fontWeight: 600, color: colors.foreground, fontFamily: typography.normalFont }}>Common Parameters</p>
                                     {params.map((p, idx) => (
                                         <div key={idx} style={{ display: "flex", columnGap: spacing.md }}>

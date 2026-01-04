@@ -41,9 +41,14 @@ const EXAMPLE_SCRIPTS: Script[] = [
   },
 ];
 
-export default function ScriptList() {
+interface ScriptListProps {
+  onAddLayer: (file: File) => Promise<void>;
+}
+
+export default function ScriptList({ onAddLayer }: ScriptListProps) {
   const [showAddNew, setShowAddNew] = useState(false);
   const [scripts, setScripts] = useState<Script[]>(EXAMPLE_SCRIPTS);
+  const [loadingScripts, setLoadingScripts] = useState<Record<string, boolean>>({});
 
   const handleAddScript = useCallback(
     (id: string, name: string, category: string, description: string) => {
@@ -110,6 +115,11 @@ const categories = Array.from(
                   id={script.id}
                   name={script.name}
                   description={script.description || ""}
+                  loading={loadingScripts[script.id] || false}
+                  setLoading={(loading) => 
+                    setLoadingScripts(prev => ({ ...prev, [script.id]: loading }))
+                  }
+                  onAddLayer={onAddLayer}
                 />
               ))}
           </ToolCategoryToggle>

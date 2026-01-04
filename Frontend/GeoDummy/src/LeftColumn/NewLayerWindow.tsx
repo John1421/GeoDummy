@@ -13,7 +13,7 @@ export default function NewLayerWindow({ isOpen, onClose, onSelect }: NewLayerWi
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const allowedExtensions = [".geojson", ".zip", ".tiff", ".tif", ".gpkg"];
-  const MAX_UPLOAD_SIZE = 200 * 1024 * 1024; // 5 MB
+  const MAX_UPLOAD_SIZE = 200 * 1024 * 1024; // 200 MB
 
   // Reset fields every time modal opens
   useEffect(() => {

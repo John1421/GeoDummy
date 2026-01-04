@@ -94,6 +94,7 @@ const AttributeTable: React.FC<AttributeTableProps> = ({ layerId }) => {
         }
 
         setData(result);
+        setLoading(false);
       } catch (err: unknown) {
         if (err instanceof Error) {
           setError(err.message);

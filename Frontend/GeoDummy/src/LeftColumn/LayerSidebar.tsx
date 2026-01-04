@@ -202,6 +202,7 @@ interface LayerSidebarProps {
   setLayers: React.Dispatch<React.SetStateAction<Layer[]>>;
   selectedLayerId: string | null;
   setSelectedLayerId: (id: string) => void;
+  onAddLayerRef?: (addLayerFn: (file: File) => Promise<void>) => void;
 }
 
 
@@ -254,7 +255,7 @@ function getRasterDescriptor(
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
-export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSelectedLayerId }: LayerSidebarProps) {
+export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSelectedLayerId, onAddLayerRef }: LayerSidebarProps) {
   const [isWindowOpen, setIsWindowOpen] = useState(false);
 
   const [settingsLayerId, setSettingsLayerId] = useState<string | null>(null);
@@ -500,6 +501,13 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
     [getNextOrder, setLayers]
   );
 
+  // Expose handleAddLayer to parent component
+  useEffect(() => {
+    if (onAddLayerRef) {
+      onAddLayerRef(handleAddLayer);
+    }
+  }, [handleAddLayer, onAddLayerRef]);
+
   // Seed demo layers only when the list is empty (first app open)
   useEffect(() => {
     if (layers.length > 0) return;
@@ -649,6 +657,7 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
 
   const headerActions = (
     <button
+      data-testid="layers-reorder-button"
       type="button"
       onClick={handleReorderByGeometry}
       title="Reorder layers by geometry type"
@@ -698,6 +707,8 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
         isOpen={isWindowOpen}
         onClose={() => setIsWindowOpen(false)}
         onSelect={handleAddLayer}
+        existingFileNames={layers.map(l => l.fileName || '').filter(Boolean)}
+        existingFileLastModified={layers.map(l => l.fileLastModified || 0).filter(Boolean)}
       />
 
       <LayerSettingsWindow

@@ -256,8 +256,11 @@ class ScriptManager:
 
         # Write all prints and errors that occured during execution to the log file
         with open(log_path, "w", encoding="utf-8") as f:
-            f.write(result.stdout)
-            f.write(result.stderr)
+            if result is not None:
+                f.write(result.stdout)
+                f.write(result.stderr)
+            else:
+                f.write("Script Timeout.")
 
         # ---- Handle outputs ----
         result_value = None
@@ -275,7 +278,7 @@ class ScriptManager:
                 output_file_paths.append(saved_file)
                 
         # If no files, fallback to stdout (simple value)
-        if not output_file_paths:
+        if not output_file_paths and result is not None:
             stdout_value = result.stdout.strip()
             if stdout_value:
                 result_value = stdout_value
@@ -307,7 +310,7 @@ class ScriptManager:
         self.metadata = self._load_metadata()
         return self.metadata["scripts"][script_id]
         
-            
+    
     def _validate_script_files(self):
         """
         Ensures that every script_id stored in metadata corresponds
@@ -432,8 +435,8 @@ class ScriptManager:
              if os.path.isfile(arg):
                  os.remove(arg) 
 
-
-    def _validate_script_integrity(self,script_path):
+    @staticmethod
+    def _validate_script_integrity(script_path):
         
         """
         Validates the integrity of a Python script without executing it.

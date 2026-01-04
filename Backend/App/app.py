@@ -728,45 +728,54 @@ def extract_data_from_layer_for_table_view(layer_id):
     response = data_manager.check_cache(layer_id)
     if response:
         return jsonify(response), 200
-    
-    
-    
-    gdf = layer_manager.get_metadata(layer_id)["attributes"]
+
+    # 1) Descobrir caminho do GPKG
+    gpkg_path = os.path.join(file_manager.layers_dir, f"{layer_id}.gpkg")
+    if not os.path.isfile(gpkg_path):
+        raise BadRequest("Vector layer file not found")
+
+    # 2) Ler a primeira layer do GPKG
+    import fiona
+    layers = fiona.listlayers(gpkg_path)
+    if not layers:
+        raise BadRequest("No layers found in GeoPackage")
+    layer_name = layers[0]
+
+    gdf = gpd.read_file(gpkg_path, layer=layer_name)
+
+    # 3) Remover geometria para tabela
+    if "geometry" in gdf.columns:
+        gdf = gdf.drop(columns=["geometry"])
 
     total_rows = len(gdf)
-    # Headers metadata
+
     headers = []
     sample_row = gdf.iloc[0].to_dict() if total_rows > 0 else {}
     for col in gdf.columns:
         headers.append({
             "name": col,
             "type": data_manager.detect_type(sample_row.get(col)),
-            "sortable": True  # All non-geometry fields are sortable
+            "sortable": True
         })
 
-    # Data formatting
     rows = []
-    warnings = set()    # warnings as a set to avoid duplicates
+    warnings = set()
 
     for _, row in gdf.iterrows():
         formatted = {}
         for col, value in row.items():
             formatted[col] = data_manager.format_value_for_table_view(value)
-
             if value is None:
                 warnings.add(f"Null value detected in field '{col}'")
-
         rows.append(formatted)
 
-    # Contruction of final data
     response_data = {
         "headers": headers,
         "rows": rows,
         "total_rows": total_rows,
         "warnings": list(warnings)
     }
-    
-    # Caching the data
+
     data_manager.insert_to_cache(layer_id, response_data, 10)
 
     return jsonify(response_data), 200
