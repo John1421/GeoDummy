@@ -10,6 +10,7 @@ function Header({ setBaseMapUrl, setBaseMapAttribution }: { setBaseMapUrl: (url:
 
       <div className="relative">
         <button
+          data-testid="edit-menu-button"
           onClick={() => setOpen(!open)}
           onMouseDown={(e) => e.stopPropagation()}
           className={BUTTON_STYLE}
