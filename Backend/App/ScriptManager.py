@@ -3,7 +3,7 @@ from .LayerManager import LayerManager
 import json
 import os
 import importlib.util
-from werkzeug.exceptions import BadRequest
+from werkzeug.exceptions import BadRequest, NotFound
 import sys
 import shutil
 import zipfile
@@ -81,7 +81,7 @@ class ScriptManager:
         self.metadata["scripts"][script_id] = parsed_metadata
         self._save_metadata()
 
-    def run_script(self, script_path, script_id, execution_id, parameters):
+    def run_script(self, script_path, script_id, execution_id, data):
         """
         Executes a Python script in an isolated, sandboxed environment with 
         comprehensive input/output handling, validation, and logging.
@@ -216,28 +216,27 @@ class ScriptManager:
         log_path = os.path.join(execution_folder, f"log_{script_id}.txt")
     
         # ----- SCRIPT PREPARATION AND EXECUTION -----
-
+    
         # Prepare/Get required arguments for script execution and store in inputs folder   
-        args = self.__prepare_parameters_for_script(parameters, inputs_folder)
-
-        # Write arguments in inputs folder (paths for files and values for others) int oan input json
-        params_json = os.path.join(inputs_folder, "params.json")
-        with open(params_json, "w") as f:
-            json.dump(args, f)
+        new_data = self.__prepare_parameters_for_script(data, inputs_folder)
 
         status = None
 
         # Execute the script as a subprocess. It will save outputs to the appropriate folder.
         try:
+            script_copy_path_abs = os.path.abspath(script_copy_path)
+            inputs_folder_abs = os.path.abspath(inputs_folder)
+            outputs_folder_abs = os.path.abspath(outputs_folder)
+            data_str = json.dumps(new_data)
             print("="*20)
             print(f"Executing script {script_id} with execution ID {execution_id}")
-            print(f"Script path: {script_copy_path}")
-            print(f"Inputs folder: {inputs_folder}")
-            print(f"Outputs folder: {outputs_folder}")
-            print(f"Parameters JSON: {params_json}")
+            print(f"Script path: {script_copy_path_abs}")
+            print(f"Inputs folder: {inputs_folder_abs}")
+            print(f"Outputs folder: {outputs_folder_abs}")
+            print(f"JSON data: {data_str}")
             print("="*20)
             result = subprocess.run(
-                ["python", script_copy_path, outputs_folder, params_json],
+                ["python", script_copy_path_abs, outputs_folder_abs, data_str],
                 cwd=execution_folder,
                 capture_output=True,
                 text=True,
@@ -254,7 +253,7 @@ class ScriptManager:
 
 
         # ----- LOGGING AND OUTPUT HANDLING -----
-
+        
         # Write all prints and errors that occured during execution to the log file
         with open(log_path, "w", encoding="utf-8") as f:
             if result is not None:
@@ -293,7 +292,7 @@ class ScriptManager:
         }
 
         # Remove temporary layer files
-        self.__clean_temp_layer_files(args) 
+        self.__clean_temp_layer_files(new_data.get("layers", [])) 
 
         return response    
 
@@ -382,7 +381,7 @@ class ScriptManager:
                 raise BadRequest("Fle extension not supported")
             
     @staticmethod
-    def __prepare_parameters_for_script(parameters, execution_dir_input, expected_arg_count=None):
+    def __prepare_parameters_for_script(data, execution_dir_input):
         """
         Prepares input parameters for script execution.
 
@@ -391,13 +390,6 @@ class ScriptManager:
         - Returns a list of processed arguments ready to be passed to the script.
         """
 
-        arguments = list(parameters.values())
-
-        # Validate argument count if provided
-        if expected_arg_count is not None and len(arguments) != expected_arg_count:
-            raise BadRequest(
-                f"main() expects {expected_arg_count} arguments, but client sent {len(arguments)}"
-            )
 
         # Validate execution_dir_input exists
         if not os.path.isdir(execution_dir_input):
@@ -405,36 +397,35 @@ class ScriptManager:
                 f"Couldn't locate folder to load input layers onto: {execution_dir_input}"
             )
 
-        processed_arguments = []
-
+        layers = data.get("layers", [])
+        layers_paths = []
+    
         # Process each argument
-        for arg in arguments:
-            if isinstance(arg, str):
-                # If string, attempt to replace it with get_layer result
-                layer = layer_manager.get_layer_for_script(arg)
+        for layer in layers:
+            layer = layer_manager.get_layer_for_script(layer)
 
-                if layer is not None:
-                    # Copy layer onto the execution_dir_input folder
-                    layer_name = os.path.basename(layer)
-                    layer_copy = os.path.join(execution_dir_input, layer_name)
-                    shutil.copy(layer, layer_copy)
+            if layer is not None:
+                # Copy layer onto the execution_dir_input folder
+                layer_name = os.path.basename(layer)
+                layer_copy = os.path.join(execution_dir_input, layer_name)
+                layer_abs = os.path.abspath(layer)
+                layer_copy_abs = os.path.abspath(layer_copy)
+                shutil.copy(layer_abs, layer_copy_abs)
 
-                    # Append layer_copy path if found
-                    processed_arguments.append(layer_copy)
-                else:
-                    # If layer not found, keep the original string
-                    processed_arguments.append(arg)
+                # Append layer_copy path if found
+                layers_paths.append(layer_copy_abs)
             else:
-                # If non-string argument, keep as-is
-                processed_arguments.append(arg)
-
-        return processed_arguments
+                # Append original value if not a layer
+                raise NotFound(f"Layer not found: {layer}"  )
+        
+        data["layers"] = layers_paths
+        return data
     
     @staticmethod
-    def __clean_temp_layer_files(arguments):
-        for arg in arguments:
-             if os.path.isfile(arg):
-                 os.remove(arg) 
+    def __clean_temp_layer_files(layers):
+        for layer in layers:
+             if os.path.isfile(layer):
+                 os.remove(layer) 
 
     @staticmethod
     def _validate_script_integrity(script_path):

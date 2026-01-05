@@ -189,13 +189,14 @@ def run_script(script_id):
         data = request.get_json()
         if not data:
             raise BadRequest("Request body must be JSON")
-        print("="*20)
-        print(data)
-        print("="*20)
-        
+
         parameters = data.get("parameters", {})
         if not isinstance(parameters, dict):
             raise BadRequest("'parameters' must be a JSON object")
+        
+        layers = data.get("layers", {})
+        if not isinstance(layers, list):
+            raise BadRequest("'layers' must be a JSON list")
 
         # Construct file path
         script_path = os.path.join(file_manager.scripts_dir, f"{script_id}.py")
@@ -208,8 +209,11 @@ def run_script(script_id):
             script_path=script_path,
             script_id=script_id,
             execution_id=execution_id,
-            parameters=parameters,
+            data=data,
         )
+
+        
+
         exec_status = output.get("status")
         outputs = output.get("outputs", [])
         log_path = output.get("log_path")

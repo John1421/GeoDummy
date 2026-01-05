@@ -469,37 +469,16 @@ class LayerManager:
     
     def get_layer_for_script(self, layer_id):
         raster_path = self.is_raster(layer_id)
-        raster_path = self.is_raster(layer_id)
 
         if raster_path:
             return raster_path
+        
         # Check if the layer_id matches a vector layer in the GeoPackage
-        if os.path.isfile(self.default_gpkg_path):
-            try:
-                layers = fiona.listlayers(self.default_gpkg_path)
-                if layer_id in layers:
-                    output_gpkg = os.path.join(file_manager.temp_dir, f"{layer_id}.gpkg")
-
-                    # Copy only the requested layer
-                    with fiona.open(self.default_gpkg_path, layer=layer_id) as src:
-                        meta = src.meta
-
-                        # Write single-layer GPKG
-                        with fiona.open(
-                            output_gpkg,
-                            mode="w",
-                            **meta
-                        ) as dst:
-                            for feature in src:
-                                dst.write(feature)
-
-                    return output_gpkg
-                            
-                else:
-                    return None                
-
-            except Exception as e:
-                raise ValueError(f"Error reading GeoPackage: {e}")        
+        path = os.path.join(file_manager.layers_dir, f"{layer_id}.gpkg")
+        if os.path.isfile(path):
+            return path
+        
+        return None 
 
     def get_layer_extension(self, layer_id):
             """
