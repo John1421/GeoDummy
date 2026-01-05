@@ -253,7 +253,7 @@ class ScriptManager:
 
 
         # ----- LOGGING AND OUTPUT HANDLING -----
-        
+
         # Write all prints and errors that occured during execution to the log file
         with open(log_path, "w", encoding="utf-8") as f:
             if result is not None:
@@ -342,17 +342,17 @@ class ScriptManager:
         match file_extension.lower():
             case ".shp":
                 if os.path.exists(file_path):
-                    os.remove(file_path)
+                    os.remove(file_path, ignore_errors=True)
                 raise BadRequest("Please upload shapefiles as a .zip containing all necessary components (.shp, .shx, .dbf, optional .prj).")
             
             case ".zip":
                 layer_manager.add_shapefile_zip(file_path,layer_id)
-                os.remove(file_path)
+                os.remove(file_path, ignore_errors=True)
                 return layer_manager.export_geopackage_layer_to_geojson(layer_id)
             
             case ".geojson":        
                 layer_manager.add_geojson(file_path,layer_id)
-                os.remove(file_path)
+                # os.remove(file_path)
                 return layer_manager.export_geopackage_layer_to_geojson(layer_id)
 
             case ".tif" | ".tiff":
@@ -361,7 +361,7 @@ class ScriptManager:
             
             case ".gpkg":
                 new_layers = layer_manager.add_gpkg_layers(file_path)
-                os.remove(file_path)
+                os.remove(file_path, ignore_errors=True)
                 zip_path = os.path.join(file_manager.temp_dir, f"{layer_id}_export.zip")
 
                 with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
