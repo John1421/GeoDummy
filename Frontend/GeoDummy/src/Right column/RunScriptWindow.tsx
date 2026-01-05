@@ -21,6 +21,11 @@ type Parameter = {
   value: string;
 };
 
+type PostPayload = {
+  layers: string[]; //array of layer IDs
+  parameters: Record<string, Parameter>;
+}
+
 interface LayerMetadata {
   attributes?: string[];
   bounding_box?: number[];
@@ -35,7 +40,7 @@ interface LayerMetadata {
 const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scriptId, onAddLayer, onScriptStart, onScriptEnd }) => {
   const [availableLayers, setAvailableLayers] = useState<string[]>([]);
   const [availableLayersMetadata, setAvailableLayersMetadata] = useState<LayerMetadata[]>([]);
-  const [metadata, setMetadata] = useState<Metadata| null>(null);
+  const [metadata, setMetadata] = useState<Metadata | null>(null);
   const [selectedLayers, setSelectedLayers] = useState<Record<string, string>>({});
   const [parameterValues, setParameterValues] = useState<Record<string, string | number>>({});
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
@@ -49,35 +54,35 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
   //   onClose();
   // };
 
-const validateParameters = (
-  params: Record<string, string | number>,
-  metadataParams: Record<string, Parameter>
-): Record<string, string> => {
-  const errors: Record<string, string> = {};
+  const validateParameters = (
+    params: Record<string, string | number>,
+    metadataParams: Record<string, Parameter>
+  ): Record<string, string> => {
+    const errors: Record<string, string> = {};
 
-  Object.entries(metadataParams).forEach(([name, param]) => {
-    const value = params[name];
+    Object.entries(metadataParams).forEach(([name, param]) => {
+      const value = params[name];
 
-    if (value === undefined || value === '' || value === null) {
-      errors[name] = `${name} is required`;
-      return;
-    }
-
-    const stringValue = String(value).trim();
-
-    if (param.type === 'int') {
-      if (!Number.isInteger(Number(stringValue))) {
-        errors[name] = `${name} must be an integer`;
+      if (value === undefined || value === '' || value === null) {
+        errors[name] = `${name} is required`;
+        return;
       }
-    } else if (param.type === 'float') {
-      if (isNaN(Number(stringValue))) {
-        errors[name] = `${name} must be a number`;
-      }
-    }
-  });
 
-  return errors;
-};
+      const stringValue = String(value).trim();
+
+      if (param.type === 'int') {
+        if (!Number.isInteger(Number(stringValue))) {
+          errors[name] = `${name} must be an integer`;
+        }
+      } else if (param.type === 'float') {
+        if (isNaN(Number(stringValue))) {
+          errors[name] = `${name} must be a number`;
+        }
+      }
+    });
+
+    return errors;
+  };
 
 
   useEffect(() => {
@@ -148,7 +153,7 @@ const validateParameters = (
                         {availableLayers.map((layerId, idx) => {
                           const layerMeta = availableLayersMetadata[idx] || {};
                           const displayName = layerMeta.layer_name || layerId;
-                          
+
                           // Check if this layer is already selected in a different dropdown
                           const isAlreadySelected = Object.entries(selectedLayers).some(
                             ([key, value]) => key !== layerName && value === layerId
@@ -175,63 +180,63 @@ const validateParameters = (
 
         {/* Parameters Section */}
         {metadata?.parameters && Object.keys(metadata.parameters).length > 0 && (
-  <>
-    <h3 className="text-lg font-semibold text-gray-800 pt-2">Parameters</h3>
-    <div className="flex flex-col space-y-3">
-      {Object.entries(metadata.parameters).map(([paramName, param]) => (
-        <div key={paramName} className="flex items-center space-x-4">
-          <label className="w-32 text-sm font-medium text-gray-700">
-            {paramName}
-          </label>
-          <div className="flex-1">
-            <input
-              type={param.type === 'int' || param.type === 'float' ? 'number' : 'text'}
-              placeholder={`Enter ${param.type}`}
-              value={parameterValues[paramName] || ''}
-              onChange={(e) => {
-                const newValues = {
-                  ...parameterValues,
-                  [paramName]: e.target.value,
-                };
-                setParameterValues(newValues);
-                setValidationErrors(
-                  validateParameters(newValues, metadata.parameters)
-                );
-              }}
-              className={`w-full px-3 py-2 border rounded-md text-sm bg-[#DADFE7] text-gray-700 focus:outline-none focus:ring-2 transition-colors ${
-                validationErrors[paramName]
-                  ? 'border-red-500 focus:ring-red-500'
-                  : 'border-gray-300 focus:ring-blue-500'
-              }`}
-            />
-            {validationErrors[paramName] && (
-              <p className="mt-1 text-sm text-red-600">
-                {validationErrors[paramName]}
-              </p>
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
-  </>
-)}
+          <>
+            <h3 className="text-lg font-semibold text-gray-800 pt-2">Parameters</h3>
+            <div className="flex flex-col space-y-3">
+              {Object.entries(metadata.parameters).map(([paramName, param]) => (
+                <div key={paramName} className="flex items-center space-x-4">
+                  <label className="w-32 text-sm font-medium text-gray-700">
+                    {paramName}
+                  </label>
+                  <div className="flex-1">
+                    <input
+                      type={param.type === 'int' || param.type === 'float' ? 'number' : 'text'}
+                      placeholder={`Enter ${param.type}`}
+                      value={parameterValues[paramName] || ''}
+                      onChange={(e) => {
+                        const newValues = {
+                          ...parameterValues,
+                          [paramName]: e.target.value,
+                        };
+                        setParameterValues(newValues);
+                        setValidationErrors(
+                          validateParameters(newValues, metadata.parameters)
+                        );
+                      }}
+                      className={`w-full px-3 py-2 border rounded-md text-sm bg-[#DADFE7] text-gray-700 focus:outline-none focus:ring-2 transition-colors ${validationErrors[paramName]
+                        ? 'border-red-500 focus:ring-red-500'
+                        : 'border-gray-300 focus:ring-blue-500'
+                        }`}
+                    />
+                    {validationErrors[paramName] && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {validationErrors[paramName]}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
 
         {/* Show empty state if no metadata */}
         {(!metadata ||
-  ((!metadata.layers || metadata.layers.length === 0) &&
-   (!metadata.parameters || Object.keys(metadata.parameters).length === 0))) && (
-  <div className="text-sm text-gray-500 italic">
-    No parameters or layers required for this script
-  </div>
-)}
+          ((!metadata.layers || metadata.layers.length === 0) &&
+            (!metadata.parameters || Object.keys(metadata.parameters).length === 0))) && (
+            <div className="text-sm text-gray-500 italic">
+              No parameters or layers required for this script
+            </div>
+          )}
 
 
         <button
           disabled={Object.keys(validationErrors).length > 0}
           onClick={async () => {
             // Prepare parameters object for backend (strings/numbers/null)
-            const paramsObj: Record<string, string | number | null> = {};
+            const paramsObj: Record<string, Parameter> = {};
+            const layersIds: string[] = [];
 
             // Add all layer selections
             if (metadata?.layers && metadata.layers.length > 0) {
@@ -239,26 +244,22 @@ const validateParameters = (
                 const selectedLayerId = selectedLayers[layerName];
                 if (selectedLayerId) {
                   // Backend expects layer IDs directly; ScriptManager resolves to file paths
-                  paramsObj[layerName] = selectedLayerId;
+                  layersIds.push(selectedLayerId);
                 }
               });
             }
 
             // Add all parameter values
             if (metadata?.parameters) {
-  Object.entries(metadata.parameters).forEach(([name, param]) => {
-    const value = parameterValues[name];
+              Object.entries(metadata.parameters).forEach(([name, param]) => {
+                const value = parameterValues[name];
 
-    if (param.type === 'int' && value !== undefined && value !== '') {
-      paramsObj[name] = parseInt(String(value));
-    } else if (param.type === 'float' && value !== undefined && value !== '') {
-      paramsObj[name] = parseFloat(String(value));
-    } else {
-      paramsObj[name] =
-        value !== undefined && value !== '' ? value : null;
-    }
-  });
-}
+                paramsObj[name] = {
+                  type: param.type,
+                  value: String(value),
+                }
+              });
+            }
 
 
             try {
@@ -266,15 +267,20 @@ const validateParameters = (
               onScriptStart();
               onClose();
 
+              const postPayload: PostPayload = {
+                layers: layersIds,
+                parameters: paramsObj,
+              };
+              console.log('Running script with parameters:', JSON.stringify({ parameters: paramsObj }));
               const response = await fetch(`http://localhost:5050/scripts/${scriptId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ parameters: paramsObj }),
+                body: JSON.stringify(postPayload),
               });
-              
+
               if (response.ok) {
                 const contentType = response.headers.get('Content-Type');
-                
+
                 // Check if response is a file (backend sends files with appropriate content-type)
                 if (contentType && !contentType.includes('application/json')) {
                   // Extract filename from Content-Disposition header or use default
@@ -288,7 +294,7 @@ const validateParameters = (
                   // Convert response to blob and create File object
                   const blob = await response.blob();
                   const file = new File([blob], filename, { type: blob.type });
-                  
+
                   // Add the layer to the map
                   await onAddLayer(file);
                   console.log('Script executed successfully and layer added');
@@ -309,17 +315,16 @@ const validateParameters = (
               onScriptEnd();
             }
           }}
-          className={`mt-4 flex items-center justify-center py-2 px-4 font-semibold rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200 ${
-            Object.keys(validationErrors).length > 0
-              ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-              : 'bg-[#0D73A5] text-white hover:bg-blue-700 focus:ring-blue-500'
-          }`}
+          className={`mt-4 flex items-center justify-center py-2 px-4 font-semibold rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200 ${Object.keys(validationErrors).length > 0
+            ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+            : 'bg-[#0D73A5] text-white hover:bg-blue-700 focus:ring-blue-500'
+            }`}
         >
           <Play size={16} className="mr-2" />
           Run Script
         </button>
       </div>
-    </PopUpWindowModal>
+    </PopUpWindowModal >
   );
 };
 

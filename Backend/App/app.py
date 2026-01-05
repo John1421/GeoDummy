@@ -189,7 +189,10 @@ def run_script(script_id):
         data = request.get_json()
         if not data:
             raise BadRequest("Request body must be JSON")
-
+        print("="*20)
+        print(data)
+        print("="*20)
+        
         parameters = data.get("parameters", {})
         if not isinstance(parameters, dict):
             raise BadRequest("'parameters' must be a JSON object")

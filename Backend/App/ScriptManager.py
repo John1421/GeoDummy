@@ -229,6 +229,13 @@ class ScriptManager:
 
         # Execute the script as a subprocess. It will save outputs to the appropriate folder.
         try:
+            print("="*20)
+            print(f"Executing script {script_id} with execution ID {execution_id}")
+            print(f"Script path: {script_copy_path}")
+            print(f"Inputs folder: {inputs_folder}")
+            print(f"Outputs folder: {outputs_folder}")
+            print(f"Parameters JSON: {params_json}")
+            print("="*20)
             result = subprocess.run(
                 ["python", script_copy_path, outputs_folder, params_json],
                 cwd=execution_folder,
