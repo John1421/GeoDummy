@@ -230,7 +230,7 @@ class ScriptManager:
         # Execute the script as a subprocess. It will save outputs to the appropriate folder.
         try:
             result = subprocess.run(
-                ["python3", script_copy_path, outputs_folder, params_json],
+                ["python", script_copy_path, outputs_folder, params_json],
                 cwd=execution_folder,
                 capture_output=True,
                 text=True,
@@ -447,7 +447,7 @@ class ScriptManager:
 
         # Syntax check
         result = subprocess.run(
-            ["python3", "-m", "py_compile", script_path],
+            ["python", "-m", "py_compile", script_path],
             capture_output=True,
             text=True
         )

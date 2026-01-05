@@ -13,12 +13,12 @@ interface RunScriptWindowProps {
 
 type Metadata = {
   layers: string[];
-  parameters: Parameter[];
+  parameters: Record<string, Parameter>;
 };
 
 type Parameter = {
-  name: string;
   type: string;
+  value: string;
 };
 
 interface LayerMetadata {
@@ -49,34 +49,36 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
   //   onClose();
   // };
 
-  const validateParameters = (params: Record<string, string | number>, metadataParams: Parameter[]): Record<string, string> => {
-    const errors: Record<string, string> = {};
+const validateParameters = (
+  params: Record<string, string | number>,
+  metadataParams: Record<string, Parameter>
+): Record<string, string> => {
+  const errors: Record<string, string> = {};
 
-    metadataParams.forEach((param) => {
-      const value = params[param.name];
+  Object.entries(metadataParams).forEach(([name, param]) => {
+    const value = params[name];
 
-      // Check if parameter is provided
-      if (value === undefined || value === '' || value === null) {
-        errors[param.name] = `${param.name} is required`;
-        return;
+    if (value === undefined || value === '' || value === null) {
+      errors[name] = `${name} is required`;
+      return;
+    }
+
+    const stringValue = String(value).trim();
+
+    if (param.type === 'int') {
+      if (!Number.isInteger(Number(stringValue))) {
+        errors[name] = `${name} must be an integer`;
       }
-
-      const stringValue = String(value).trim();
-
-      // Validate based on type
-      if (param.type === 'int') {
-        if (!Number.isInteger(Number(stringValue))) {
-          errors[param.name] = `${param.name} must be an integer`;
-        }
-      } else if (param.type === 'float') {
-        if (isNaN(Number(stringValue))) {
-          errors[param.name] = `${param.name} must be a number`;
-        }
+    } else if (param.type === 'float') {
+      if (isNaN(Number(stringValue))) {
+        errors[name] = `${name} must be a number`;
       }
-    });
+    }
+  });
 
-    return errors;
-  };
+  return errors;
+};
+
 
   useEffect(() => {
     if (!isOpen || !scriptId) return;
@@ -172,47 +174,58 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
         )}
 
         {/* Parameters Section */}
-        {metadata?.parameters && metadata.parameters.length > 0 && (
-          <>
-            <h3 className="text-lg font-semibold text-gray-800 pt-2">Parameters</h3>
-            <div className="flex flex-col space-y-3">
-              {metadata.parameters.map((param, index) => (
-                <div key={index} className="flex items-center space-x-4">
-                  <label className="w-32 text-sm font-medium text-gray-700">{param.name}</label>
-                  <div className="flex-1">
-                    <input
-                      type={param.type === 'int' || param.type === 'float' ? 'number' : 'text'}
-                      placeholder={`Enter ${param.type}`}
-                      value={parameterValues[param.name] || ''}
-                      onChange={(e) => {
-                        const newValues = { ...parameterValues, [param.name]: e.target.value };
-                        setParameterValues(newValues);
-                        // Validate on change
-                        const errors = validateParameters(newValues, metadata.parameters);
-                        setValidationErrors(errors);
-                      }}
-                      className={`w-full px-3 py-2 border rounded-md text-sm bg-[#DADFE7] text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors ${
-                        validationErrors[param.name]
-                          ? 'border-red-500 focus:ring-red-500'
-                          : 'border-gray-300 focus:ring-blue-500'
-                      }`}
-                    />
-                    {validationErrors[param.name] && (
-                      <p className="mt-1 text-sm text-red-600">{validationErrors[param.name]}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+        {metadata?.parameters && Object.keys(metadata.parameters).length > 0 && (
+  <>
+    <h3 className="text-lg font-semibold text-gray-800 pt-2">Parameters</h3>
+    <div className="flex flex-col space-y-3">
+      {Object.entries(metadata.parameters).map(([paramName, param]) => (
+        <div key={paramName} className="flex items-center space-x-4">
+          <label className="w-32 text-sm font-medium text-gray-700">
+            {paramName}
+          </label>
+          <div className="flex-1">
+            <input
+              type={param.type === 'int' || param.type === 'float' ? 'number' : 'text'}
+              placeholder={`Enter ${param.type}`}
+              value={parameterValues[paramName] || ''}
+              onChange={(e) => {
+                const newValues = {
+                  ...parameterValues,
+                  [paramName]: e.target.value,
+                };
+                setParameterValues(newValues);
+                setValidationErrors(
+                  validateParameters(newValues, metadata.parameters)
+                );
+              }}
+              className={`w-full px-3 py-2 border rounded-md text-sm bg-[#DADFE7] text-gray-700 focus:outline-none focus:ring-2 transition-colors ${
+                validationErrors[paramName]
+                  ? 'border-red-500 focus:ring-red-500'
+                  : 'border-gray-300 focus:ring-blue-500'
+              }`}
+            />
+            {validationErrors[paramName] && (
+              <p className="mt-1 text-sm text-red-600">
+                {validationErrors[paramName]}
+              </p>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  </>
+)}
+
 
         {/* Show empty state if no metadata */}
-        {(!metadata || ((!metadata.layers || metadata.layers.length === 0) && (!metadata.parameters || metadata.parameters.length === 0))) && (
-          <div className="text-sm text-gray-500 italic">
-            No parameters or layers required for this script
-          </div>
-        )}
+        {(!metadata ||
+  ((!metadata.layers || metadata.layers.length === 0) &&
+   (!metadata.parameters || Object.keys(metadata.parameters).length === 0))) && (
+  <div className="text-sm text-gray-500 italic">
+    No parameters or layers required for this script
+  </div>
+)}
+
 
         <button
           disabled={Object.keys(validationErrors).length > 0}
@@ -232,19 +245,21 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
             }
 
             // Add all parameter values
-            if (metadata?.parameters && metadata.parameters.length > 0) {
-              metadata.parameters.forEach((param) => {
-                const value = parameterValues[param.name];
-                // Convert to appropriate type
-                if (param.type === 'int' && value) {
-                  paramsObj[param.name] = parseInt(String(value));
-                } else if (param.type === 'float' && value) {
-                  paramsObj[param.name] = parseFloat(String(value));
-                } else {
-                  paramsObj[param.name] = value !== undefined && value !== '' ? value : null;
-                }
-              });
-            }
+            if (metadata?.parameters) {
+  Object.entries(metadata.parameters).forEach(([name, param]) => {
+    const value = parameterValues[name];
+
+    if (param.type === 'int' && value !== undefined && value !== '') {
+      paramsObj[name] = parseInt(String(value));
+    } else if (param.type === 'float' && value !== undefined && value !== '') {
+      paramsObj[name] = parseFloat(String(value));
+    } else {
+      paramsObj[name] =
+        value !== undefined && value !== '' ? value : null;
+    }
+  });
+}
+
 
             try {
               // Start loading animation and close window

@@ -43,7 +43,13 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
             category: string;
             description: string;
             layers: string[];
-            parameters: Array<{ name: string; type: string }>;
+            parameters: Record<
+            string,
+            {
+                type: string;
+            }
+    >;
+            
         }
     ) {
         const formData = new FormData();
@@ -59,7 +65,7 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
         // include arrays/objects as JSON strings
         formData.append("layers", JSON.stringify(metadata.layers || []));
         formData.append("parameters", JSON.stringify(metadata.parameters || []));
-
+        console.log(JSON.stringify(metadata.parameters || []))
         const res = await fetch("http://localhost:5050/scripts", {
             method: "POST",
             body: formData,
@@ -129,7 +135,14 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
             category,
             description,
             layers: layers.map(l => l.type),
-            parameters: params.filter(p => p.name && p.type),
+            parameters: Object.fromEntries(
+                    params
+                        .filter(p => p.name && p.type)
+                        .map(p => [
+                            p.name,
+                            { type: p.type }
+            ])
+    ),
         };
         try{
             const saved = await postScript(scriptFile, metadata);

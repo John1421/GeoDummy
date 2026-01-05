@@ -14,32 +14,32 @@ export interface Script {
   category?: string;
 }
 
-const EXAMPLE_SCRIPTS: Script[] = [
-  {
-    id: "1",
-    category: "Category 1",
-    name: "Tree Height Analysis",
-    description: "Analysis of tree heights on a selected layer.",
-  },
-  {
-    id: "2",
-    category: "Category 1",
-    name: "Simplify Geometry",
-    description: "Reduces geometry complexity.",
-  },
-  {
-    id: "3",
-    category: "Category 2",
-    name: "Buffer Zones",
-    description: "Creates buffer zones around features.",
-  },
-  {
-    id: "4",
-    category: "Category 2",
-    name: "Spatial Join",
-    description: "Joins attributes based on spatial relationships.",
-  },
-];
+// const EXAMPLE_SCRIPTS: Script[] = [
+//   {
+//     id: "1",
+//     category: "Category 1",
+//     name: "Tree Height Analysis",
+//     description: "Analysis of tree heights on a selected layer.",
+//   },
+//   {
+//     id: "2",
+//     category: "Category 1",
+//     name: "Simplify Geometry",
+//     description: "Reduces geometry complexity.",
+//   },
+//   {
+//     id: "3",
+//     category: "Category 2",
+//     name: "Buffer Zones",
+//     description: "Creates buffer zones around features.",
+//   },
+//   {
+//     id: "4",
+//     category: "Category 2",
+//     name: "Spatial Join",
+//     description: "Joins attributes based on spatial relationships.",
+//   },
+// ];
 
 interface ScriptListProps {
   onAddLayer: (file: File) => Promise<void>;
@@ -47,7 +47,7 @@ interface ScriptListProps {
 
 export default function ScriptList({ onAddLayer }: ScriptListProps) {
   const [showAddNew, setShowAddNew] = useState(false);
-  const [scripts, setScripts] = useState<Script[]>(EXAMPLE_SCRIPTS);
+  const [scripts, setScripts] = useState<Script[]>([]);
   const [loadingScripts, setLoadingScripts] = useState<Record<string, boolean>>({});
 
   const handleAddScript = useCallback(
