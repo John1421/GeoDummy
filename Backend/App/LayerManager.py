@@ -590,6 +590,30 @@ class LayerManager:
             
         return None
 
+    def get_geopackage_layers(self, gpkg_path):
+        """
+        Retrieve the list of spatial layers from a GeoPackage file without importing them.
+        
+        Parameters:
+            gpkg_path (str): Path to the GeoPackage file.
+        
+        Returns:
+            list: List of layer names in the GeoPackage.
+        
+        Raises:
+            ValueError: If the file is not a valid GeoPackage or contains no spatial layers.
+        """
+        if not os.path.isfile(gpkg_path):
+            raise ValueError("GeoPackage file does not exist.")
+        
+        try:
+            spatial_layers = self.__retrieve_spatial_layers_from_incoming_gpkg(gpkg_path)
+            return spatial_layers
+        except ValueError as e:
+            raise e
+        except Exception as e:
+            raise ValueError(f"Error reading GeoPackage: {e}")
+
     #=====================================================================================
     #                               HELPER METHODS
     #=====================================================================================    

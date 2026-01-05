@@ -460,6 +460,46 @@ def add_layer():
         
     return jsonify({"layer_id": layer_id, "metadata": metadata}), 200    
 
+@app.route('/layers/preview/geopackage', methods=['POST'])
+def preview_geopackage_layers():
+    """
+    Preview layers inside a GeoPackage file without importing them.
+    Useful for allowing users to select which layers to import.
+    
+    Returns:
+        JSON: {"layers": [list of layer names]}
+    """
+    added_file = request.files.get('file')
+    if not added_file:
+        raise BadRequest("You must upload a file under the 'file' field.")
+    
+    # File is temporarily stored in tmp_dir folder for handling
+    temp_path = os.path.join(file_manager.temp_dir, added_file.filename)
+    added_file.save(temp_path)
+
+    if os.path.getsize(temp_path) > layer_manager.MAX_LAYER_FILE_SIZE:
+        os.remove(temp_path)
+        raise BadRequest("The uploaded file exceeds the maximum allowed size.")
+
+    file_name, file_extension = os.path.splitext(added_file.filename)
+
+    if file_extension.lower() != ".gpkg":
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        raise BadRequest("This endpoint only accepts GeoPackage (.gpkg) files.")
+
+    try:
+        layers = layer_manager.get_geopackage_layers(temp_path)
+        return jsonify({"layers": layers}), 200
+    except ValueError as e:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        raise BadRequest(str(e))
+    finally:
+        # Clean up temp file
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
 '''
 UC-B-16
 '''

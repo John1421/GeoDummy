@@ -48,7 +48,7 @@ export default function NewLayerWindow({ isOpen, onClose, onSelect, onSelectGpkg
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("http://localhost:5050/layers/gpkg/layers", {
+      const res = await fetch("http://localhost:5050/layers/preview/geopackage", {
         method: "POST",
         body: formData,
       });
