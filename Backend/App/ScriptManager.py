@@ -18,6 +18,10 @@ file_manager = FileManager()
 layer_manager = LayerManager()
 
 class ScriptManager:
+
+    MAX_SCRIPT_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+    ALLOWED_MIME_TYPES = {"text/x-python", "application/octet-stream"}
+
     def __init__(self, scripts_metadata='scripts_metadata.json'):
         """
         Initializes the ScriptManager.
@@ -62,29 +66,19 @@ class ScriptManager:
         return script_id in self.metadata.get("scripts", {})
     
 
-    def add_script(self, script_id, parameters_form):
-        """
-        Adds a script entry if it doesn't already exist.
-        """
-        # for key, value in parameters.items():
-        #     try:
-        #         parsed_value = json.loads(value)
-        #         parameters[key] = parsed_value
-        #     except (json.JSONDecodeError, TypeError):
-        #         # Keep original string if not valid JSON
-        #         pass
-        
-        parameters = {}
-        for key in parameters_form:
+    def add_script(self, script_id, metadata_form):
+        parsed_metadata = {}
+
+        for key, value in metadata_form.items():
             try:
-                # Try to parse JSON values
-                parameters[key] = json.loads(parameters_form[key])
+                parsed_metadata[key] = json.loads(value)
             except (json.JSONDecodeError, TypeError):
-                # Keep as string if not JSON
-                # parameters[key] = v[key]
-                pass
-        # Store the script metadata
-        self.metadata["scripts"][script_id] = parameters
+                parsed_metadata[key] = value
+        
+        if "scripts" not in self.metadata:
+            self.metadata["scripts"] = {}
+        
+        self.metadata["scripts"][script_id] = parsed_metadata
         self._save_metadata()
 
     def run_script(self, script_path, script_id, execution_id, parameters):

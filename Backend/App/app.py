@@ -1,7 +1,7 @@
 
 import json
 from flask import Flask, request, after_this_request, jsonify, send_file, abort
-from werkzeug.exceptions import HTTPException, BadRequest, NotFound, InternalServerError
+from werkzeug.exceptions import HTTPException, BadRequest, NotFound, InternalServerError, UnprocessableEntity
 import geopandas as gpd
 import shutil
 import os
@@ -75,58 +75,61 @@ def home():
 
 # Script Management Endpoints
 
+'''
+Use Case: UC-B-09
+'''
 @app.route('/scripts', methods=['POST'])
 def add_script():
-    # Accept file from the browser via multipart/form-data
-    added_file = request.files.get('file')
-    if not added_file:
-        raise BadRequest("You must upload a file under the 'file' field.")
+    # Recieve file from browser via multipart/form-data
+    uploaded_file = request.files.get('file')
+    if not uploaded_file:
+        raise BadRequest("Missing script file under 'file' field.")
     
-    # Get parameters (sent as regular form fields)
-    parameters = request.form.to_dict()
+    # Recieve metadata
+    metadata = request.form.to_dict()
+    if not metadata:
+        raise BadRequest("Missing script metadata.")
+    
+    # Validate filename and extension
+    original_id, file_extension = os.path.splitext(uploaded_file.filename)
 
-    if not parameters:
-        raise BadRequest("You must provide at least one parameter in the request.")
-
-    # File is temporarily stored in tmp_dir folder for handling
-    temp_path = os.path.join(file_manager.temp_dir, added_file.filename)
-    added_file.save(temp_path)
-
-    script_id, file_extension = os.path.splitext(added_file.filename)
-
+    if not original_id:
+        raise BadRequest("Uploaded script has no filename.")
+    
     if file_extension.lower() != ".py":
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-        raise BadRequest("This programm only accepts python scripts")
-
-
-    if script_manager.check_script_name_exists(script_id):
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-        raise BadRequest("A Script with the same name already exists")
+        raise BadRequest("Only .py files are supported.")
     
+    # Validate MIME
+    if uploaded_file.mimetype not in script_manager.ALLOWED_MIME_TYPES:
+        raise BadRequest(f"Unsupported MIME type: {uploaded_file.mimetype}")    
 
-    file_manager.move_file(temp_path, file_manager.scripts_dir)
-    script_manager.add_script(script_id, parameters)
+    # Generate unique script id
+    script_id = str(uuid.uuid4())
+    stored_filename = f"{script_id}.py"
 
-    return jsonify({"message": f"Script added successfully", "script_id": script_id}), 200
+    # Store file temporarily in temp_dir
+    temp_path = os.path.join(file_manager.temp_dir, stored_filename)
+    uploaded_file.save(temp_path)
 
-@app.route('/scripts/<script_id>', methods=['DELETE'])
-def remove_script(script_id):
-    if not script_id:
-        raise BadRequest("script_id parameter is required")
+    try:
+        # Validate size
+        if os.path.getsize(temp_path) > script_manager.MAX_SCRIPT_FILE_SIZE:
+            raise BadRequest("Script file exceeds maximum allowed size.")
+        
+        file_manager.move_file(temp_path, file_manager.scripts_dir)
+        script_manager.add_script(script_id, metadata)
+    
+    except HTTPException:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        raise
 
-    # TODO: Implement script removal
+    except Exception:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        abort(500, description="Failed to store script.")
 
-    return jsonify({"message": f"Script {script_id} removed successfully"}), 200
-
-@app.route('/scripts', methods=['GET'])
-def list_scripts():
-
-    # TODO: Implement script listing
-    scripts = ["script001", "script002", "script003"]
-    return jsonify({"message": f"List of scripts received", "scripts":scripts}), 200
-
+    return jsonify({"message": f"Script added successfully", "script_id": script_id, "metadata": metadata}), 200
 
 '''
 Use Case: UC-B-10
