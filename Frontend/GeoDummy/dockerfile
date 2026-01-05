@@ -4,23 +4,24 @@ WORKDIR /app
 
 
 # Copiar o restante projeto
-COPY . ./
+COPY package.json .
+COPY package-lock.json .
 
 RUN npm ci
+
+RUN npm install -g http-server
+
+COPY . .
 
 # Build Vite
 RUN npm run build
 
-# Instalar o http-server globalmente
-RUN npm install -g http-server
 
 # Create group and user before changing ownership
 RUN addgroup -S appgroup && adduser -S user -G appgroup
 
 # Change ownership of the /app folder
 RUN chown -R user:appgroup /app
-
-
 
 # Switch to the new user
 USER user
