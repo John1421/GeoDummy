@@ -1246,6 +1246,170 @@ class TestLayerManager:
         assert layer_manager.check_layer_name_exists("roads") is True
         assert layer_manager.check_layer_name_exists("forests") is False
 
+    # --- get_geopackage_layers Method Tests ---
+
+    def test_get_geopackage_layers_file_not_found(self, layer_manager: LayerManager) -> None:
+        """
+        Test that ValueError is raised when the gpkg_path does not exist.
+        Covers the 'if not os.path.isfile' branch.
+        """
+        with patch('os.path.isfile', return_value=False):
+            with pytest.raises(ValueError, match="GeoPackage file does not exist."):
+                layer_manager.get_geopackage_layers("non_existent.gpkg")
+
+    def test_get_geopackage_layers_success(self, layer_manager: LayerManager) -> None:
+        """
+        Test successful retrieval of spatial layers.
+        Covers the main success path.
+        """
+        gpkg_path = "valid.gpkg"
+        expected_layers = ["layer1", "layer2"]
+        
+        with patch('os.path.isfile', return_value=True), \
+             patch.object(LayerManager, '_LayerManager__retrieve_spatial_layers_from_incoming_gpkg', 
+                          return_value=expected_layers):
+            
+            result = layer_manager.get_geopackage_layers(gpkg_path)
+            assert result == expected_layers
+
+    def test_get_geopackage_layers_re_raises_value_error(self, layer_manager: LayerManager) -> None:
+        """
+        Test that specific ValueErrors from the internal helper are re-raised.
+        Covers the 'except ValueError as e: raise e' branch.
+        """
+        gpkg_path = "empty.gpkg"
+        error_msg = "contains no spatial layers"
+        
+        with patch('os.path.isfile', return_value=True), \
+             patch.object(LayerManager, '_LayerManager__retrieve_spatial_layers_from_incoming_gpkg', 
+                          side_effect=ValueError(error_msg)):
+            
+            with pytest.raises(ValueError, match=error_msg):
+                layer_manager.get_geopackage_layers(gpkg_path)
+
+    def test_get_geopackage_layers_generic_exception(self, layer_manager: LayerManager) -> None:
+        """
+        Test that unexpected exceptions are caught and wrapped in a ValueError.
+        Covers the 'except Exception as e' branch.
+        """
+        gpkg_path = "corrupt.gpkg"
+        original_error = "Low level driver error"
+        
+        with patch('os.path.isfile', return_value=True), \
+             patch.object(LayerManager, '_LayerManager__retrieve_spatial_layers_from_incoming_gpkg', 
+                          side_effect=RuntimeError(original_error)):
+            
+            with pytest.raises(ValueError, match=f"Error reading GeoPackage: {original_error}"):
+                layer_manager.get_geopackage_layers(gpkg_path)   
+
+    # --- add_shapefile_zip Method Tests ---
+
+    def test_add_shapefile_zip_unzip_failure(self, layer_manager: LayerManager) -> None:
+        """
+        Test branch: "Error unzipping shapefile".
+        Triggers exception during zip extraction and ensures cleanup of the zip file.
+        """
+        zip_path = "/tmp/test.zip"
+        with patch('zipfile.ZipFile', side_effect=Exception("Corrupt Zip")), \
+             patch('os.remove') as mock_remove:
+            
+            with pytest.raises(ValueError, match="Error unzipping shapefile: Corrupt Zip"):
+                layer_manager.add_shapefile_zip(zip_path)
+            
+            # Verify cleanup of the zip file after failure
+            mock_remove.assert_called_once_with(zip_path)
+
+    def test_add_shapefile_zip_delete_zip_failure(self, layer_manager: LayerManager) -> None:
+        """
+        Test branch: "Failed to delete the zip file after extraction".
+        Triggers exception when trying to remove the zip file after successful extraction.
+        """
+        zip_path = "/tmp/test.zip"
+        # Mocking os.remove specifically for the second try-block
+        with patch('zipfile.ZipFile'), \
+             patch('os.listdir', return_value=['test.shp']), \
+             patch('os.remove', side_effect=Exception("Permission Denied")):
+            
+            with pytest.raises(ValueError, match="Failed to delete the zip file after extraction: Permission Denied"):
+                layer_manager.add_shapefile_zip(zip_path)
+
+    def test_add_shapefile_zip_geopandas_read_failure(self, layer_manager: LayerManager) -> None:
+        """
+        Test branch: "Error reading shapefile with GeoPandas:".
+        Triggers exception during gpd.read_file and ensures temp directory cleanup.
+        """
+        with patch('zipfile.ZipFile'), \
+             patch('os.remove'), \
+             patch('os.listdir', return_value=['valid.shp']), \
+             patch('geopandas.read_file', side_effect=Exception("Fiona Error")), \
+             patch('shutil.rmtree') as mock_rmtree:
+            
+            with pytest.raises(ValueError, match="Error reading shapefile with GeoPandas: Fiona Error"):
+                layer_manager.add_shapefile_zip("test.zip")
+            
+            # Verify extracted files are cleaned up
+            mock_rmtree.assert_called_with(os.path.join("/tmp/temp", "shp_extracted"))
+
+    def test_add_shapefile_zip_no_crs(self, layer_manager: LayerManager) -> None:
+        """
+        Test branch: "Shapefile has no CRS defined (.prj missing or unreadable).".
+        Triggers branch where gdf.crs is None.
+        """
+        mock_gdf = MagicMock()
+        mock_gdf.crs = None
+        
+        with patch('zipfile.ZipFile'), \
+             patch('os.remove'), \
+             patch('os.listdir', return_value=['test.shp']), \
+             patch('geopandas.read_file', return_value=mock_gdf), \
+             patch('shutil.rmtree') as mock_rmtree:
+            
+            with pytest.raises(ValueError, match="Shapefile has no CRS defined"):
+                layer_manager.add_shapefile_zip("test.zip")
+            
+            mock_rmtree.assert_called_with(os.path.join("/tmp/temp", "shp_extracted"))
+
+    def test_add_shapefile_zip_reprojection_and_success(self, layer_manager: LayerManager) -> None:
+        """
+        Test branch: # 6. Reproject if needed.
+        Covers the branch where original_crs != target_crs and successful completion.
+        """
+        # Setup mock GDF with a different CRS than EPSG:4326
+        mock_gdf = MagicMock()
+        mock_gdf.crs.to_string.return_value = "EPSG:3857"
+        mock_metadata = {"crs": "EPSG:4326", "bounds": [0, 0, 1, 1]}
+        
+        with patch('zipfile.ZipFile'), \
+             patch('os.remove'), \
+             patch('os.listdir', return_value=['test.shp']), \
+             patch('geopandas.read_file', return_value=mock_gdf), \
+             patch.object(LayerManager, '_LayerManager__get_gpkg_metadata', return_value=mock_metadata), \
+             patch.object(LayerManager, '_LayerManager__move_to_permanent'):
+            
+            layer_id, metadata = layer_manager.add_shapefile_zip("test.zip", target_crs="EPSG:4326")
+            
+            # Verify to_crs was called because EPSG:3857 != EPSG:4326
+            mock_gdf.to_crs.assert_called_once_with("EPSG:4326")
+            assert metadata == mock_metadata
+
+    def test_add_shapefile_zip_writing_failure(self, layer_manager: LayerManager) -> None:
+        """
+        Test branch: "Error writing shapefile into GeoPackage: {e}".
+        Triggers exception during the gdf.to_file or metadata processing phase.
+        """
+        mock_gdf = MagicMock()
+        mock_gdf.crs.to_string.return_value = "EPSG:4326"
+        
+        with patch('zipfile.ZipFile'), \
+             patch('os.remove'), \
+             patch('os.listdir', return_value=['test.shp']), \
+             patch('geopandas.read_file', return_value=mock_gdf):
+            
+            # Simulate failure during the writing process
+            mock_gdf.to_file.side_effect = Exception("Disk Full")
+            
+            with pytest.raises(ValueError, match="Error writing shapefile into GeoPackage: Disk Full"):
+                layer_manager.add_shapefile_zip("test.zip")
     
 
 # ==========================================
