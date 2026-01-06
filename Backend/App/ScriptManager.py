@@ -14,7 +14,7 @@ layer_manager = LayerManager()
 class ScriptManager:
 
     MAX_SCRIPT_FILE_SIZE = 5 * 1024 * 1024  # 5MB
-    ALLOWED_MIME_TYPES = {"text/x-python", "application/octet-stream"}
+    ALLOWED_MIME_TYPES = {"text/x-python", "application/octet-stream", "text/x-python-script"}
 
     def __init__(self, scripts_metadata='scripts_metadata.json'):
         """
