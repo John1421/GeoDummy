@@ -215,7 +215,8 @@ def run_script(script_id):
         
 
         exec_status = output.get("status")
-        outputs = output.get("outputs", [])
+        layer_ids = output.get("layer_ids", [])
+        metadatas = output.get("metadatas", [])
         log_path = output.get("log_path")
 
         # Handle timeout (504 Gateway Timeout)
@@ -251,25 +252,27 @@ def run_script(script_id):
             # Mark as finished
             with running_scripts_lock:
                 running_scripts[script_id]["status"] = "finished"
-            
+
+
             # Check if output is a file
-            if outputs and isinstance(outputs[0], str) and os.path.isfile(outputs[0]):
-                file_path = outputs[0]
-                file_name, file_extension = os.path.splitext(file_path)
-                layer_id = os.path.basename(file_name)
+            # if outputs and isinstance(outputs[0], str) and os.path.isfile(outputs[0]):
+            #     file_path = outputs[0]
+            #     file_name, file_extension = os.path.splitext(file_path)
+            #     layer_id = os.path.basename(file_name)
 
-                file_path_abs = os.path.abspath(file_path)
-                if not os.path.isfile(file_path_abs):
-                    raise InternalServerError(f"Exported file not found: {file_path_abs}")
+            #     file_path_abs = os.path.abspath(file_path)
+            #     if not os.path.isfile(file_path_abs):
+            #         raise InternalServerError(f"Exported file not found: {file_path_abs}")
 
-                return send_file(file_path_abs, as_attachment=True, download_name=f"{layer_id}{file_extension}")
+            #     return send_file(file_path_abs, as_attachment=True, download_name=f"{layer_id}{file_extension}")
             
             # Return JSON response
-            elif outputs and outputs[0] is not None:
+            if layer_ids is not None:
                 return jsonify({
                     "message": f"Script '{script_id}' executed successfully",
                     "execution_id": execution_id,
-                    "output": outputs,
+                    "layer_ids": layer_ids,
+                    "metadatas": metadatas,
                     "log_path": log_path
                 }), 200
             

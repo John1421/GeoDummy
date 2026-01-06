@@ -225,16 +225,9 @@ class ScriptManager:
         # Execute the script as a subprocess. It will save outputs to the appropriate folder.
         try:
             script_copy_path_abs = os.path.abspath(script_copy_path)
-            inputs_folder_abs = os.path.abspath(inputs_folder)
             outputs_folder_abs = os.path.abspath(outputs_folder)
             data_str = json.dumps(new_data)
-            print("="*20)
-            print(f"Executing script {script_id} with execution ID {execution_id}")
-            print(f"Script path: {script_copy_path_abs}")
-            print(f"Inputs folder: {inputs_folder_abs}")
-            print(f"Outputs folder: {outputs_folder_abs}")
-            print(f"JSON data: {data_str}")
-            print("="*20)
+
             result = subprocess.run(
                 ["python", script_copy_path_abs, outputs_folder_abs, data_str],
                 cwd=execution_folder,
@@ -264,7 +257,8 @@ class ScriptManager:
 
         # ---- Handle outputs ----
         result_value = None
-        output_file_paths = []
+        output_ids = []
+        metadatas = []
 
         # Check for any files in outputs folder (layers). 'Path([folder_path].glob("*"))' extracts all file paths within the folder_path
         output_files = list(Path(outputs_folder).glob("*"))
@@ -274,11 +268,13 @@ class ScriptManager:
                 filesize_bytes = os.path.getsize(file_path)
                 if filesize_bytes > layer_manager.MAX_LAYER_FILE_SIZE:
                     raise BadRequest(f"Output file {file_path.name} exceeds the maximum allowed size of {layer_manager.MAX_LAYER_FILE_SIZE} MB.")
-                saved_file = self.__add_output_to_existing_layers_and_create_export_file(file_path)
-                output_file_paths.append(saved_file)
+                
+                layer_ids, metadata = self.__add_output_to_existing_layers(file_path)
+                output_ids.extend(layer_ids)
+                metadatas.extend(metadata)
                 
         # If no files, fallback to stdout (simple value)
-        if not output_file_paths and result is not None:
+        if not output_ids and result is not None:
             stdout_value = result.stdout.strip()
             if stdout_value:
                 result_value = stdout_value
@@ -287,7 +283,8 @@ class ScriptManager:
         response = {
             "execution_id": execution_id,
             "status": status,
-            "outputs": output_file_paths or [result_value], # fallback to stdout if no files
+            "layer_ids": output_ids or [result_value], # fallback to stdout if no files
+            "metadatas": metadata if output_ids else None,
             "log_path": log_path
         }
 
@@ -335,50 +332,41 @@ class ScriptManager:
             print(f"Removed missing scripts from metadata: {', '.join(removed_scripts)}")
 
     @staticmethod
-    def __add_output_to_existing_layers_and_create_export_file(file_path):
+    def __add_output_to_existing_layers(file_path):
         file_name, file_extension = os.path.splitext(file_path)
         layer_id = os.path.basename(file_name)
 
         match file_extension.lower():
             case ".shp":
                 if os.path.exists(file_path):
-                    os.remove(file_path, ignore_errors=True)
+                    os.remove(file_path)
                 raise BadRequest("Please upload shapefiles as a .zip containing all necessary components (.shp, .shx, .dbf, optional .prj).")
             
             case ".zip":
-                layer_manager.add_shapefile_zip(file_path,layer_id)
-                os.remove(file_path, ignore_errors=True)
-                return layer_manager.export_geopackage_layer_to_geojson(layer_id)
+                layer_id, metadata = layer_manager.add_shapefile_zip(file_path,file_name)
             
             case ".geojson":        
-                layer_manager.add_geojson(file_path,layer_id)
-                # os.remove(file_path)
-                return layer_manager.export_geopackage_layer_to_geojson(layer_id)
-
+                layer_id, metadata = layer_manager.add_geojson(file_path,file_name)
+            
             case ".tif" | ".tiff":
-                layer_manager.add_raster(file_path,layer_id)
-                return layer_manager.export_raster_layer(layer_id)
+                layer_id, metadata = layer_manager.add_raster(file_path,file_name)
             
             case ".gpkg":
-                new_layers = layer_manager.add_gpkg_layers(file_path)
-                os.remove(file_path, ignore_errors=True)
-                zip_path = os.path.join(file_manager.temp_dir, f"{layer_id}_export.zip")
+                layer_id, metadata = layer_manager.add_gpkg_layers(file_path)
 
-                with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-                    for layer in new_layers:
-                        # Export each layer from the default gpkg
-                        exported_geojson = layer_manager.export_geopackage_layer_to_geojson(layer)
-                        # Add it into zip
-                        zipf.write(exported_geojson, arcname=f"{layer}.geojson")
-                        # Optional cleanup
-                        os.remove(exported_geojson)
-
-                return zip_path
-                
             case _: 
                 if os.path.exists(file_path):
                     os.remove(file_path)
-                raise BadRequest("Fle extension not supported")
+                raise BadRequest("File extension not supported")
+
+        
+        if not isinstance(layer_id, list):
+            layer_id = [layer_id]
+
+        if not isinstance(metadata, list):
+            metadata = [metadata]
+            
+        return layer_id, metadata
             
     @staticmethod
     def __prepare_parameters_for_script(data, execution_dir_input):
