@@ -54,22 +54,6 @@ class TestScriptManager:
 
         return ScriptManager(scripts_metadata='test_metadata.json')
 
-    # --- Validation Tests ---
-
-    def test_validate_script_integrity_missing_main(self, tmp_path: Path):
-        """
-        Tests missing 'main' function. 
-        Fixed assertion to account for Werkzeug BadRequest string formatting.
-        """
-        script_file = tmp_path / "no_main.py"
-        script_file.write_text("if __name__ == '__main__': pass")
-        
-        with pytest.raises(BadRequest) as excinfo:
-            ScriptManager._validate_script_integrity(str(script_file))
-        
-        # Use description or a partial match to avoid formatting issues
-        assert "must define a function named 'main(params)'" in str(excinfo.value)
-
     # --- Execution Tests ---
 
     @patch('App.ScriptManager.shutil.copy')
@@ -118,21 +102,6 @@ class TestScriptManager:
 
     # --- Edge Cases & Internal Helpers ---
 
-    def test_prepare_parameters_with_real_paths(self, script_manager: ScriptManager, mock_deps, tmp_path: Path):
-        """Tests parameter preparation ensuring paths are strings, not Mocks."""
-        mock_fm, mock_lm = mock_deps
-        input_layer = tmp_path / "input.geojson"
-        input_layer.write_text("{}")
-        mock_lm.get_layer_for_script.return_value = str(input_layer)
-        execution_input_dir = tmp_path / "inputs"
-        execution_input_dir.mkdir()
-        params = {"layer_key": "my_layer"}
-        processed = script_manager._ScriptManager__prepare_parameters_for_script(
-            params, str(execution_input_dir)
-        )
-        # The new code likely returns a dict, not a list
-        assert isinstance(processed, dict)
-
     def test_add_script_parsing(self, script_manager: ScriptManager):
         """
         Tests that add_script correctly parses JSON strings.
@@ -160,83 +129,6 @@ class TestScriptManager:
         # The code now adds an empty dict for the script
         assert script_manager.metadata["scripts"]["script_123"] == {}
 
-    @patch('os.path.exists')
-    def test_add_output_shp_error(self, mock_exists, script_manager: ScriptManager):
-        """Fixed: Ensure the file 'exists' so the logic hits the remove and raise block."""
-        mock_exists.return_value = True
-        with patch('os.remove'): # Mock remove to prevent actual disk access
-            with pytest.raises(BadRequest) as excinfo:
-                script_manager._ScriptManager__add_output_to_existing_layers_and_create_export_file("/tmp/map.shp")
-        assert "upload shapefiles as a .zip" in str(excinfo.value)
-
-    @patch('os.remove')
-    def test_add_output_zip_success(self, mock_remove, script_manager: ScriptManager, mock_deps):
-        # The code may not call os.remove anymore, so just check for output
-        result = script_manager._ScriptManager__add_output_to_existing_layers_and_create_export_file("/tmp/map.zip")
-        assert result is not None
-
-    @patch('os.remove')
-    def test_add_output_geojson_success(self, mock_remove, script_manager: ScriptManager, mock_deps):
-        # The code may not call os.remove anymore, so just check for output
-        result = script_manager._ScriptManager__add_output_to_existing_layers_and_create_export_file("/tmp/map.geojson")
-        assert result is not None
-
-    def test_add_output_raster_success(self, script_manager: ScriptManager, mock_deps):
-        """
-        Tests successful processing of raster files (.tif/.tiff).
-        Covers: .tif | .tiff combined branch. Note: Source does not call os.remove for rasters.
-        """
-        _, mock_lm = mock_deps
-        mock_lm.export_raster_layer.return_value = "/exports/raster.tif"
-        
-        # Test .tiff extension
-        result = script_manager._ScriptManager__add_output_to_existing_layers_and_create_export_file("/tmp/map.tiff")
-        
-        assert result == "/exports/raster.tif"
-        mock_lm.add_raster.assert_called_once_with("/tmp/map.tiff", "map")
-
-    @patch('os.remove')
-    @patch('zipfile.ZipFile')
-    def test_add_output_gpkg_complex_success(self, mock_zip, mock_remove, script_manager: ScriptManager, mock_deps):
-        """
-        Tests the GeoPackage branch, including multi-layer zipping and internal cleanup.
-        Covers: .gpkg branch, layer iteration, and zipfile creation.
-        """
-        mock_fm, mock_lm = mock_deps
-        mock_lm.add_gpkg_layers.return_value = ["layer1", "layer2"]
-        mock_lm.export_geopackage_layer_to_geojson.side_effect = ["/tmp/l1.json", "/tmp/l2.json"]
-        
-        test_path = "/tmp/input.gpkg"
-        expected_zip = f"{mock_fm.temp_dir}\\input_export.zip"
-        
-        # Mocking context manager for zipfile
-        zip_instance = mock_zip.return_value.__enter__.return_value
-        
-        result = script_manager._ScriptManager__add_output_to_existing_layers_and_create_export_file(test_path)
-        
-        assert result == expected_zip
-        # Verify both layers were processed
-        assert mock_lm.export_geopackage_layer_to_geojson.call_count == 2
-        assert zip_instance.write.call_count == 2
-        
-        # Verify internal cleanup: 1 input gpkg + 2 exported geojsons = 3 removals
-        assert mock_remove.call_count == 3
-
-    @patch('os.path.exists')
-    @patch('os.remove')
-    def test_add_output_unsupported_extension(self, mock_remove, mock_exists, script_manager: ScriptManager):
-        """
-        Tests behavior for unsupported extensions.
-        Covers: Default case (_) and cleanup logic.
-        """
-        mock_exists.return_value = True
-        test_path = "/tmp/image.png"
-        
-        with pytest.raises(BadRequest) as excinfo:
-            script_manager._ScriptManager__add_output_to_existing_layers_and_create_export_file(test_path)
-        
-        assert "extension not supported" in str(excinfo.value)
-        mock_remove.assert_called_once_with(test_path)
 
     # --- Tests for _validate_script_integrity ---
 
@@ -536,3 +428,93 @@ class TestScriptManager:
             assert result == expected_data
             assert result["name"] == "Test Script"
             mock_load.assert_called_once()
+
+    @pytest.mark.parametrize("extension, manager_method", [
+        (".zip", "add_shapefile_zip"),
+        (".geojson", "add_geojson"),
+        (".tif", "add_raster"),
+        (".tiff", "add_raster"),
+    ])
+    def test_add_output_to_existing_layers_success_single(
+        self, script_manager: ScriptManager, mock_deps, extension, manager_method
+    ):
+        """
+        Tests successful registration of single-layer outputs (zip, geojson, tif).
+        Covers: match cases, and the 'if not isinstance(..., list)' normalization.
+        """
+        _, mock_lm = mock_deps
+        file_path = f"/tmp/output/test_layer{extension}"
+        mock_output_id = "layer_123"
+        mock_metadata = {"type": "vector"}
+        
+        # Setup the specific layer_manager method being called
+        getattr(mock_lm, manager_method).return_value = (mock_output_id, mock_metadata)
+
+        # Accessing private static method
+        ids, meta = script_manager._ScriptManager__add_output_to_existing_layers(file_path)
+
+        assert ids == [mock_output_id]
+        assert meta == [mock_metadata]
+        assert isinstance(ids, list)
+        assert isinstance(meta, list)
+
+    def test_add_output_to_existing_layers_gpkg_list(self, script_manager: ScriptManager, mock_deps):
+        """
+        Tests Geopackage output which typically returns lists.
+        Covers: .gpkg case and bypasses the list normalization (since it's already a list).
+        """
+        _, mock_lm = mock_deps
+        file_path = "/tmp/output/data.gpkg"
+        mock_ids = ["l1", "l2"]
+        mock_metas = [{"id": "l1"}, {"id": "l2"}]
+        mock_lm.add_gpkg_layers.return_value = (mock_ids, mock_metas)
+
+        ids, meta = script_manager._ScriptManager__add_output_to_existing_layers(file_path)
+
+        assert ids == mock_ids
+        assert meta == mock_metas
+
+    @patch("os.path.exists")
+    @patch("os.remove")
+    def test_add_output_to_existing_layers_shp_error(self, mock_remove, mock_exists, script_manager: ScriptManager):
+        """
+        Tests that .shp files are rejected and deleted if they exist.
+        Covers: .shp case, os.path.exists == True branch, and BadRequest exception.
+        """
+        file_path = "/tmp/output/invalid.shp"
+        mock_exists.return_value = True
+
+        with pytest.raises(BadRequest) as excinfo:
+            script_manager._ScriptManager__add_output_to_existing_layers(file_path)
+
+        assert "upload shapefiles as a .zip" in str(excinfo.value)
+        mock_remove.assert_called_once_with(file_path)
+
+    @patch("os.path.exists")
+    @patch("os.remove")
+    def test_add_output_to_existing_layers_unsupported_and_missing(self, mock_remove, mock_exists, script_manager: ScriptManager):
+        """
+        Tests unsupported extensions and ensuring remove isn't called if file doesn't exist.
+        Covers: default case (_), os.path.exists == False branch.
+        """
+        file_path = "/tmp/output/wrong.exe"
+        mock_exists.return_value = False
+
+        with pytest.raises(BadRequest) as excinfo:
+            script_manager._ScriptManager__add_output_to_existing_layers(file_path)
+
+        assert "extension not supported" in str(excinfo.value)
+        mock_remove.assert_not_called()
+
+    def test_add_output_to_existing_layers_case_insensitivity(self, script_manager: ScriptManager, mock_deps):
+        """
+        Tests that the match statement handles uppercase extensions.
+        Covers: .lower() branch logic.
+        """
+        _, mock_lm = mock_deps
+        file_path = "/tmp/output/PHOTO.TIF"
+        mock_lm.add_raster.return_value = ("id", "meta")
+
+        ids, _ = script_manager._ScriptManager__add_output_to_existing_layers(file_path)
+        assert ids == ["id"]
+        mock_lm.add_raster.assert_called_once()
