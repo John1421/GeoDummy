@@ -4,22 +4,32 @@ import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Eye, EyeOff } from "lucide-react";
 import type { Layer } from "./LayerSidebar";
 import { colors, typography, radii, shadows } from "../Design/DesignTokens";
+//import { Select } from "@mui/material";
 
 interface LayerCardProps {
   layer: Layer;
   selected: boolean;
   onSelect: () => void;
+  onSettings: (layerId: string, rect: DOMRect) => void;
   onToggleVisibility: (layerId: string) => void;
   onRename: (layerId: string, newTitle: string) => void;
 }
 
-function LayerCardComponent({ layer, selected, onSelect, onToggleVisibility, onRename }: LayerCardProps) {
-  const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
+function LayerCardComponent({ layer, selected, onSelect, onSettings, onToggleVisibility, onRename }: LayerCardProps) {
+  const {
+    setNodeRef,
+    attributes,
+    listeners,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
     id: layer.id,
     animateLayoutChanges: () => false,
   });
 
-  // Local ref only used for sortable and potential future UI anchoring
+
+  // Local ref to measure the card position (used to place the settings window)
   const cardRef = useRef<HTMLDivElement | null>(null);
 
   const transformStyle = useMemo(
@@ -46,8 +56,14 @@ function LayerCardComponent({ layer, selected, onSelect, onToggleVisibility, onR
     userSelect: "none",
   };
 
-  // Consider the layer "hidden" when opacity is very low
+  // Consider the layer "hidden" when opacity is very low (you can tweak this threshold)
   const isHidden = (layer.opacity ?? 1) <= 0.01;
+
+  const handleSettingsOpen = () => {
+    if (!cardRef.current) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    onSettings(layer.id, rect);
+  };
 
   const handleToggleVisibilityClick = () => {
     onToggleVisibility(layer.id);
@@ -77,6 +93,7 @@ function LayerCardComponent({ layer, selected, onSelect, onToggleVisibility, onR
     setDraftTitle(layer.title);
   };
 
+
   return (
     <div
       data-testid={`layer-card-${layer.id}`}
@@ -89,10 +106,21 @@ function LayerCardComponent({ layer, selected, onSelect, onToggleVisibility, onR
         borderColor: selected ? colors.primary : colors.borderStroke,
         boxShadow: selected ? shadows.medium : shadows.none,
       }}
+
       onClick={onSelect}
       {...attributes}
+      onContextMenu={(e) => {
+        e.preventDefault();      // evita o menu do browser
+        handleSettingsOpen();    // abre as settings no right-click
+      }}
     >
-      <div style={{ display: "flex", alignItems: "center", columnGap: 8 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          columnGap: 8,
+        }}
+      >
         {/* Drag handle */}
         <button
           {...listeners}
@@ -157,12 +185,12 @@ function LayerCardComponent({ layer, selected, onSelect, onToggleVisibility, onR
           )}
         </div>
 
-        {/* Visibility icon */}
+        {/* Visibility icon (eye or eye-off) */}
         <button
           aria-label={isHidden ? "Show layer" : "Hide layer"}
           onClick={(e) => {
-            e.stopPropagation(); // Prevent selecting the layer when toggling visibility
-            handleToggleVisibilityClick();
+            e.stopPropagation();          // prevents the click from moving up to the card.
+            handleToggleVisibilityClick(); // It only deals with visibility.
           }}
           style={{
             padding: 4,

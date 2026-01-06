@@ -1,125 +1,165 @@
 // LayerSettingsWindow.tsx
-import React, { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronUp, X } from "lucide-react";
-import type { Layer, LayerStyle, LayerPattern, LayerIconType, PointShape } from "./LayerSidebar";
-import { LAYER_COLOR_PALETTE, colors, typography, radii, spacing, shadows } from "../Design/DesignTokens";
+import React, { useEffect, useRef, useState } from "react";
+import { X } from "lucide-react";
+import type { Layer } from "./LayerSidebar";
+import { LAYER_COLOR_PALETTE } from "../Design/DesignTokens";
+import { colors, typography, radii, spacing, shadows } from "../Design/DesignTokens";
 
+/**
+ * Small floating window for per-layer settings.
+ * It appears next to the card that triggered it.
+ */
 interface LayerSettingsWindowProps {
   isOpen: boolean;
   layer: Layer | null;
+  position: { top: number; left: number } | null;
   onClose: () => void;
   onOpacityChange: (layerId: string, opacity: number) => void;
   onRestoreOpacity: (layerId: string) => void;
   onDeleteLayer: (layerId: string) => void;
-
-  onStyleChange: (layerId: string, patch: Partial<LayerStyle>, iconFile?: File | null) => void;
+  onColorChange: (layerId: string, color: string) => void;
 }
-
-const clampInt = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
-
-const normalizeGeomKey = (geometryType?: string) => {
-  const t = (geometryType ?? "").toLowerCase();
-  if (t.includes("point")) return "point";
-  if (t.includes("line")) return "line";
-  if (t.includes("polygon")) return "polygon";
-  return "unknown";
-};
-
-const percentFromRange = (value: number, min: number, max: number) => {
-  if (max <= min) return 0;
-  return Math.round(((value - min) / (max - min)) * 100);
-};
 
 export default function LayerSettingsWindow({
   isOpen,
   layer,
+  position,
   onClose,
   onOpacityChange,
   onRestoreOpacity,
   onDeleteLayer,
-  onStyleChange,
+  onColorChange,
 }: LayerSettingsWindowProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+
+  // Adjusted position that keeps the window inside the viewport
+  const [adjustedPosition, setAdjustedPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+
   const [isColorPaletteOpen, setIsColorPaletteOpen] = useState(false);
 
+  // Close with ESC key
   useEffect(() => {
     if (!isOpen) return;
-    setIsCollapsed(false);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
+  // Close when clicking outside the panel
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+
+    window.addEventListener("mousedown", handleClickOutside);
+    return () => window.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen, onClose]);
+
+  // Clamp the window inside the viewport so it does not go out of view
+  useEffect(() => {
+    if (!isOpen || !position) {
+      setAdjustedPosition(null);
+      return;
+    }
+
+    const panel = panelRef.current;
+    const padding = 8;
+    let top = position.top;
+    let left = position.left;
+
+    // If we don't have the panel yet, use the raw position for the first paint
+    if (!panel) {
+      setAdjustedPosition({ top, left });
+      return;
+    }
+
+    const rect = panel.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // If the window would overflow below the viewport, move it up
+    if (top + rect.height + padding > viewportHeight) {
+      top = Math.max(padding, viewportHeight - rect.height - padding);
+    }
+
+    // If the window would overflow to the right, move it left
+    if (left + rect.width + padding > viewportWidth) {
+      left = Math.max(padding, viewportWidth - rect.width - padding);
+    }
+
+    // Guard against negative positions
+    top = Math.max(padding, top);
+    left = Math.max(padding, left);
+
+    setAdjustedPosition({ top, left });
+  }, [isOpen, position]);
+
+  // Reset palette state when opening/closing or switching layer
+  useEffect(() => {
+    if (!isOpen) return;
     setIsColorPaletteOpen(false);
   }, [isOpen, layer?.id]);
 
-  const geomKey = useMemo(() => normalizeGeomKey(layer?.geometryType), [layer?.geometryType]);
+  // If closed or missing data, render nothing
+  if (!isOpen || !layer || !position) return null;
 
-  const isVector = useMemo(() => {
-    if (!layer) return false;
-    return layer.kind === "vector" || !!layer.vectorData;
-  }, [layer]);
-
-  if (!isOpen || !layer) return null;
-
+  const isVector = layer.kind === "vector" || !!layer.vectorData;
   const currentOpacity = layer.opacity ?? 1;
   const opacityPercent = Math.round(currentOpacity * 100);
+  const currentColor = layer.color ?? "#2563EB";
 
-  const currentColor = layer.style?.color ?? layer.color ?? "#2563EB";
-
-  const currentPattern: LayerPattern = (layer.style?.pattern ?? "solid") as LayerPattern;
-
-  const isPoint = geomKey === "point";
-  const isLine = geomKey === "line";
-
-  const sizeMin = 1;
-  const sizeMax = isPoint ? 20 : 12;
-  const defaultSize = isPoint ? 6 : isLine ? 3 : 6;
-  const currentSize = typeof layer.style?.size === "number" ? layer.style?.size : defaultSize;
-  const sizePercent = percentFromRange(currentSize, sizeMin, sizeMax);
-
-  const iconType: LayerIconType = (layer.style?.icon?.type ?? "shape") as LayerIconType;
-  const shape: PointShape = (layer.style?.icon?.shape ?? "circle") as PointShape;
-
-  const glyph = layer.style?.icon?.glyph ?? "★";
-  const imageFileName = layer.style?.icon?.fileName ?? "";
-
-  const handleOpacitySliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = Number(e.target.value);
     const normalized = Math.min(100, Math.max(0, value)) / 100;
     onOpacityChange(layer.id, normalized);
   };
 
-  const handleHide = () => onOpacityChange(layer.id, 0);
-  const handleShow = () => onRestoreOpacity(layer.id);
-  const handleDelete = () => onDeleteLayer(layer.id);
+  const handleHide = () => {
+    onOpacityChange(layer.id, 0);
+  };
+
+  const handleShow = () => {
+    onRestoreOpacity(layer.id);
+  };
+
+  const handleDelete = () => {
+    onDeleteLayer(layer.id);
+  };
 
   const handlePickColor = (c: string) => {
-    onStyleChange(layer.id, { color: c });
+    onColorChange(layer.id, c);
     setIsColorPaletteOpen(false);
   };
 
-  const opacitySliderStyle: React.CSSProperties = {
+  // Inline style for CSS variable used in the slider gradient
+  const sliderStyle: React.CSSProperties = {
     width: "100%",
-    // @ts-expect-error custom css var
+    // CSS variable consumed in the <style> block below
+    // @ts-expect-error custom CSS variable
     "--value": opacityPercent,
   };
 
-  const sizeSliderStyle: React.CSSProperties = {
-    width: "100%",
-    // @ts-expect-error custom css var
-    "--value": sizePercent,
-  };
+  const effectivePosition = adjustedPosition ?? position;
 
   return (
-    <div
-      style={{
-        marginTop: 10,
-        borderRadius: radii.md,
-        overflow: "hidden",
-        backgroundColor: colors.cardBackground,
-        boxShadow: shadows.subtle,
-        border: `1px solid ${colors.borderStroke}`,
-      }}
-    >
+    <>
+      {/* Local styles for the opacity slider. */}
       <style>
         {`
-          .styled-slider {
+          .opacity-slider {
             width: 100%;
             -webkit-appearance: none;
             appearance: none;
@@ -135,7 +175,7 @@ export default function LayerSettingsWindow({
             );
           }
 
-          .styled-slider::-webkit-slider-thumb {
+          .opacity-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
             width: 14px;
@@ -149,13 +189,13 @@ export default function LayerSettingsWindow({
             box-shadow: none;
           }
 
-          .styled-slider::-webkit-slider-runnable-track {
+          .opacity-slider::-webkit-slider-runnable-track {
             height: 6px;
             border-radius: 999px;
             background: transparent;
           }
 
-          .styled-slider::-moz-range-thumb {
+          .opacity-slider::-moz-range-thumb {
             width: 14px;
             height: 14px;
             border-radius: 999px;
@@ -166,7 +206,7 @@ export default function LayerSettingsWindow({
             box-shadow: none;
           }
 
-          .styled-slider::-moz-range-track {
+          .opacity-slider::-moz-range-track {
             height: 6px;
             border-radius: 999px;
             background: linear-gradient(
@@ -180,22 +220,36 @@ export default function LayerSettingsWindow({
         `}
       </style>
 
-      {/* Header */}
       <div
+        ref={panelRef}
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          paddingInline: 12,
-          paddingBlock: 10,
-          backgroundImage: `linear-gradient(90deg, ${colors.gradientStart}, ${colors.gradientEnd})`,
-          color: colors.primaryForeground,
-          fontFamily: typography.titlesFont,
-          gap: 10,
+          position: "fixed",
+          top: effectivePosition.top,
+          left: effectivePosition.left,
+          zIndex: 1000000,
+          backgroundColor: colors.cardBackground,
+          borderRadius: radii.md,
+          border: "none",
+          boxShadow: shadows.subtle,
+          minWidth: 260,
+          maxWidth: 320,
+          overflow: "hidden",
         }}
       >
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div
+        {/* Header */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingInline: 16,
+            paddingBlock: 10,
+            backgroundImage: `linear-gradient(90deg, ${colors.gradientStart}, ${colors.gradientEnd})`,
+            color: colors.primaryForeground,
+            fontFamily: typography.titlesFont,
+          }}
+        >
+          <h2
             style={{
               fontWeight: Number(typography.titlesStyle),
               fontSize: typography.sizeSm,
@@ -203,67 +257,32 @@ export default function LayerSettingsWindow({
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
+              maxWidth: 220,
             }}
-            title={layer.title}
           >
             {layer.title}
-          </div>
+          </h2>
 
-          <div
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close layer settings"
             style={{
-              fontFamily: typography.normalFont,
-              fontSize: 12,
-              opacity: 0.9,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 4,
+              border: "none",
+              background: "transparent",
+              borderRadius: radii.sm,
+              cursor: "pointer",
             }}
-            title={layer.fileName ?? "Unknown"}
           >
-            {layer.fileName ?? "Unknown"}
-          </div>
+            <X size={20} strokeWidth={3} />
+          </button>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsCollapsed((v) => !v)}
-          aria-label={isCollapsed ? "Expand settings" : "Collapse settings"}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 6,
-            border: "none",
-            background: "transparent",
-            borderRadius: radii.sm,
-            cursor: "pointer",
-            color: colors.primaryForeground,
-          }}
-        >
-          {isCollapsed ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-        </button>
-
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close layer settings (deselect layer)"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 6,
-            border: "none",
-            background: "transparent",
-            borderRadius: radii.sm,
-            cursor: "pointer",
-            color: colors.primaryForeground,
-          }}
-        >
-          <X size={18} />
-        </button>
-      </div>
-
-      {!isCollapsed && (
+        {/* Body */}
         <div
           style={{
             padding: 12,
@@ -275,236 +294,148 @@ export default function LayerSettingsWindow({
             rowGap: spacing.sm,
           }}
         >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+          {/* Source file */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              width: "100%",
+              gap: 12,
+            }}
+          >
+            <span style={{ fontWeight: 600, whiteSpace: "nowrap" }}>Source file:</span>
+            <span
+              style={{
+                flex: 1,
+                textAlign: "right",
+                overflow: "hidden",
+                whiteSpace: "nowrap",
+                textOverflow: "ellipsis",
+              }}
+              title={layer.fileName ?? "Unknown"}
+            >
+              {layer.fileName ?? "Unknown"}
+            </span>
+          </div>
+
+          {/* Geometry type */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              width: "100%",
+              gap: 12,
+            }}
+          >
             <span style={{ fontWeight: 600, whiteSpace: "nowrap" }}>Geometry type:</span>
-            <span style={{ flex: 1, textAlign: "right", opacity: 0.8 }} title={layer.geometryType ?? "Unknown"}>
+            <span
+              style={{
+                flex: 1,
+                textAlign: "right",
+                overflow: "hidden",
+                whiteSpace: "nowrap",
+                textOverflow: "ellipsis",
+                opacity: 0.8,
+              }}
+              title={layer.geometryType ?? "Unknown"}
+            >
               {layer.geometryType ?? "Unknown"}
             </span>
           </div>
 
+          {/* Color (vector only) */}
           {isVector && (
-            <div style={{ display: "flex", flexDirection: "column", gap: spacing.sm }}>
-              {/* Color */}
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <span style={{ fontWeight: 600 }}>Color</span>
+            <div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 6,
+                }}
+              >
+                <span style={{ fontWeight: 600 }}>Color</span>
 
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span
-                      title={currentColor}
-                      style={{
-                        width: 16,
-                        height: 16,
-                        borderRadius: 999,
-                        backgroundColor: currentColor,
-                        border: `1px solid ${colors.borderStroke}`,
-                        display: "inline-block",
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setIsColorPaletteOpen((v) => !v)}
-                      style={{
-                        paddingInline: 10,
-                        paddingBlock: 4,
-                        borderRadius: radii.sm,
-                        border: `1px solid ${colors.borderStroke}`,
-                        backgroundColor: colors.cardBackground,
-                        cursor: "pointer",
-                        fontSize: typography.sizeSm,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {isColorPaletteOpen ? "Close" : "Change"}
-                    </button>
-                  </div>
-                </div>
-
-                {isColorPaletteOpen && (
-                  <div
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span
+                    title={currentColor}
                     style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: 8,
-                      padding: 10,
-                      borderRadius: radii.md,
+                      width: 16,
+                      height: 16,
+                      borderRadius: 999,
+                      backgroundColor: currentColor,
+                      border: `1px solid ${colors.borderStroke}`,
+                      display: "inline-block",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setIsColorPaletteOpen((v) => !v)}
+                    style={{
+                      paddingInline: 10,
+                      paddingBlock: 4,
+                      borderRadius: radii.sm,
                       border: `1px solid ${colors.borderStroke}`,
                       backgroundColor: colors.cardBackground,
+                      cursor: "pointer",
+                      fontSize: typography.sizeSm,
+                      whiteSpace: "nowrap",
                     }}
                   >
-                    {LAYER_COLOR_PALETTE.map((c) => {
-                      const selected = c.toLowerCase() === currentColor.toLowerCase();
-                      return (
-                        <button
-                          key={c}
-                          type="button"
-                          onClick={() => handlePickColor(c)}
-                          title={c}
-                          style={{
-                            width: 22,
-                            height: 22,
-                            borderRadius: 999,
-                            border: selected ? `2px solid ${colors.primary}` : `1px solid ${colors.borderStroke}`,
-                            backgroundColor: c,
-                            cursor: "pointer",
-                            padding: 0,
-                          }}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
+                    {isColorPaletteOpen ? "Close" : "Change"}
+                  </button>
+                </div>
               </div>
 
-              {/* Size (points & lines) */}
-              {(isPoint || isLine) && (
-                <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontWeight: 600 }}>{isPoint ? "Point size" : "Line width"}</span>
-                    <span style={{ opacity: 0.8 }}>{currentSize}px</span>
-                  </div>
-
-                  <input
-                    type="range"
-                    min={sizeMin}
-                    max={sizeMax}
-                    value={clampInt(currentSize, sizeMin, sizeMax)}
-                    onChange={(e) => onStyleChange(layer.id, { size: Number(e.target.value) })}
-                    className="styled-slider"
-                    style={sizeSliderStyle}
-                  />
-                </div>
-              )}
-
-              {/* Pattern (lines only) */}
-              {isLine && (
-                <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontWeight: 600 }}>Pattern</span>
-                  </div>
-
-                  <select
-                    value={currentPattern}
-                    onChange={(e) => onStyleChange(layer.id, { pattern: e.target.value as LayerPattern })}
-                    style={{
-                      width: "100%",
-                      paddingInline: 10,
-                      paddingBlock: 6,
-                      borderRadius: radii.sm,
-                      border: `1px solid ${colors.borderStroke}`,
-                      backgroundColor: colors.cardBackground,
-                      cursor: "pointer",
-                      fontSize: typography.sizeSm,
-                    }}
-                  >
-                    <option value="solid">Solid</option>
-                    <option value="dash">Dashed</option>
-                    <option value="dot">Dotted</option>
-                  </select>
-                </div>
-              )}
-
-              {/* Point symbol (points only) */}
-              {isPoint && (
-                <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                    <span style={{ fontWeight: 600 }}>Point symbol</span>
-                  </div>
-
-                  <select
-                    value={iconType}
-                    onChange={(e) => {
-                      const next = e.target.value as LayerIconType;
-                      if (next === "shape") onStyleChange(layer.id, { icon: { type: "shape", shape: "circle" } });
-                      if (next === "unicode") onStyleChange(layer.id, { icon: { type: "unicode", glyph: glyph || "★" } });
-                      if (next === "image") onStyleChange(layer.id, { icon: { type: "image", url: layer.style?.icon?.url, fileName: layer.style?.icon?.fileName } });
-                    }}
-                    style={{
-                      width: "100%",
-                      paddingInline: 10,
-                      paddingBlock: 6,
-                      borderRadius: radii.sm,
-                      border: `1px solid ${colors.borderStroke}`,
-                      backgroundColor: colors.cardBackground,
-                      cursor: "pointer",
-                      fontSize: typography.sizeSm,
-                    }}
-                  >
-                    <option value="shape">Base shapes</option>
-                    <option value="unicode">Unicode symbol (copy/paste)</option>
-                    <option value="image">Image/icon (local file)</option>
-                  </select>
-
-                  {iconType === "shape" && (
-                    <div style={{ marginTop: 8 }}>
-                      <select
-                        value={shape}
-                        onChange={(e) => onStyleChange(layer.id, { icon: { type: "shape", shape: e.target.value as PointShape } })}
+              {isColorPaletteOpen && (
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 8,
+                    padding: 10,
+                    borderRadius: radii.md,
+                    border: `1px solid ${colors.borderStroke}`,
+                    backgroundColor: colors.cardBackground,
+                  }}
+                >
+                  {LAYER_COLOR_PALETTE.map((c) => {
+                    const selected = c.toLowerCase() === currentColor.toLowerCase();
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => handlePickColor(c)}
+                        title={c}
                         style={{
-                          width: "100%",
-                          paddingInline: 10,
-                          paddingBlock: 6,
-                          borderRadius: radii.sm,
-                          border: `1px solid ${colors.borderStroke}`,
-                          backgroundColor: colors.cardBackground,
+                          width: 22,
+                          height: 22,
+                          borderRadius: 999,
+                          border: selected ? `2px solid ${colors.primary}` : `1px solid ${colors.borderStroke}`,
+                          backgroundColor: c,
                           cursor: "pointer",
-                          fontSize: typography.sizeSm,
-                        }}
-                      >
-                        <option value="circle">Circle</option>
-                        <option value="square">Square</option>
-                        <option value="triangle">Triangle</option>
-                      </select>
-                    </div>
-                  )}
-
-                  {iconType === "unicode" && (
-                    <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
-                      <input
-                        type="text"
-                        value={glyph}
-                        onChange={(e) => onStyleChange(layer.id, { icon: { type: "unicode", glyph: e.target.value } })}
-                        placeholder="★"
-                        style={{
-                          width: "100%",
-                          paddingInline: 10,
-                          paddingBlock: 6,
-                          borderRadius: radii.sm,
-                          border: `1px solid ${colors.borderStroke}`,
-                          backgroundColor: colors.cardBackground,
-                          fontSize: typography.sizeSm,
-                          outline: "none",
+                          padding: 0,
                         }}
                       />
-                      <div style={{ fontSize: 12, opacity: 0.8 }}>Copy/paste 1 símbolo (ex.: ★ ⚑ ⬤). Emojis podem variar por sistema.</div>
-                    </div>
-                  )}
-
-                  {iconType === "image" && (
-                    <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (!f) return;
-                          onStyleChange(layer.id, {}, f);
-                          e.currentTarget.value = "";
-                        }}
-                      />
-                      <div style={{ fontSize: 12, opacity: 0.8 }}>
-                        {imageFileName ? `Selected: ${imageFileName}` : "No file selected yet."}
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })}
                 </div>
               )}
             </div>
           )}
 
-          {/* Opacity */}
+          {/* Opacity controls */}
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 4,
+              }}
+            >
               <span style={{ fontWeight: 600 }}>Opacity</span>
               <span style={{ opacity: 0.8 }}>{opacityPercent}%</span>
             </div>
@@ -514,12 +445,19 @@ export default function LayerSettingsWindow({
               min={0}
               max={100}
               value={opacityPercent}
-              onChange={handleOpacitySliderChange}
-              className="styled-slider"
-              style={opacitySliderStyle}
+              onChange={handleSliderChange}
+              className="opacity-slider"
+              style={sliderStyle}
             />
 
-            <div style={{ marginTop: 8, display: "flex", justifyContent: "space-between", columnGap: 8 }}>
+            <div
+              style={{
+                marginTop: 8,
+                display: "flex",
+                justifyContent: "space-between",
+                columnGap: 8,
+              }}
+            >
               <div style={{ display: "flex", gap: 8 }}>
                 <button
                   type="button"
@@ -536,7 +474,6 @@ export default function LayerSettingsWindow({
                 >
                   Hide
                 </button>
-                
                 <button
                   type="button"
                   onClick={handleShow}
@@ -575,7 +512,7 @@ export default function LayerSettingsWindow({
             </div>
           </div>
         </div>
-      )}
-    </div>
+      </div>
+    </>
   );
 }
