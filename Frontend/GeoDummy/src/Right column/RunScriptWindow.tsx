@@ -6,7 +6,7 @@ interface RunScriptWindowProps {
   isOpen: boolean;
   onClose: () => void;
   scriptId: string;
-  onAddLayer: (file: File) => Promise<void>;
+  onAddLayer: (layer_id: string, metadata: any) => Promise<void>;
   onScriptStart: () => void;
   onScriptEnd: () => void;
 }
@@ -279,29 +279,19 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
               });
 
               if (response.ok) {
-                const contentType = response.headers.get('Content-Type');
+                const data = await response.json();
+                const layersReturned: string[] = data.layer_ids || [];
+                const metadatasReturned: LayerMetadata[] = data.metadatas || [];
 
-                // Check if response is a file (backend sends files with appropriate content-type)
-                if (contentType && !contentType.includes('application/json')) {
-                  // Extract filename from Content-Disposition header or use default
-                  const contentDisposition = response.headers.get('Content-Disposition');
-                  let filename = 'output.geojson';
-                  if (contentDisposition) {
-                    const filenameMatch = contentDisposition.match(/filename="?(.+?)"?$/i);
-                    if (filenameMatch) filename = filenameMatch[1];
-                  }
+                console.log('Script executed successfully:', data);
 
-                  // Convert response to blob and create File object
-                  const blob = await response.blob();
-                  const file = new File([blob], filename, { type: blob.type });
+                // For each returned layer, fetch and add to the application
+                for (let i = 0; i < layersReturned.length; i++) {
+                  const layerId = layersReturned[i];
+                  const metadata = metadatasReturned[i] || {};
 
-                  // Add the layer to the map
-                  await onAddLayer(file);
-                  console.log('Script executed successfully and layer added');
-                } else {
-                  // Handle JSON response (no file output)
-                  const data = await response.json();
-                  console.log('Script executed successfully:', data);
+
+                  onAddLayer(layerId, metadata)
                 }
               } else {
                 console.error('Script execution failed:', response.status);

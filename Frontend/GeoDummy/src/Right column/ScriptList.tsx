@@ -42,7 +42,7 @@ export interface Script {
 // ];
 
 interface ScriptListProps {
-  onAddLayer: (file: File) => Promise<void>;
+  onAddLayer: (layer_id: string, metadata: any) => Promise<void>;
 }
 
 export default function ScriptList({ onAddLayer }: ScriptListProps) {
@@ -73,7 +73,7 @@ export default function ScriptList({ onAddLayer }: ScriptListProps) {
   );
 
 
-const categories = Array.from(
+  const categories = Array.from(
     new Set(
       scripts.map((s) =>
         (s.category ?? "Uncategorized").trim().replace(/\s+/g, " ").toLowerCase()
@@ -116,7 +116,7 @@ const categories = Array.from(
                   name={script.name}
                   description={script.description || ""}
                   loading={loadingScripts[script.id] || false}
-                  setLoading={(loading) => 
+                  setLoading={(loading) =>
                     setLoadingScripts(prev => ({ ...prev, [script.id]: loading }))
                   }
                   onAddLayer={onAddLayer}

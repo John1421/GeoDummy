@@ -18,7 +18,7 @@ function App() {
 
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
 
-  const addLayerRef = useRef<((file: File) => Promise<void>) | null>(null);
+  const addLayerRef = useRef<((layer_id: string, metadata: any) => Promise<void>) | null>(null);
 
   return (
     <div
@@ -64,9 +64,9 @@ function App() {
             borderLeft: `1px solid ${colors.borderStroke}`,
           }}
         >
-          <ScriptList onAddLayer={async (file) => {
+          <ScriptList onAddLayer={async (layer_id, metadata) => {
             if (addLayerRef.current) {
-              await addLayerRef.current(file);
+              await addLayerRef.current(layer_id, metadata);
             }
           }} />
         </div>

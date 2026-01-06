@@ -202,7 +202,7 @@ interface LayerSidebarProps {
   setLayers: React.Dispatch<React.SetStateAction<Layer[]>>;
   selectedLayerId: string | null;
   setSelectedLayerId: (id: string) => void;
-  onAddLayerRef?: (addLayerFn: (file: File) => Promise<void>) => void;
+  onAddLayerRef?: (addLayerFn: (layer_id: string, metadata: BackendLayerMetadata) => Promise<void>) => void;
 }
 
 
@@ -212,7 +212,7 @@ async function postLayerFile(
 ): Promise<{ ids: string[]; metadata: BackendLayerMetadata[] }> {
   const formData = new FormData();
   formData.append("file", file);
-  
+
   // Append selected layers if provided (for geopackages)
   if (selectedLayers && selectedLayers.length > 0) {
     selectedLayers.forEach(layer => {
@@ -281,6 +281,170 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
     return Math.max(...layers.map((l) => (typeof l.order === "number" ? l.order : 0))) + 1;
   }, [layers]);
 
+  const createTempLayer = async (file: File, layerId: string) => {
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    const nextOrder = getNextOrder();
+    // Create a single temporary layer now (may later become multiple layers if backend returns multiple ids)
+    setLayers((prev) => [
+      ...prev,
+      {
+        id: layerId,
+        title: layerId, // testing: name = id
+        order: nextOrder,
+        fileName: file.name,
+        file,
+        fileLastModified: file.lastModified,
+        opacity: 1,
+        previousOpacity: 1,
+        // color will be assigned once we know geometry type
+        origin: "file",
+      },
+    ]);
+
+    // Client-side preview for GeoJSON/JSON only (keeps development fast)
+    if (ext === "geojson" || ext === "json") {
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+
+        if (!parsed || typeof parsed !== "object" || !("type" in parsed)) {
+          throw new Error("Invalid GeoJSON: missing root 'type'.");
+        }
+
+        // Normalize to FeatureCollection to keep UI state consistent
+        const normalized: GeoJSON.FeatureCollection =
+          parsed.type === "FeatureCollection"
+            ? parsed
+            : parsed.type === "Feature"
+              ? { type: "FeatureCollection", features: [parsed] }
+              : {
+                type: "FeatureCollection",
+                features: [
+                  {
+                    type: "Feature",
+                    properties: {},
+                    geometry: parsed,
+                  },
+                ],
+              };
+
+        const detectedGeom = detectGeometryTypeFromFC(normalized);
+        const defaultColor = defaultColorForGeometryType(detectedGeom);
+
+
+        setLayers((prev) =>
+          prev.map((l) =>
+            l.id === layerId
+              ? {
+                ...l,
+                kind: "vector",
+                geometryType: detectedGeom,
+                vectorData: normalized,
+                color: defaultColor,
+              }
+              : l
+          )
+        );
+        //return;
+      } catch {
+        // Keep the layer, but without data. Backend integration will later handle errors properly.
+        //return;
+      }
+    }
+
+  };
+
+  const getLayer = async (layer_id: string, metadata: BackendLayerMetadata) => {
+    console.log("==".repeat(20))
+    console.log('Adding layer from script:', layer_id, metadata);
+    console.log("==".repeat(20))
+    // If the backend returns multiple ids, replace the temporary layer with one layer per id
+    createTempLayer(new File([], layer_id), layer_id);
+    // Single id: update the temporary layer id -> backend id
+    const backendId = layer_id;
+    const layerName = metadata?.layer_name || "Ola mundo";
+
+
+    setLayers((prev) =>
+      prev.map((l) =>
+        l.id === layer_id
+          ? {
+            ...l,
+            id: backendId,
+            title: layerName,
+          }
+          : l
+      )
+    );
+
+
+    if (metadata.type === "vector") {
+      try {
+        const geojson = await getVectorLayerData(layer_id);
+        setLayers(prev =>
+          prev.map(l =>
+            l.id === layer_id
+              ? {
+                ...l,
+                title: metadata.layer_name,
+                kind: "vector",
+                geometryType: metadata.geometry_type,
+                vectorData: geojson,
+                color: l.color ?? defaultColorForGeometryType(metadata.geometry_type),
+                origin: "backend",
+                projection: metadata.crs ?? "EPSG:4326",
+                status: "active",
+              }
+              : l
+          )
+        );
+      } catch {
+        setLayers(prev =>
+          prev.map(l =>
+            l.id === layer_id
+              ? {
+                ...l,
+                status: "error",
+                opacity: 0,
+              }
+              : l
+          )
+        );
+      }
+    }
+    if (metadata.type === "raster") {
+      try {
+        setLayers(prev =>
+          prev.map(l =>
+            l.id === layer_id
+              ? {
+                ...l,
+                title: metadata.layer_name || layer_id,
+                kind: "raster",
+                geometryType: "Raster",
+                rasterData: getRasterDescriptor(layer_id, metadata),
+                origin: "backend",
+                projection: metadata.crs ?? "EPSG:4326",
+                status: "active",
+              }
+              : l
+          )
+        );
+      } catch {
+        setLayers(prev =>
+          prev.map(l =>
+            l.id === layer_id
+              ? {
+                ...l,
+                status: "error",
+                opacity: 0,
+              }
+              : l
+          )
+        );
+      }
+    }
+  }
   /**
    * Add new layer workflow (prepared for backend):
    * 1) Create a temporary UI layer (so the UI responds instantly).
@@ -297,7 +461,6 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
       const ext = file.name.split(".").pop()?.toLowerCase();
       const tempId = crypto.randomUUID();
       const nextOrder = getNextOrder();
-
       // Create a single temporary layer now (may later become multiple layers if backend returns multiple ids)
       setLayers((prev) => [
         ...prev,
@@ -509,12 +672,14 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
     [getNextOrder, setLayers]
   );
 
+
+
   // Expose handleAddLayer to parent component
   useEffect(() => {
     if (onAddLayerRef) {
-      onAddLayerRef(handleAddLayer);
+      onAddLayerRef(getLayer);
     }
-  }, [handleAddLayer, onAddLayerRef]);
+  }, [getLayer, onAddLayerRef]);
 
   // Seed demo layers only when the list is empty (first app open)
   useEffect(() => {
