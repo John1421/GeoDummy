@@ -23,17 +23,15 @@ import type { Layer } from "./LayerSidebar";
 interface Props {
   layers: Layer[];
   setLayers: React.Dispatch<React.SetStateAction<Layer[]>>;
-  onSettings: (layerId: string, rect: DOMRect) => void;
   onToggleVisibility: (layerId: string) => void;
   onRename: (layerId: string, newTitle: string) => void;
   selectedLayerId: string | null;
-  onSelectLayer: (id: string) => void;
+  onSelectLayer: (id: string | null) => void;
 }
 
 export default function LayerCardList({
   layers,
   setLayers,
-  onSettings,
   onToggleVisibility,
   onRename,
   selectedLayerId,
@@ -57,11 +55,7 @@ export default function LayerCardList({
     });
   }, [layers]);
 
-
-  const layerIds = useMemo(
-    () => sortedLayers.map((l) => l.id),
-    [sortedLayers]
-  );
+  const layerIds = useMemo(() => sortedLayers.map((l) => l.id), [sortedLayers]);
 
   const handleDragEnd = useCallback(
     ({ active, over }: DragEndEvent) => {
@@ -84,29 +78,22 @@ export default function LayerCardList({
         const len = reordered.length;
 
         // Assign explicit order so top card has highest order.
-        const withOrder = reordered.map((layer, index) => ({
+        return reordered.map((layer, index) => ({
           ...layer,
           order: len - 1 - index,
         }));
-
-        return withOrder;
       });
     },
     [setLayers]
   );
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragEnd={handleDragEnd}
-    >
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       <SortableContext items={layerIds} strategy={verticalListSortingStrategy}>
         {sortedLayers.map((layer) => (
           <LayerCard
             key={layer.id}
             layer={layer}
-            onSettings={onSettings}
             onToggleVisibility={onToggleVisibility}
             onRename={onRename}
             selected={layer.id === selectedLayerId}
