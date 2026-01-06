@@ -207,10 +207,18 @@ interface LayerSidebarProps {
 
 
 async function postLayerFile(
-  file: File
+  file: File,
+  selectedLayers?: string[]
 ): Promise<{ ids: string[]; metadata: BackendLayerMetadata[] }> {
   const formData = new FormData();
   formData.append("file", file);
+  
+  // Append selected layers if provided (for geopackages)
+  if (selectedLayers && selectedLayers.length > 0) {
+    selectedLayers.forEach(layer => {
+      formData.append("layers", layer);
+    });
+  }
 
   const res = await fetch("http://localhost:5050/layers", {
     method: "POST",
@@ -285,7 +293,7 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
    * - Raster is created as "pending data" (will render once backend provides rasterData).
    */
   const handleAddLayer = useCallback(
-    async (file: File) => {
+    async (file: File, selectedLayers?: string[]) => {
       const ext = file.name.split(".").pop()?.toLowerCase();
       const tempId = crypto.randomUUID();
       const nextOrder = getNextOrder();
@@ -362,7 +370,7 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
       // 1) POST file -> receive one or many ids
       //const { ids } = await postLayerFilePlaceholder(file);
 
-      const { ids, metadata } = await postLayerFile(file);
+      const { ids, metadata } = await postLayerFile(file, selectedLayers);
       console.log("Layer:", ids, metadata);
       // If the backend returns multiple ids, replace the temporary layer with one layer per id
       if (ids.length > 1) {

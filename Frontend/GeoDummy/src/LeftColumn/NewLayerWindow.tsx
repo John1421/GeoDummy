@@ -7,7 +7,7 @@ import GpkgLayerSelectionWindow from "./GpkgLayerSelectionWindow";
 interface NewLayerWindowProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (file: File) => void;
+  onSelect: (file: File, selectedLayers?: string[]) => void;
   onSelectGpkgLayer?: (layerNames: string[]) => void;
   existingFileNames?: string[];
   existingFileLastModified?: number[];
@@ -23,6 +23,7 @@ export default function NewLayerWindow({ isOpen, onClose, onSelect, onSelectGpkg
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const allowedExtensions = [".geojson", ".zip", ".tiff", ".tif", ".gpkg"];
   const MAX_UPLOAD_SIZE = 200 * 1024 * 1024; // 5 MB
+  const isGpkgFile = selectedFile?.name?.toLowerCase().endsWith(".gpkg") ?? false;
 
   // Helper function to check if file is duplicate
   const isDuplicateFile = (file: File): boolean => {
@@ -114,12 +115,22 @@ export default function NewLayerWindow({ isOpen, onClose, onSelect, onSelectGpkg
       return;
     }
 
-    onSelect(selectedFile);
-    onClose();
-  }, [selectedFile, onSelect, onClose, showDuplicateWarning]);
+    // For geopackage files, require at least one layer to be selected
+    const isGpkg = selectedFile.name.toLowerCase().endsWith(".gpkg");
+    if (isGpkg && selectedGpkgLayers.length === 0) {
+      setError("Please select at least one layer from the GeoPackage.");
+      return;
+    }
 
-  const isCreateDisabled = !selectedFile || !!error;
-  const isGpkgFile = selectedFile?.name?.toLowerCase().endsWith(".gpkg") ?? false;
+    // Pass selected layers if geopackage file
+    const layersToPass = isGpkg && selectedGpkgLayers.length > 0 ? selectedGpkgLayers : undefined;
+    
+    onSelect(selectedFile, layersToPass);
+    onClose();
+  }, [selectedFile, onSelect, onClose, showDuplicateWarning, selectedGpkgLayers]);
+
+  const isCreateDisabled = !selectedFile || !!error || (isGpkgFile && selectedGpkgLayers.length === 0);
+  
 
   // Allow pressing Enter to create the layer
   useEffect(() => {

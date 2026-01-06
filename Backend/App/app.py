@@ -422,6 +422,9 @@ def add_layer():
     if not added_file:
         raise BadRequest("You must upload a file under the 'file' field.")
     
+    # Get optional selected layers parameter (for geopackages)
+    selected_layers = request.form.getlist('layers')
+    
     # File is temporarily stored in tmp_dir folder for handling
     temp_path = os.path.join(file_manager.temp_dir, added_file.filename)
     added_file.save(temp_path)
@@ -454,7 +457,7 @@ def add_layer():
             layer_id, metadata = layer_manager.add_raster(temp_path,file_name)
         
         case ".gpkg":
-            layer_id, metadata = layer_manager.add_gpkg_layers(temp_path)
+            layer_id, metadata = layer_manager.add_gpkg_layers(temp_path, selected_layers=selected_layers if selected_layers else None)
 
         case _: 
             if os.path.exists(temp_path):

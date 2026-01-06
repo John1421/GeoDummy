@@ -253,14 +253,15 @@ class LayerManager:
 
         return layer_name, metadata
 
-    def add_gpkg_layers(self, geopackage_path, target_crs="EPSG:4326"):
+    def add_gpkg_layers(self, geopackage_path, target_crs="EPSG:4326", selected_layers=None):
         """
-        Add all layers from an external GeoPackage into the application's
+        Add selected layers from an external GeoPackage into the application's
         default GeoPackage, with CRS normalization and name conflict checks.
 
         Parameters:
             geopackage_path (str): Path to the incoming .gpkg file.
             target_crs (str): CRS to convert vector layers to (default EPSG:4326)
+            selected_layers (list): Optional list of layer names to import. If None, imports all layers.
 
         Returns
         tuple[list(new_gpkg_id(str)), list(metadata(str))]:
@@ -272,6 +273,12 @@ class LayerManager:
         """
 
         incoming_layers = self.__retrieve_spatial_layers_from_incoming_gpkg(geopackage_path)
+        
+        # If selected_layers is provided, filter to only those layers
+        if selected_layers:
+            incoming_layers = [layer for layer in incoming_layers if layer in selected_layers]
+            if not incoming_layers:
+                raise ValueError("No valid layers found in the selected layer names.")
 
         all_metadata = []
         all_gpkg_ids = [] 
@@ -382,6 +389,7 @@ class LayerManager:
             ValueError: If the raster does not exist.
         """
         raster_path = self.is_raster(layer_name)
+        
         if raster_path:
             return raster_path
        
