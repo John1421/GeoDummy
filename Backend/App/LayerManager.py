@@ -382,7 +382,6 @@ class LayerManager:
             ValueError: If the raster does not exist.
         """
         raster_path = self.is_raster(layer_name)
-        raster_path = self.is_raster(layer_name)
         if raster_path:
             return raster_path
        
