@@ -361,7 +361,19 @@ class ScriptManager:
             metadata = [metadata]
             
         return layer_id, metadata
-            
+
+    def list_scripts(self):
+        try:
+            script_metadatas = []
+            script_ids = list(self.metadata.get("scripts", {}).keys())
+            for script_id in script_ids:
+                script_metadata = self.get_metadata(script_id)
+                script_metadatas.append(script_metadata)
+        except Exception as e:
+            raise ValueError(f"Error retrieving scripts: {str(e)}")
+        
+        return script_ids, script_metadatas
+
     @staticmethod
     def __prepare_parameters_for_script(data, execution_dir_input):
         """

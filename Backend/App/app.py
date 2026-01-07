@@ -153,9 +153,17 @@ def script_metadata(script_id):
 
     return jsonify({"script_id": script_id, "output": metadata}), 200
 
+'''
+Use Case: UC-B-10
+'''
+@app.route('/scripts', methods=['GET'])
+def list_scripts():
+    
+    scripts_ids, scripts_metadata = script_manager.list_scripts()
+
+    return  jsonify({"scripts_ids": scripts_ids, "scripts_metadata": scripts_metadata}), 200
 
 # Script Execution Endpoints
-
 
 '''
 Implements UC-B-11, UC-B-12 and UC-B-13, UC-B-14 is in the background
