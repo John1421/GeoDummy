@@ -1,6 +1,6 @@
 
 import json
-from flask import Flask, request, after_this_request, jsonify, send_file, abort
+from flask import Flask, request, after_this_request, jsonify, send_file, abort, g
 from werkzeug.exceptions import HTTPException, BadRequest, NotFound, InternalServerError, UnprocessableEntity
 import geopandas as gpd
 import shutil
@@ -12,11 +12,13 @@ from .BasemapManager import BasemapManager
 from .LayerManager import LayerManager
 from .ScriptManager import ScriptManager
 from .DataManager import DataManager
+from .LogManager import LogManager
 from flask_cors import CORS
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 import uuid
 from threading import Lock
+import time
 
 import rasterio
 from rasterio.warp import transform_bounds
@@ -24,7 +26,6 @@ from rasterio.windows import Window
 from PIL import Image
 import io
 import numpy as np
-
 
 ALLOWED_EXTENSIONS = {'.geojson', '.shp', '.gpkg', '.tif', '.tiff'}
 
@@ -40,11 +41,14 @@ data_manager = DataManager()
 running_scripts = {}
 running_scripts_lock = Lock()
 
-
-
 @app.errorhandler(HTTPException)
 def handle_http_exception(e):
     """Handles standard HTTP errors (404, 405, etc.)"""
+    app.logger.warning(
+        "[%s] %s",
+        g.request_id,
+        f"HTTP Exception: {e}"
+    )    
     response = e.get_response()
     response.data = jsonify({
         "error": {
@@ -59,7 +63,11 @@ def handle_http_exception(e):
 @app.errorhandler(Exception)
 def handle_generic_exception(e):
     """Handles unexpected errors gracefully"""
-    app.logger.error(f"Unhandled Exception: {e}")
+    app.logger.error(
+        "[%s] %s",
+        g.request_id,
+        f"Unhandled Exception: {e}"
+    )
     return jsonify({
         "error": {
             "code": 500,
@@ -68,6 +76,47 @@ def handle_generic_exception(e):
         }
     }), 500
 
+@app.errorhandler(ValueError)
+def handle_value_error_exception(e):
+    """Handles unexpected errors gracefully"""
+    app.logger.error(
+        "[%s] %s",
+        g.request_id,
+        f"Value Error: {e}"
+    )
+    return jsonify({
+        "error": {
+            "code": 500,
+            "message": "Internal Server Error",
+            "details": str(e)
+        }
+    }), 500
+
+
+@app.before_request
+def before_request():
+    g.start_time = time.time()
+    g.request_id = str(uuid.uuid4())
+
+@app.after_request
+def log_response(response):
+    duration = round(time.time() - g.start_time, 6)
+
+    app.logger.info(
+        "[%s] %s %s %s %ss",
+        g.request_id,
+        request.method,
+        request.path,
+        response.status_code,
+        duration
+    )
+
+    return response
+
+
+log_manager = LogManager(disable_console=True,)
+
+log_manager.configure_flask_logger(app)
 
 @app.route('/')
 def home():
@@ -158,8 +207,13 @@ Use Case: UC-B-10
 '''
 @app.route('/scripts', methods=['GET'])
 def list_scripts():
-    
     scripts_ids, scripts_metadata = script_manager.list_scripts()
+
+    app.logger.info(
+        "[%s] %s",
+        g.request_id,
+        f"Listed {len(scripts_ids)} scripts and {len(scripts_metadata)} metadata entries"
+    )
 
     return  jsonify({"scripts_ids": scripts_ids, "scripts_metadata": scripts_metadata}), 200
 
