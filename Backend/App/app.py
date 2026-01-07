@@ -103,18 +103,19 @@ def log_response(response):
     duration = round(time.time() - g.start_time, 6)
 
     app.logger.info(
-        "[%s] %s %s %s %ss",
+        "[%s] %s %s %s %s %s",
         g.request_id,
+        request.remote_addr,
         request.method,
         request.path,
         response.status_code,
-        duration
+        f"duration: {duration}s"
     )
 
     return response
 
 
-log_manager = LogManager(disable_console=True,)
+log_manager = LogManager(disable_console=False, disable_werkzeug=False)
 
 log_manager.configure_flask_logger(app)
 
