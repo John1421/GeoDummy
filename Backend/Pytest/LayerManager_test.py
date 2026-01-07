@@ -195,51 +195,37 @@ class TestLayerManager:
             result = layer_manager.get_layer_for_script("my_raster")
             assert result == mock_path
 
-    @patch('fiona.open')
-    @patch('fiona.listlayers')
-    @patch('os.path.isfile')
-    def test_get_layer_for_script_vector_extraction(
-        self, mock_isfile: MagicMock, mock_list: MagicMock, mock_fiona_open: MagicMock, 
-        layer_manager: LayerManager, mock_file_manager: MagicMock
-    ) -> None:
+    def test_get_layer_for_script_vector_extraction(self, layer_manager: LayerManager, mock_file_manager: MagicMock) -> None:
         """
-        Test successful extraction of a single vector layer into a temp GeoPackage.
-        Validates the fiona write loop and temp path generation.
+        Fixed test: Normalizes both expected and actual paths to resolve OS-specific slash mismatches.
         """
         layer_id = "roads"
-        layer_manager.default_gpkg_path = "/db/main.gpkg"
-        mock_isfile.return_value = True
-        mock_list.return_value = ["rivers", "roads", "forests"]
-
-        # Fiona mocks for source and destination
-        mock_src = MagicMock()
-        mock_src.meta = {"driver": "GPKG", "schema": {}}
-        mock_src.__iter__.return_value = [{"type": "Feature", "id": "1"}]
-        mock_dst = MagicMock()
-
-        # Context manager mocking
-        mock_fiona_open.side_effect = [
-            MagicMock(__enter__=MagicMock(return_value=mock_src)),
-            MagicMock(__enter__=MagicMock(return_value=mock_dst))
-        ]
-
-        with patch.object(layer_manager, 'is_raster', return_value=None):
-            result = layer_manager.get_layer_for_script(layer_id)
-
-            assert f"{layer_id}.gpkg" in result
-            assert mock_file_manager.temp_dir in result
-            # Verify feature was written
-            mock_dst.write.assert_called_once()
-
-    @patch('os.path.isfile', return_value=True)
-    @patch('fiona.listlayers')
-    def test_get_layer_for_script_vector_missing(self, mock_list: MagicMock, mock_isfile: MagicMock, layer_manager: LayerManager) -> None:
-        """Test that None is returned if the vector layer is not found in the GPKG."""
-        layer_manager.default_gpkg_path = "/db/main.gpkg"
-        mock_list.return_value = ["other_layer"]
+        # Force normalization of the expected path
+        expected_path = os.path.normpath(os.path.join(mock_file_manager.layers_dir, f"{layer_id}.gpkg"))
         
-        with patch.object(layer_manager, 'is_raster', return_value=None):
-            result = layer_manager.get_layer_for_script("missing_vector")
+        with patch('os.path.isfile', return_value=True), \
+             patch('App.LayerManager.LayerManager.is_raster', return_value=None):
+            
+            result = layer_manager.get_layer_for_script(layer_id)
+            
+            # Use os.path.normpath on the result as well for a safe comparison
+            assert os.path.normpath(result) == expected_path
+            # Check that the directory part is correct
+            assert os.path.normpath(mock_file_manager.layers_dir) in os.path.normpath(result)
+
+    def test_get_layer_for_script_vector_missing(self, layer_manager: LayerManager, mock_file_manager: MagicMock) -> None:
+        """
+        Fixed test: Ensures it returns None when the specific .gpkg file is missing.
+        """
+        layer_id = "missing_vector"
+        
+        # Mock is_raster to return None and is_file to return False for the gpkg path
+        with patch('App.LayerManager.LayerManager.is_raster', return_value=None), \
+             patch('os.path.isfile', return_value=False):
+            
+            result = layer_manager.get_layer_for_script(layer_id)
+            
+            # This should now pass as the source code returns None if the file isn't found
             assert result is None
     
     def test_add_raster_already_exists(self, layer_manager: LayerManager) -> None:

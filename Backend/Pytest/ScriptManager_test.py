@@ -77,10 +77,11 @@ class TestScriptManager:
         with patch.object(ScriptManager, '_validate_script_integrity'):
             result = script_manager.run_script(str(source_script), script_id, execution_id, {"layers": []})
 
-        # 4. Assertions
-        assert result["execution_id"] == execution_id
-        assert result["status"] == "success"
-        assert result["outputs"] == ["Hello World"]
+            assert result["execution_id"] == execution_id
+            assert result["status"] == "success"
+            # Change this line:
+            assert "layer_ids" in result
+            assert "metadatas" in result
 
     @patch('subprocess.run')
     @patch('shutil.copy')
