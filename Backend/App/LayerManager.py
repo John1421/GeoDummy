@@ -1,27 +1,57 @@
-from .FileManager import FileManager
-import os
-import geopandas as gpd
-import fiona
-from fiona.errors import FionaValueError
-import zipfile
-from shapely.geometry import shape, mapping
-import rioxarray
-import shutil
-import rasterio
-from rasterio.warp import transform_bounds
-import uuid
+"""
+Layer management module for geospatial data.
+
+This module provides the LayerManager class for handling vector and raster geospatial
+layers. It supports importing, exporting, and managing various geospatial formats
+including Shapefiles, GeoJSON, GeoPackages, and GeoTIFF rasters.
+
+The module handles:
+    - Format conversion between different geospatial formats
+    - Coordinate reference system (CRS) transformations
+    - Layer metadata management
+    - Tile generation for web mapping
+    - Cache management for raster tiles
+"""
+
 import json
-from werkzeug.exceptions import NotFound
 import math
+import os
+import shutil
+import uuid
+import zipfile
+
+import fiona
+import geopandas as gpd
+import rasterio
+import rioxarray
+from fiona.errors import FionaValueError
+from rasterio.warp import transform_bounds
+from werkzeug.exceptions import NotFound
+
+from .FileManager import FileManager
 
 file_manager = FileManager()
 
 class LayerManager:
+    """
+    Manages geospatial layers including import, export, and metadata operations.
+    
+    This class handles both vector (Shapefile, GeoJSON, GeoPackage) and raster
+    (GeoTIFF) geospatial data formats.
+    """
+
     MAX_LAYER_FILE_SIZE = 1000 * 1024 * 1024 # 1000 MB
     def __init__(self):
+        """
+        Initialize LayerManager and perform integrity checks on existing layers.
+        
+        Scans the layers directory for orphaned files and removes them to maintain
+        data integrity.
+        """
+
         # Default GeoPackage path for vector layers
         self.default_gpkg_path = os.path.join(file_manager.layers_dir, "default.gpkg")
-        
+
         # Supported layer formats
         supported_ext = {'.gpkg', '.tif', '.tiff'}
 
@@ -29,7 +59,7 @@ class LayerManager:
             all_files = set(os.listdir(file_manager.layers_dir))
         except FileNotFoundError:
             return
-        
+
         for filename in list(all_files):
             layer_id, ext = os.path.splitext(filename)
             ext = ext.lower()
@@ -44,13 +74,13 @@ class LayerManager:
                         print(f"Integrity: Deleted orphan layer '{filename}'")
                     except OSError as e:
                         print(f"Error deleting orphan layer: {e}")
-            
+
             # --- Check 2: Metadata File missing Layer ---
             elif filename.endswith('_metadata.json'):
                 # Extract ID: "my_layer_metadata.json" -> "my_layer"
                 # len("_metadata.json") is 14
-                meta_layer_id = filename[:-14] 
-                
+                meta_layer_id = filename[:-14]
+
                 layer_found = False
                 for sext in supported_ext:
                     candidate = f"{meta_layer_id}{sext}"
@@ -68,22 +98,17 @@ class LayerManager:
 
     #=====================================================================================
     #                               Layer Converters METHODS
-    #=====================================================================================    
+    #=====================================================================================
 
     def add_shapefile_zip(self, zip_path, layer_name=None, target_crs="EPSG:4326"):
         """
-        Import a zipped ESRI Shapefile into the system by converting it into a
-        GeoPackage layer.
+        Import a zipped ESRI Shapefile and convert it into a GeoPackage layer.
 
-        Parameters:
-            zip_path(str): Absolute path to the ZIP file containing the shapefile components.
-            layer_name(str): Name of the layer to be created in the GeoPackage. If not provided,
-            target_crs(str): Target coordinate reference system to reproject the data to. Defaults to "EPSG:4326".
-
-        Returns:
-            tuple[new_gpkg_id(str), metadata(str)]:
-            The UUID of the newly created GeoPackage.
-            Metadata extracted from the GeoPackage.
+        :param zip_path: Absolute path to the ZIP file containing shapefile components.
+        :param layer_name: Name for the layer in the GeoPackage. If None, uses shapefile base name.
+        :param target_crs: Target coordinate reference system. Defaults to "EPSG:4326".
+        :return: Tuple of (new_gpkg_id, metadata) where new_gpkg_id is a UUID and metadata a dict.
+        :raises ValueError: If ZIP is invalid, no .shp file found, no CRS, or processing fails.
         """
         # 1. Extract ZIP
         temp_dir = os.path.join(file_manager.temp_dir, "shp_extracted")
@@ -152,24 +177,19 @@ class LayerManager:
             metadata = self.__get_gpkg_metadata(new_gpkg_path, original_crs)
             self.__move_to_permanent(new_gpkg_path, new_gpkg_id, metadata)
         except Exception as e:
-            raise ValueError(f"Error writing shapefile into GeoPackage: {e}")    
+            raise ValueError(f"Error writing shapefile into GeoPackage: {e}")
 
         return new_gpkg_id, metadata
 
     def add_geojson(self, geojson_path, layer_name=None, target_crs="EPSG:4326"):
         """
-        Reads a GeoJSON file, validates CRS, reprojects features if needed,
-        and writes it as a new layer inside the default GeoPackage.
+        Import a GeoJSON file and convert it into a GeoPackage layer.
 
-        Parameters:
-            geojson_path (str): Path to the .geojson file.
-            layer_name (str): Optional layer name inside the GeoPackage.
-            target_crs (str): Target CRS for storage.
-
-        Returns:
-            tuple[new_gpkg_id(str), metadata(str)]:
-            The UUID of the newly created GeoPackage.
-            Metadata extracted from the GeoPackage.
+        :param geojson_path: Path to the .geojson file.
+        :param layer_name: Name for the layer in the GeoPackage. Defaults to None.
+        :param target_crs: Target coordinate reference system. Defaults to "EPSG:4326".
+        :return: Tuple of (new_gpkg_id, metadata) where new_gpkg_id is a UUID and metadata a dict.
+        :raises ValueError: If file doesn't exist, has no CRS, or processing fails.
         """
 
         if not os.path.isfile(geojson_path):
@@ -211,16 +231,13 @@ class LayerManager:
 
     def add_raster(self, raster_path, layer_name=None, target_crs="EPSG:4326"):
         """
-        Adds a raster (.tiff) file into a storage location.
+        Import a GeoTIFF raster file into the layer storage system.
 
-        Parameters:
-            raster_path (str): Path to the .tiff file.
-            layer_name (str): Optional layer name for storage.
-
-        Returns:
-            tuple[raster_name(str), metadata(str)]:
-            The name of the raster.
-            Metadata extracted from the raster.
+        :param raster_path: Path to the .tif or .tiff file.
+        :param layer_name: Name for the raster layer. If None, derives from file basename.
+        :param target_crs: Target coordinate reference system. Defaults to "EPSG:4326".
+        :return: Tuple of (layer_name, metadata), metadata includes dimensions, CRS, zoom levels.
+        :raises ValueError: If file doesn't exist, layer name already exists, or processing fails.
         """
 
         if not os.path.isfile(raster_path):
@@ -243,7 +260,7 @@ class LayerManager:
                     self.__move_to_permanent(temp_path, layer_name, metadata)
                 except Exception as e:
                     os.remove(raster_path)
-                    raise ValueError(f"Failed convert raster system coordinates: {e}")    
+                    raise ValueError(f"Failed convert raster system coordinates: {e}")
             else:
                 metadata = self.__get_raster_metadata(raster_path, target_crs)
                 self.__move_to_permanent(raster_path, layer_name, metadata)
@@ -255,25 +272,17 @@ class LayerManager:
 
     def add_gpkg_layers(self, geopackage_path, target_crs="EPSG:4326", selected_layers=None):
         """
-        Add selected layers from an external GeoPackage into the application's
-        default GeoPackage, with CRS normalization and name conflict checks.
+        Import selected layers from an external GeoPackage into the application's storage.
 
-        Parameters:
-            geopackage_path (str): Path to the incoming .gpkg file.
-            target_crs (str): CRS to convert vector layers to (default EPSG:4326)
-            selected_layers (list): Optional list of layer names to import. If None, imports all layers.
-
-        Returns
-        tuple[list(new_gpkg_id(str)), list(metadata(str))]:
-            The UUID of the newly created GeoPackages.
-            Metadata extracted from the GeoPackages.
-
-        Raises:
-            ValueError: If file does not exist, is invalid, or contains conflicting layer names.
+        :param geopackage_path: Path to the incoming .gpkg file.
+        :param target_crs: CRS to convert vector layers to. Defaults to "EPSG:4326".
+        :param selected_layers: Optional list of layer names to import. If None, imports all layers.
+        :return: Tuple of (list of new_gpkg_ids, list of metadata dicts).
+        :raises ValueError: If file doesn't exist, is invalid, or contains conflicting layer names.
         """
 
         incoming_layers = self.__retrieve_spatial_layers_from_incoming_gpkg(geopackage_path)
-        
+
         # If selected_layers is provided, filter to only those layers
         if selected_layers:
             incoming_layers = [layer for layer in incoming_layers if layer in selected_layers]
@@ -281,7 +290,7 @@ class LayerManager:
                 raise ValueError("No valid layers found in the selected layer names.")
 
         all_metadata = []
-        all_gpkg_ids = [] 
+        all_gpkg_ids = []
 
         # Import each layer
         for layer_name in incoming_layers:
@@ -299,7 +308,6 @@ class LayerManager:
                 # Create unique gpkg ids
                 new_gpkg_id = str(uuid.uuid4())
                 new_gpkg_path = os.path.join(file_manager.temp_dir, f"{new_gpkg_id}.gpkg")
-
 
                 # Write to default GeoPackage
                 gdf.to_file(
@@ -321,13 +329,11 @@ class LayerManager:
 
     def export_geopackage_layer_to_geojson(self, layer_id):
         """
-        Extracts a layer from a GeoPackage and saves it as a GeoJSON file.
+        Extract a layer from a GeoPackage and save it as a GeoJSON file.
 
-        Parameters:
-            layer_id(str): The id of the GeoPackage.
-
-        Returns:
-            str: Path to the exported GeoJSON file.
+        :param layer_id: The id of the GeoPackage.
+        :return: Path to the exported GeoJSON file.
+        :raises ValueError: If GeoPackage has no layers or conversion fails.
         """
         export_dir = os.path.join(file_manager.temp_dir, "export")
 
@@ -374,35 +380,28 @@ class LayerManager:
             raise ValueError(f"Failed to convert GeoPackage to GeoJSON: {e}")
 
         return geojson_path
-        
+
     def export_raster_layer(self, layer_name):
         """
-        Locate a raster layer in file_manager.layers_dir using its layer name.
+        Locate and return the path to a raster layer.
 
-        Parameters:
-            layer_name (str): Name of the raster layer (without extension).
-
-        Returns:
-            str: Full path to the raster file.
-
-        Raises:
-            ValueError: If the raster does not exist.
+        :param layer_name: Name of the raster layer (without extension).
+        :return: Full path to the raster file.
+        :raises ValueError: If the raster does not exist.
         """
         raster_path = self.is_raster(layer_name)
-        
+
         if raster_path:
             return raster_path
-       
+
         raise ValueError(f"Raster layer '{layer_name}' not found in layers directory.")
 
     def check_layer_name_exists(self, new_name):
         """
-        Check if a layer with the given name exists in either:
-        - the GeoPackage (vector layers)
-        - the file_manager.layers_dir as a raster file (.tif or .tiff)
+        Check if a layer with the given name exists.
 
-        Returns:
-            bool: True if the layer exists, False otherwise.
+        :param new_name: Layer name to check.
+        :return: True if the layer exists, False otherwise.
         """
 
         exists = False
@@ -415,28 +414,20 @@ class LayerManager:
         except Exception:
             # GPKG may not exist yet or unreadable
             pass
-        
+
 
         if self.is_raster(new_name):
             exists = True
 
         return exists
-        
+
     def get_layer_information(self, layer_id):
         """
-        Retrieves metadata for a specific layer stored either as a raster file 
-        or a vector layer within the default GeoPackage.
+        Retrieve metadata for a specific layer (raster or vector).
 
-        Parameters:
-            layer_id (str): The unique name/identifier of the layer.
-
-        Returns:
-            dict: A dictionary containing metadata about the layer.
-                - For Raster: {'type', 'bands', 'width', 'height', 'crs', 'resolution'}
-                - For Vector: {'type', 'geometry_type', 'crs', 'attributes', 'feature_count'}
-
-        Raises:
-            ValueError: If the layer is not found in either location or if the GeoPackage is unreadable.
+        :param layer_id: The unique name/identifier of the layer.
+        :return: Dictionary containing layer metadata (type, geometry, CRS, attributes, etc.).
+        :raises ValueError: If the layer is not found or GeoPackage is unreadable.
         """
 
         layers_dir = os.path.join(file_manager.layers_dir)
@@ -473,67 +464,70 @@ class LayerManager:
 
         # If neither raster nor vector layer found, raise error
         raise ValueError(f"Layer '{layer_id}' not found in rasters or GeoPackage")
-    
+
     def get_layer_for_script(self, layer_id):
+        """
+        Get the file path for a layer to be used in scripts.
+
+        :param layer_id: The unique layer identifier.
+        :return: Path to the layer file, or None if not found.
+        """
+
         raster_path = self.is_raster(layer_id)
 
         if raster_path:
             return raster_path
-        
+
         # Check if the layer_id matches a vector layer in the GeoPackage
         path = os.path.join(file_manager.layers_dir, f"{layer_id}.gpkg")
         if os.path.isfile(path):
             return path
-        
-        return None 
+
+        return None
 
     def get_layer_extension(self, layer_id):
-            """
-            Return the file extension for a given layer ID stored in layers_dir.
+        """
+        Return the file extension for a given layer ID.
+        
+        :param layer_id: The unique layer identifier.
+        :return: The file extension (including the leading dot), e.g. ".gpkg", ".tif".
+        :raises NotFound: If no layer file found for the given layer_id.
+        :raises ValueError: If multiple layer files found for the same layer_id.
+        """
 
-            Parameters:
-                layer_id(str): The unique layer identifier.
+        prefix = f"{layer_id}."
+        metadata_suffix = f"{layer_id}_metadata.json"
 
-            Returns:
-                extension(str): The file extension (including the leading dot), e.g. ".gpkg", ".tif".
+        matches = []
 
-            """
-            prefix = f"{layer_id}."
-            metadata_suffix = f"{layer_id}_metadata.json"
+        for filename in os.listdir(file_manager.layers_dir):
+            if filename == metadata_suffix:
+                continue
 
-            matches = []
+            if filename.startswith(prefix):
+                matches.append(filename)
 
-            for filename in os.listdir(file_manager.layers_dir):
-                if filename == metadata_suffix:
-                    continue
+        if not matches:
+            raise NotFound(f"No layer file found for layer_id '{layer_id}'")
 
-                if filename.startswith(prefix):
-                    matches.append(filename)
+        if len(matches) > 1:
+            raise ValueError(
+                f"Multiple layer files found for layer_id '{layer_id}': {matches}"
+            )
 
-            if not matches:
-                raise NotFound(f"No layer file found for layer_id '{layer_id}'")
+        _, extension = os.path.splitext(matches[0])
+        return extension
 
-            if len(matches) > 1:
-                raise ValueError(
-                    f"Multiple layer files found for layer_id '{layer_id}': {matches}"
-                )
-
-            _, extension = os.path.splitext(matches[0])
-            return extension
-    
     def tile_bounds(self, x, y, z):
         """
         Calculate the geographic bounding box of an XYZ tile in EPSG:4326.
 
-        Parameters:
-            x (int): Tile column number.
-            y (int): Tile row number.
-            z (int): Zoom level.
-
-        Returns:
-            (min_lon, min_lat, max_lon, max_lat): (float, float, float, float)
-            The longitude and latitude bounds of the tile in degrees.
+        :param x: Tile column number.
+        :param y: Tile row number.
+        :param z: Zoom level.
+        :return: Tuple of (min_lon, min_lat, max_lon, max_lat) in degrees.
         """
+
         n = 2.0 ** z
         lon_deg_min = x / n * 360.0 - 180.0
         lon_deg_max = (x + 1) / n * 360.0 - 180.0
@@ -545,53 +539,60 @@ class LayerManager:
 
     def clean_raster_cache(self, cache_dir, CACHE_MAX_BYTES=500*1024*1024):
         """
-        Remove oldest cached raster tiles to keep the total cache size under a limit.
+        Remove oldest cached raster tiles to keep total cache size under a limit.
 
-        Parameters:
-            cache_dir(str): Path to the cache directory containing raster tiles.
-            CACHE_MAX_BYTES(int, optional): Maximum allowed size of the cache in bytes. Defaults to 500 Mb.
-
-        Returns:
-        None
+        :param cache_dir: Path to the cache directory containing raster tiles.
+        :param cache_max_bytes: Maximum allowed size of the cache in bytes. Defaults to 500 MB.
         """
-        files = [(os.path.join(dp, f), os.path.getatime(os.path.join(dp, f)), os.path.getsize(os.path.join(dp, f)))
-                for dp, dn, filenames in os.walk(cache_dir) for f in filenames]
-        
+
+        files = [
+            (
+                os.path.join(root, filename),
+                os.path.getatime(os.path.join(root, filename)),
+                os.path.getsize(os.path.join(root, filename)),
+            )
+            for root, _, filenames in os.walk(cache_dir)
+            for filename in filenames
+        ]
+
         files.sort(key=lambda x: x[1])  # oldest first
         total_size = sum(f[2] for f in files)
-        
+
         while total_size > CACHE_MAX_BYTES and files:
             file_path, _, size = files.pop(0)
             os.remove(file_path)
             total_size -= size
 
     def get_metadata(self, layer_id):
-        
+        """
+        Retrieve metadata for a layer by its ID.
+
+        :param layer_id: The unique layer identifier.
+        :return: Dictionary containing layer metadata, or None if not found.
+        """
+
+
         metadata_filename = f"{layer_id}_metadata.json"
         metadata_path = os.path.join(file_manager.layers_dir, metadata_filename)
 
         if os.path.exists(metadata_path):
             with open(metadata_path, "r", encoding="utf-8") as f:
                 return json.load(f)
-            
+
         return None
 
     def get_geopackage_layers(self, gpkg_path):
         """
-        Retrieve the list of spatial layers from a GeoPackage file without importing them.
-        
-        Parameters:
-            gpkg_path (str): Path to the GeoPackage file.
-        
-        Returns:
-            list: List of layer names in the GeoPackage.
-        
-        Raises:
-            ValueError: If the file is not a valid GeoPackage or contains no spatial layers.
+        Retrieve the list of spatial layers from a GeoPackage without importing them.
+
+        :param gpkg_path: Path to the GeoPackage file.
+        :return: List of layer names in the GeoPackage.
+        :raises ValueError: If file is not a valid GeoPackage or contains no spatial layers.
         """
+
         if not os.path.isfile(gpkg_path):
             raise ValueError("GeoPackage file does not exist.")
-        
+
         try:
             spatial_layers = self.__retrieve_spatial_layers_from_incoming_gpkg(gpkg_path)
             return spatial_layers
@@ -602,22 +603,25 @@ class LayerManager:
 
     #=====================================================================================
     #                               HELPER METHODS
-    #=====================================================================================    
+    #=====================================================================================
 
     def list_layer_ids(self):
         """
-        Devolve todos os layer_ids existentes, com o respetivo metadata JSON.
+        List all existing layer IDs with their respective metadata.
+
+        :return: Tuple of (list of layer_ids, list of metadata dicts).
         """
+
         layer_ids = []
         metadata_list = []
 
         try:
-            for filename in os.listdir(self.file_manager.layers_dir):
+            for filename in os.listdir(file_manager.layers_dir):
                 if not filename.endswith("_metadata.json"):
                     continue
 
                 layer_id = filename.replace("_metadata.json", "")
-                metadata_path = os.path.join(self.file_manager.layers_dir, filename)
+                metadata_path = os.path.join(file_manager.layers_dir, filename)
 
                 try:
                     with open(metadata_path, "r", encoding="utf-8") as f:
@@ -634,21 +638,38 @@ class LayerManager:
 
 
     @staticmethod
-    def __check_raster_system_coordinates(raster_path, target_crs="EPSG:4326"):
+    def __check_raster_system_coordinates(raster_path):
+        """
+        Check the coordinate reference system of a raster file.
+
+        :param raster_path: Path to the raster file.
+        :return: CRS string of the raster.
+        :raises ValueError: If raster has no CRS information or reading fails.
+        """
+
         try:
             # Read the GeoTIFF file
             with rioxarray.open_rasterio(raster_path) as raster:
                 if raster.rio.crs is None:
                     raise ValueError("Raster has no CRS information.")
-                else:
-                    return raster.rio.crs.to_string()
+
+                return raster.rio.crs.to_string()
         except Exception as e:
-            raise ValueError(f"Error checking tif CRS: {e}")    
+            raise ValueError(f"Error checking tif CRS: {e}")
 
 
     @staticmethod
     def __convert_raster_system_coordinates(raster_path,target_crs="EPSG:4326"):
-        temp_path = f"very_complex_raster_name_temp.tiff"
+        """
+        Convert a raster to a target coordinate reference system.
+
+        :param raster_path: Path to the raster file.
+        :param target_crs: Target CRS. Defaults to "EPSG:4326".
+        :return: Path to the converted raster file.
+        :raises ValueError: If conversion fails.
+        """
+
+        temp_path = "very_complex_raster_name_temp.tiff"
         shutil.copy(raster_path, temp_path)
         try:
             with rioxarray.open_rasterio(temp_path) as raster:
@@ -658,14 +679,22 @@ class LayerManager:
                 # Save the converted file back to the same path
                 raster_converted.rio.to_raster(raster_path)
 
-            os.remove(temp_path)    
+            os.remove(temp_path)
 
             return raster_path
         except Exception as e:
-            raise ValueError(f"Error converting tif CRS: {e}") 
+            raise ValueError(f"Error converting tif CRS: {e}")
 
     @staticmethod
-    def __retrieve_spatial_layers_from_incoming_gpkg(new_geopackage_path): 
+    def __retrieve_spatial_layers_from_incoming_gpkg(new_geopackage_path):
+        """
+        Extract spatial layer names from a GeoPackage file.
+
+        :param new_geopackage_path: Path to the GeoPackage file.
+        :return: List of spatial layer names.
+        :raises ValueError: If GeoPackage is invalid or contains no spatial layers.
+        """
+
         try:
             all_layers = fiona.listlayers(new_geopackage_path)
         except Exception as e:
@@ -693,11 +722,20 @@ class LayerManager:
 
         if not incoming_layers:
             raise ValueError("No valid spatial layers found in GeoPackage.")
-        
+
         return incoming_layers
-    
+
     @staticmethod
     def __get_gpkg_metadata(gpkg_path, crs_original):
+        """
+        Extract metadata from a GeoPackage layer.
+
+        :param gpkg_path: Path to the GeoPackage file.
+        :param crs_original: Original CRS string before any transformation.
+        :return: Dictionary containing layer metadata.
+        :raises ValueError: If reading GeoPackage fails.
+        """
+
         try:
             layers = fiona.listlayers(gpkg_path)
 
@@ -717,6 +755,14 @@ class LayerManager:
 
     @staticmethod
     def __get_raster_metadata(raster_path, crs_original, tile_size=256):
+        """
+        Extract metadata from a raster file including zoom levels for tile serving.
+
+        :param raster_path: Path to the raster file.
+        :param crs_original: Original CRS string before any transformation.
+        :param tile_size: Tile size in pixels. Defaults to 256.
+        :return: Dictionary containing raster metadata.
+        """
 
         with rasterio.open(raster_path) as src:
             transform = src.transform
@@ -760,7 +806,7 @@ class LayerManager:
                     "min_lat": min_lat,
                     "max_lon": max_lon,
                     "max_lat": max_lat
-                }    
+                }
             }
 
     @staticmethod
@@ -784,7 +830,7 @@ class LayerManager:
 
         try:
             if not os.path.isfile(temp_layer_path):
-                 raise ValueError(f"Source file not found: {temp_layer_path}")
+                raise ValueError(f"Source file not found: {temp_layer_path}")
 
             shutil.move(temp_layer_path, dest_path)
         except Exception as e:
@@ -800,12 +846,10 @@ class LayerManager:
         except Exception as e:
             raise ValueError(f"Failed to save layer metadata: {e}")
 
-        return
-    
     def is_raster(self, layer_id):
         """
         Docstring for is_raster
-        
+
         :param layer_id: Description
 
         Returns raster_path or None
@@ -819,5 +863,5 @@ class LayerManager:
             if os.path.isfile(candidate):
                 raster_path = candidate
                 break
-        
+
         return raster_path

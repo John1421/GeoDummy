@@ -1,4 +1,3 @@
-
 import json
 import math
 from flask import Flask, request, after_this_request, jsonify, send_file, abort, g
@@ -49,7 +48,7 @@ def handle_http_exception(e):
         "[%s] %s",
         g.request_id,
         f"HTTP Exception: {e}"
-    )    
+    )
     response = e.get_response()
     response.data = jsonify({
         "error": {
@@ -139,33 +138,34 @@ def home():
 
 # Script Management Endpoints
 
-'''
-Use Case: UC-B-09
-'''
 @app.route('/scripts', methods=['POST'])
 def add_script():
+    '''
+    Use Case: UC-B-09
+    '''
+
     # Recieve file from browser via multipart/form-data
     uploaded_file = request.files.get('file')
     if not uploaded_file:
         raise BadRequest("Missing script file under 'file' field.")
-    
+
     # Recieve metadata
     metadata = request.form.to_dict()
     if not metadata:
         raise BadRequest("Missing script metadata.")
-    
+
     # Validate filename and extension
     original_id, file_extension = os.path.splitext(uploaded_file.filename)
 
     if not original_id:
         raise BadRequest("Uploaded script has no filename.")
-    
+
     if file_extension.lower() != ".py":
         raise BadRequest("Only .py files are supported.")
-    
+
     # Validate MIME
     if uploaded_file.mimetype not in script_manager.ALLOWED_MIME_TYPES:
-        raise BadRequest(f"Unsupported MIME type: {uploaded_file.mimetype}")    
+        raise BadRequest(f"Unsupported MIME type: {uploaded_file.mimetype}")
 
     # Generate unique script id
     script_id = str(uuid.uuid4())
@@ -179,10 +179,10 @@ def add_script():
         # Validate size
         if os.path.getsize(temp_path) > script_manager.MAX_SCRIPT_FILE_SIZE:
             raise BadRequest("Script file exceeds maximum allowed size.")
-        
+
         file_manager.move_file(temp_path, file_manager.scripts_dir)
         script_manager.add_script(script_id, metadata)
-    
+
     except HTTPException:
         if os.path.exists(temp_path):
             os.remove(temp_path)
@@ -217,11 +217,13 @@ def script_metadata(script_id):
 
     return jsonify({"script_id": script_id, "output": metadata}), 200
 
-'''
-Use Case: UC-B-10
-'''
+
 @app.route('/scripts', methods=['GET'])
 def list_scripts():
+    '''
+    Use Case: UC-B-10
+    '''
+
     scripts_ids, scripts_metadata = script_manager.list_scripts()
 
     app.logger.info(
@@ -234,21 +236,24 @@ def list_scripts():
 
 # Script Execution Endpoints
 
-'''
-Implements UC-B-11, UC-B-12 and UC-B-13, UC-B-14 is in the background
-'''
+
 @app.route('/scripts/<script_id>', methods=['POST'])
 def run_script(script_id):
+    '''
+    Implements UC-B-11, UC-B-12 and UC-B-13, UC-B-14 is in the background
+    '''
+
     if not script_id:
         raise BadRequest("script_id is required")
-    
+
     # Begin script execution workflow
     with running_scripts_lock:
         # Check if another script is already running
         if script_id in running_scripts and running_scripts[script_id]["status"] == "running":
             return jsonify({
                     "error": "Conflict",
-                    "message": f"Script '{script_id}' is already running. Only one script can be run at a time.",
+                    "message": f"Script '{script_id}' is already running. " 
+                    + "Only one script can be run at a time.",
                     "script_id": script_id,
                     "execution_id": running_scripts[script_id]["execution_id"]
                 }), 409
@@ -270,7 +275,7 @@ def run_script(script_id):
         parameters = data.get("parameters", {})
         if not isinstance(parameters, dict):
             raise BadRequest("'parameters' must be a JSON object")
-        
+
         layers = data.get("layers", {})
         if not isinstance(layers, list):
             raise BadRequest("'layers' must be a JSON list")
@@ -289,7 +294,7 @@ def run_script(script_id):
             data=data,
         )
 
-        
+
 
         exec_status = output.get("status")
         layer_ids = output.get("layer_ids", [])
@@ -300,7 +305,7 @@ def run_script(script_id):
         if exec_status == "timeout":
             with running_scripts_lock:
                 running_scripts[script_id]["status"] = "failed"
-            
+
             return jsonify({
                 "error": "Gateway Timeout",
                 "message": "Script execution exceeded the maximum allowed time of 30 seconds",
@@ -309,12 +314,12 @@ def run_script(script_id):
                 "timeout_seconds": 30,
                 "log_path": log_path
             }), 504
-        
+
         # Handle failure (500 Internal Server Error)
         elif exec_status == "failure":
             with running_scripts_lock:
                 running_scripts[script_id]["status"] = "failed"
-            
+
             return jsonify({
                 "error": "Internal Server Error",
                 "message": "Script execution failed with errors",
@@ -323,7 +328,7 @@ def run_script(script_id):
                 "log_path": log_path,
                 "details": "Check log file for error details"
             }), 500
-        
+
         # Handle success
         elif exec_status == "success":
             # Mark as finished
@@ -342,7 +347,7 @@ def run_script(script_id):
             #         raise InternalServerError(f"Exported file not found: {file_path_abs}")
 
             #     return send_file(file_path_abs, as_attachment=True, download_name=f"{layer_id}{file_extension}")
-            
+
             # Return JSON response
             if layer_ids is not None:
                 return jsonify({
@@ -352,7 +357,7 @@ def run_script(script_id):
                     "metadatas": metadatas,
                     "log_path": log_path
                 }), 200
-            
+
             # No output produced
             else:
                 return jsonify({
@@ -365,7 +370,7 @@ def run_script(script_id):
         else:
             with running_scripts_lock:
                 running_scripts[script_id]["status"] = "failed"
-            
+
             return jsonify({
                 "error": "Internal Server Error",
                 "message": f"Unknown execution status: {exec_status}",
@@ -373,22 +378,22 @@ def run_script(script_id):
                 "execution_id": execution_id,
                 "log_path": log_path
             }), 500
-        
-    
+
+
     except BadRequest as e:
         # Client errors (4xx) - re-raise to be handled by Flask
         with running_scripts_lock:
             running_scripts[script_id]["status"] = "failed"
         raise
-    
+
     except Exception as e:
         # Generic server errors - 500 Internal Server Error
         with running_scripts_lock:
             running_scripts[script_id]["status"] = "failed"
-        
+
         # Log the full error server-side for debugging
         app.logger.error(f"Script execution failed: {script_id} (execution_id: {execution_id})", exc_info=True)
-        
+
         # Return sanitized error to client
         return jsonify({
             "error": "Internal Server Error",
@@ -408,10 +413,10 @@ def stop_script(script_id):
     return jsonify({"message": f"Script {script_id} stopped"}), 200
 
 @app.route('/execute_script/<script_id>', methods=['GET'])
-def get_script_status(script_id):    
+def get_script_status(script_id):
     if not script_id:
         raise BadRequest("script_id parameter is required")
-    
+
     '''
     Implementação proposta por Esteves:
 
@@ -457,7 +462,7 @@ def load_basemap(basemap_id):
     if basemap is None:
         return jsonify({"error": f"Basemap with id {basemap_id} not found"}), 404
 
-    return jsonify(basemap), 200 
+    return jsonify(basemap), 200
 
 @app.route('/basemaps', methods=['GET'])
 def list_basemaps():
@@ -497,15 +502,15 @@ Use Case: UC-B-03
 Use Case: UC-B-04
 '''
 @app.route('/layers', methods=['POST'])
-def add_layer():    
+def add_layer():
     # Accept file from the browser via multipart/form-data
     added_file = request.files.get('file')
     if not added_file:
         raise BadRequest("You must upload a file under the 'file' field.")
-    
+
     # Get optional selected layers parameter (for geopackages)
     selected_layers = request.form.getlist('layers')
-    
+
     # File is temporarily stored in tmp_dir folder for handling
     temp_path = os.path.join(file_manager.temp_dir, added_file.filename)
     added_file.save(temp_path)
@@ -527,32 +532,33 @@ def add_layer():
             if os.path.exists(temp_path):
                 os.remove(temp_path)
             raise BadRequest("Please upload shapefiles as a .zip containing all necessary components (.shp, .shx, .dbf, optional .prj).")
-        
+
         case ".zip":
             layer_id, metadata = layer_manager.add_shapefile_zip(temp_path,file_name)
-        
-        case ".geojson":        
+
+        case ".geojson":
             layer_id, metadata = layer_manager.add_geojson(temp_path,file_name)
-        
+
         case ".tif" | ".tiff":
             layer_id, metadata = layer_manager.add_raster(temp_path,file_name)
-        
-        case ".gpkg":
-            layer_id, metadata = layer_manager.add_gpkg_layers(temp_path, selected_layers=selected_layers if selected_layers else None)
 
-        case _: 
+        case ".gpkg":
+            selected_layers = selected_layers if selected_layers else None
+            layer_id, metadata = layer_manager.add_gpkg_layers(temp_path, selected_layers)
+
+        case _:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
             raise BadRequest("File extension not supported")
 
-    
+
     if not isinstance(layer_id, list):
         layer_id = [layer_id]
 
     if not isinstance(metadata, list):
         metadata = [metadata]
-        
-    return jsonify({"layer_id": layer_id, "metadata": metadata}), 200    
+
+    return jsonify({"layer_id": layer_id, "metadata": metadata}), 200
 
 @app.route('/layers/preview/geopackage', methods=['POST'])
 def preview_geopackage_layers():
@@ -566,7 +572,7 @@ def preview_geopackage_layers():
     added_file = request.files.get('file')
     if not added_file:
         raise BadRequest("You must upload a file under the 'file' field.")
-    
+
     # File is temporarily stored in tmp_dir folder for handling
     temp_path = os.path.join(file_manager.temp_dir, added_file.filename)
     added_file.save(temp_path)
@@ -601,7 +607,7 @@ UC-B-16
 def get_layer(layer_id):
     if not layer_id:
         raise BadRequest("layer_id is required")
-    
+
     extension = layer_manager.get_layer_extension(layer_id)
 
     if extension == ".gpkg":
@@ -613,7 +619,7 @@ def get_layer(layer_id):
     export_file_abs = os.path.abspath(export_file)
     if not os.path.isfile(export_file_abs):
         raise InternalServerError(f"Exported file not found: {export_file_abs}")
-    
+
     return send_file(export_file_abs, as_attachment=True, download_name=f"{layer_id}{extension}")
 
 '''
@@ -629,7 +635,7 @@ UC-B-16
 '''
 @app.route("/layers/<layer_id>/tiles/<int:z>/<int:x>/<int:y>.png")
 def serve_tile(layer_id, z, x, y, tile_size=256):
-    
+
     # Compute a unique cache filenam
     tile_key = f"{layer_id}_{z}_{x}_{y}.png"
     cache_file = os.path.join(file_manager.raster_cache_dir, tile_key)
@@ -655,7 +661,7 @@ def serve_tile(layer_id, z, x, y, tile_size=256):
 
             width = col_stop - col_start
             height = row_stop - row_start
-            
+
             if width <= 0 or height <= 0:
                 # Tile outside raster
                 img = Image.new("RGBA", (tile_size, tile_size), (0, 0, 0, 0))
@@ -678,8 +684,8 @@ def serve_tile(layer_id, z, x, y, tile_size=256):
                         img = Image.fromarray(data[0], mode="L")
                 except Exception as e:
                     # In case of any error reading the window, return transparent tile
-                    img = Image.new("RGBA", (tile_size, tile_size), (0, 0, 0, 0))        
-            
+                    img = Image.new("RGBA", (tile_size, tile_size), (0, 0, 0, 0))
+
             # Save to cache
             img.save(cache_file, format="PNG")
 
@@ -693,21 +699,21 @@ def serve_tile(layer_id, z, x, y, tile_size=256):
 
     except Exception as e:
         raise ValueError(f"Error serving tile: {e}")
-    
+
 @app.route('/layers/<layer_id>/preview.png', methods=['GET'])
 def get_layer_preview(layer_id):
     if not layer_id:
         raise BadRequest("layer_id is required")
-    
+
     # Get bounds from query parameters instead of JSON body
     min_lat = request.args.get('min_lat', type=float)
     min_lon = request.args.get('min_lon', type=float)
     max_lat = request.args.get('max_lat', type=float)
     max_lon = request.args.get('max_lon', type=float)
-    
+
     if None in [min_lat, min_lon, max_lat, max_lon]:
         raise BadRequest("min_lat, min_lon, max_lat, max_lon are required as query parameters")
-    
+
     # Rest of your code stays the same...
     tile_key = f"{layer_id}_preview.png"
     cache_file = os.path.join(file_manager.raster_cache_dir, tile_key)
@@ -730,7 +736,7 @@ def get_layer_preview(layer_id):
 
             width = col_stop - col_start
             height = row_stop - row_start
-            
+
             if width <= 0 or height <= 0:
                 # Tile outside raster
                 raise ValueError("Requested bounds are outside the raster extent")
@@ -749,8 +755,8 @@ def get_layer_preview(layer_id):
                         img = Image.fromarray(data[0], mode="L")
                 except Exception as e:
                     # In case of any error reading the window, return transparent tile
-                    raise ValueError(f"Error reading raster window: {e}")        
-            
+                    raise ValueError(f"Error reading raster window: {e}")
+
             # Save to cache
             img.save(cache_file, format="PNG")
 
@@ -767,7 +773,7 @@ def get_layer_preview(layer_id):
 
 
 @app.route('/layers/<layer_id>', methods=['PUT'])
-def export_layer(layer_id):    
+def export_layer(layer_id):
     data = request.get_json()
 
     if not layer_id:
@@ -778,7 +784,7 @@ def export_layer(layer_id):
     return jsonify({"message": f"Layer {layer_id} exported"}), 200
 
 @app.route('/layers/<layer_id>', methods=['DELETE'])
-def remove_layer(layer_id):    
+def remove_layer(layer_id):
     if not layer_id:
         raise BadRequest("layer_id is required")
 
@@ -803,11 +809,11 @@ def remove_layer(layer_id):
 
     except OSError as e:
         raise InternalServerError(f"Failed to remove layer {layer_id}: {str(e)}")
-    
+
     return jsonify({"message": f"Layer {layer_id} removed"}), 200
 
 @app.route('/layers/<layer_id>/<priority>', methods=['POST'])
-def set_layer_priority(layer_id,priority):  
+def set_layer_priority(layer_id,priority):
     data = request.get_json()
     if not layer_id:
         raise BadRequest("layer_id is required")
@@ -855,11 +861,11 @@ Use Case: UC-B-06
 def extract_data_from_layer_for_table_view(layer_id):
     if not layer_id:
         raise BadRequest("layer_id parameter is required")
-    
+
     if layer_manager.is_raster(layer_id):
-        raise BadRequest("Raster doesn't have attributes") 
-    
-    
+        raise BadRequest("Raster doesn't have attributes")
+
+
     response = data_manager.check_cache(layer_id)
     if response:
         return jsonify(response), 200
@@ -919,4 +925,3 @@ def extract_data_from_layer_for_table_view(layer_id):
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5050)
-

@@ -1,24 +1,39 @@
-import geopandas as gpd
-import rioxarray
+"""
+File manager module.
+
+Provides utilities for validating, moving, and copying geospatial
+files while managing application directories.
+"""
+
 import shutil
 import os
 
 
 class FileManager:
+    """
+    Manages file system operations for layer, temporary, script,
+    raster cache, and log directories.
+    """
 
     # Allowed file extensions for processing
     allowed_extensions = {'.geojson', '.shp', '.gpkg', '.tif', '.tiff'}
 
-    def __init__(self, layers_dir='./data/input_layers', temp_dir='./data/temporary', scripts_dir='./data/scripts', logs_dir='./logs'):
+    def __init__(
+            self,
+            layers_dir='./data/input_layers',
+            temp_dir='./data/temporary',
+            scripts_dir='./data/scripts',
+            logs_dir='./logs'
+        ):
         """
-        Constructor to initialize layer and temporary directories.
-        Creates directories if they do not already exist.
-        
-        Parameters:
-            layers_dir (str): Path for layer files.
-            temporary (str): Path for temporary files.
-            scripts (str): Path for script tools
+        Initialize directory structure for file management.
+
+        :param layers_dir: Path for layer files.
+        :param temp_dir: Path for temporary files.
+        :param scripts_dir: Path for script tools.
+        :param logs_dir: Path for log files.
         """
+
         self.layers_dir = layers_dir
         self.temp_dir = temp_dir
         self.scripts_dir = scripts_dir
@@ -37,16 +52,14 @@ class FileManager:
 
     def move_file(self, source_path, destination_path):
         """
-        Moves a file from source_path to destination_path.
-        Raises an error if the source/destination is invalid or if the file already exists.
+        Move a file to a destination directory.
 
-        Parameters:
-            source_path (str): Full path to the source file.
-            destination_path (str): Directory where the file should be moved.
-
-        Returns:
-            True if the move was successful.
+        :param source_path: Full path to the source file.
+        :param destination_path: Target directory.
+        :return: True if the move was successful.
+        :raises ValueError: If validation or move fails.
         """
+
         self.__validate_paths_and_file(source_path, destination_path)
 
         try:
@@ -58,16 +71,14 @@ class FileManager:
 
     def copy_file(self, source_path, destination_path):
         """
-        Copies a file from source_path to destination_path.
-        Raises an error if the source/destination is invalid or if a file with the same name exists in the destination.
+        Copy a file to a destination directory.
 
-        Parameters:
-            source_path (str): Full path to the source file. (e.g., ./temp/file.shp)
-            destination_path (str): Directory where the file should be copied. (e.g., ./layers_dir)
-
-        Returns:
-            True if the copy was successful.
+        :param source_path: Full path to the source file.
+        :param destination_path: Target directory.
+        :return: True if the copy was successful.
+        :raises ValueError: If validation or copy fails.
         """
+
         self.__validate_paths_and_file(source_path, destination_path)
 
         file_name = os.path.basename(source_path)
@@ -86,16 +97,12 @@ class FileManager:
     @staticmethod
     def __validate_paths_and_file(source_path, destination_path):
         """
-        Validates source file path and destination directory.
-        Ensures the source exists, the destination is a valid directory,
-        and that no file with the same name exists in the destination.
+        Validate source file and destination directory.
 
-        Parameters:
-            source_path (str): Path to the source file. (e.g., ./temp_dir/file.shp)
-            destination_path (str): Path to the destination directory. (e.g., ./layers_dir)
-
-        Raises:
-            ValueError: If the source or destination is invalid, or if a conflicting file exists.
+        :param source_path: Path to the source file.
+        :param destination_path: Path to the destination directory.
+        :return: True if validation succeeds.
+        :raises ValueError: If validation fails.
         """
 
         # Validate source path
@@ -105,7 +112,7 @@ class FileManager:
         # Validate destination path
         if not isinstance(destination_path, str) or not os.path.isdir(destination_path):
             raise ValueError("Invalid destination path")
-        
+
         # Check for existing file in destination
         file_name = os.path.basename(source_path)
         hipothetical_destination_path = os.path.join(destination_path, file_name)
@@ -114,5 +121,3 @@ class FileManager:
             raise ValueError("A file with the same name already exists in the destination path")
 
         return True
-
-
