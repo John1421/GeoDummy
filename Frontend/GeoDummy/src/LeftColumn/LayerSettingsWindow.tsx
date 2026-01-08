@@ -210,7 +210,7 @@ export default function LayerSettingsWindow({
           border: `1px solid ${colors.borderStroke}`,
           width: "100%",
           overflow: "hidden",
-          margin: spacing.sm,
+          marginBlock: spacing.sm,
         }}
       >
         {/* Header */}

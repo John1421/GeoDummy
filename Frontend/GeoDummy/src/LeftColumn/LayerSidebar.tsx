@@ -1081,7 +1081,6 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
             <div
               style={{
                 flexShrink: 0,
-                borderTop: `1px solid ${colors.borderStroke}`,
                 backgroundColor: colors.sidebarBackground,
               }}
             >
