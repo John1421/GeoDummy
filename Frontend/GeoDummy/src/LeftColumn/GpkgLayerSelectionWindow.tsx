@@ -130,7 +130,7 @@ export default function GpkgLayerSelectionWindow({ isOpen, onClose, onSelect, gp
               cursor: "pointer",
             }}
           >
-            {selectedLayers.length === gpkgLayers.length ? "Deselect All" : "Select All"}
+            {selectedLayers.length === gpkgLayers.length ? "Unselect All" : "Select All"}
           </button>
         )}
 
