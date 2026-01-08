@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Layer, RasterDescriptor } from "../LeftColumn/LayerSidebar";
@@ -154,7 +154,7 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
     };
   };
 
-  const applyVectorStyle = useCallback((gj: L.GeoJSON, opacity: number, color: string, layer?: Layer) => {
+  const applyVectorStyle = (gj: L.GeoJSON, opacity: number, color: string, layer?: Layer) => {
     gj.setStyle((feat) => leafletStyleForFeature(feat as GjFeature, opacity, color, layer));
     gj.eachLayer((child) => {
       if (child instanceof L.CircleMarker) {
@@ -163,7 +163,7 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
         child.setRadius(pointSize);
       }
     });
-  }, []);
+  };
 
   /**
    * Create a point marker based on the layer's symbol configuration.
@@ -304,12 +304,16 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
         gj.addTo(map);
         vectorOverlaysRef.current.set(layer.id, gj);
       } else {
-        // For updates, we need to recreate if point symbol changed (different marker types use different Leaflet classes)
+        // For updates, we need to recreate if:
+        // 1. Point symbol type changed (different marker types use different Leaflet classes)
+        // 2. Symbol is not circle (DivIcon markers can't be easily updated, need recreation)
         const currentSymbol = layer.pointSymbol ?? "circle";
         const previousSymbol = previousPointSymbolRef.current.get(layer.id) ?? "circle";
-        const needsRecreate = currentSymbol !== previousSymbol;
+        const symbolChanged = currentSymbol !== previousSymbol;
+        const isNonCircleMarker = currentSymbol !== "circle";
         
-        if (needsRecreate) {
+        // Recreate if symbol changed OR if it's a non-circle marker (to update icon properties)
+        if (symbolChanged || isNonCircleMarker) {
           map.removeLayer(existing);
           vectorOverlaysRef.current.delete(layer.id);
           previousPointSymbolRef.current.set(layer.id, currentSymbol);
@@ -323,6 +327,7 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
           gj.addTo(map);
           vectorOverlaysRef.current.set(layer.id, gj);
         } else {
+          // Only circle markers can be updated without recreation
           applyVectorStyle(existing, opacity, color, layer);
         }
       }
@@ -345,7 +350,7 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
         // Pane is stable per layer id; zIndex is controlled by pane element style.
       }
     }
-  }, [layers, applyVectorStyle]);
+  }, [layers]);
 
   return (
     <div className="flex-1 flex items-start justify-center w-full h-full">

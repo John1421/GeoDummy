@@ -24,6 +24,7 @@ interface LayerSettingsWindowProps {
   onLineStyleChange: (layerId: string, style: "solid" | "dashed" | "dotted") => void;
   onStrokeColorChange: (layerId: string, strokeColor: string) => void;
   onStrokeWidthChange: (layerId: string, strokeWidth: number) => void;
+  onResetSettings: (layerId: string) => void;
 }
 
 export default function LayerSettingsWindow({
@@ -41,6 +42,7 @@ export default function LayerSettingsWindow({
   onLineStyleChange,
   onStrokeColorChange,
   onStrokeWidthChange,
+  onResetSettings,
 }: LayerSettingsWindowProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [isColorPaletteOpen, setIsColorPaletteOpen] = useState(false);
@@ -797,23 +799,41 @@ export default function LayerSettingsWindow({
                 </button>
               </div>
 
-              <button
-                type="button"
-                onClick={handleDelete}
-                style={{
-                  paddingInline: 10,
-                  paddingBlock: 4,
-                  borderRadius: radii.sm,
-                  border: "none",
-                  backgroundColor: colors.error,
-                  color: colors.errorForeground,
-                  cursor: "pointer",
-                  fontSize: typography.sizeSm,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Delete layer
-              </button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => onResetSettings(layer.id)}
+                  style={{
+                    paddingInline: 10,
+                    paddingBlock: 4,
+                    borderRadius: radii.sm,
+                    border: `1px solid ${colors.borderStroke}`,
+                    backgroundColor: colors.cardBackground,
+                    cursor: "pointer",
+                    fontSize: typography.sizeSm,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  style={{
+                    paddingInline: 10,
+                    paddingBlock: 4,
+                    borderRadius: radii.sm,
+                    border: "none",
+                    backgroundColor: colors.error,
+                    color: colors.errorForeground,
+                    cursor: "pointer",
+                    fontSize: typography.sizeSm,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Delete layer
+                </button>
+              </div>
             </div>
           </div>
           </div>

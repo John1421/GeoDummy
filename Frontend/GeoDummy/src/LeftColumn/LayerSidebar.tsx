@@ -965,6 +965,37 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
     [setLayers]
   );
 
+  /** Reset all style settings to defaults. */
+  const handleResetSettings = useCallback(
+    (layerId: string) => {
+      setLayers((prev) =>
+        prev.map((l) => {
+          if (l.id !== layerId) return l;
+          
+          const defaultColor = defaultColorForGeometryType(l.geometryType);
+          
+          return {
+            ...l,
+            color: defaultColor,
+            opacity: 1,
+            previousOpacity: 1,
+            // Reset point-specific settings
+            pointSymbol: undefined,
+            customSymbol: undefined,
+            pointSize: undefined,
+            // Reset line-specific settings
+            lineWidth: undefined,
+            lineStyle: undefined,
+            // Reset polygon-specific settings
+            strokeColor: undefined,
+            strokeWidth: undefined,
+          };
+        })
+      );
+    },
+    [setLayers]
+  );
+
   /** Delete layer. */
   const handleDeleteLayer = useCallback(
     (layerId: string) => {
@@ -1099,6 +1130,7 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
                 onLineStyleChange={handleLineStyleChange}
                 onStrokeColorChange={handleStrokeColorChange}
                 onStrokeWidthChange={handleStrokeWidthChange}
+                onResetSettings={handleResetSettings}
               />
             </div>
           )}
