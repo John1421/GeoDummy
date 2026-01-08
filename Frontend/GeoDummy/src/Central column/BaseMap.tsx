@@ -111,13 +111,13 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
     const t = feature?.geometry?.type;
 
     if (t === "Polygon" || t === "MultiPolygon") {
-      const strokeWidth = layer?.strokeWidth ?? 0;
+      const strokeWidth = layer?.strokeWidth ?? 2;
       const strokeColor = layer?.strokeColor ?? "#000000";
       return {
-        stroke: strokeWidth > 0,
+        stroke: true,
         color: strokeColor,
         weight: strokeWidth,
-        opacity: strokeWidth > 0 ? opacity : 0,
+        opacity: opacity,
         fill: true,
         fillColor: color,
         fillOpacity: opacity,

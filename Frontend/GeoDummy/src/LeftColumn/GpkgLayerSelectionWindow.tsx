@@ -41,6 +41,17 @@ export default function GpkgLayerSelectionWindow({ isOpen, onClose, onSelect, gp
     onClose();
   }, [selectedLayers, onClose, onSelect]);
 
+  const handleToggleAll = useCallback(() => {
+    if (selectedLayers.length === gpkgLayers.length) {
+      // All are selected, so deselect all
+      setSelectedLayers([]);
+    } else {
+      // Not all are selected, so select all
+      setSelectedLayers(gpkgLayers);
+    }
+    setError(null);
+  }, [selectedLayers, gpkgLayers]);
+
   const layersToShow = gpkgLayers ?? [];
   const isConfirmDisabled = !selectedLayers.length;
 
@@ -103,6 +114,26 @@ export default function GpkgLayerSelectionWindow({ isOpen, onClose, onSelect, gp
           Pick the layers from this GeoPackage you want to send to the backend.
         </p>
 
+        {!isLoading && layersToShow.length > 0 && (
+          <button
+            type="button"
+            onClick={handleToggleAll}
+            style={{
+              paddingInline: spacing.md,
+              paddingBlock: spacing.xs,
+              borderRadius: radii.md,
+              border: `1px solid ${colors.borderStroke}`,
+              backgroundColor: colors.cardBackground,
+              color: colors.foreground,
+              fontFamily: typography.normalFont,
+              fontSize: typography.sizeSm,
+              cursor: "pointer",
+            }}
+          >
+            {selectedLayers.length === gpkgLayers.length ? "Deselect All" : "Select All"}
+          </button>
+        )}
+
         {isLoading ? (
           <p
             style={{
@@ -149,11 +180,11 @@ export default function GpkgLayerSelectionWindow({ isOpen, onClose, onSelect, gp
                     borderRadius: radii.md,
                     border: `1px solid ${isActive ? colors.primary : colors.borderStroke}`,
                     backgroundColor: isActive ? colors.primary : colors.cardBackground,
-                    color: colors.foreground,
+                    color: isActive ? "#ffffff" : colors.foreground,
                     fontFamily: typography.normalFont,
                     fontSize: typography.sizeSm,
                     cursor: "pointer",
-                    transition: "background-color 120ms ease, border-color 120ms ease",
+                    transition: "background-color 120ms ease, border-color 120ms ease, color 120ms ease",
                   }}
                 >
                   <span>{layer}</span>
