@@ -26,6 +26,17 @@ type PostPayload = {
   parameters: Record<string, Parameter>;
 }
 
+type BackendParameter = {
+  name: string;
+  type: string;
+};
+
+type BackendMetadata = {
+  layers: string[];
+  parameters: BackendParameter[];
+};
+
+
 interface LayerMetadata {
   attributes?: string[];
   bounding_box?: number[];
@@ -98,8 +109,25 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
           return;
         }
         const data = await res.json();
-        setMetadata(data?.output ?? data);
-        // console.log('Script metadata fetched:', data?.output ?? data);
+        const rawMetadata: BackendMetadata = data?.output ?? data;
+
+        const normalizedParameters: Record<string, Parameter> =
+          Array.isArray(rawMetadata.parameters)
+            ? Object.fromEntries(
+                rawMetadata.parameters.map((p) => [
+                  p.name,
+                  { type: p.type, value: '' }
+                ])
+              )
+            : rawMetadata.parameters;
+
+        setMetadata({
+          ...rawMetadata,
+          parameters: normalizedParameters,
+        });
+
+        //console.log('Script metadata fetched:', data?.output ?? data);
+        //console.log('parameters:', data?.output?.parameters ?? data?.parameters);
       } catch (err) {
         console.error('Error fetching script metadata:', err);
         setMetadata(null);
