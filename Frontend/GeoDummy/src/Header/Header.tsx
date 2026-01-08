@@ -1,24 +1,40 @@
 import { useState } from "react";
-import EditMenu from "./EditMenu";
+import BaseMapSettings from "./BaseMapSettings";
 import logo from "../assets/logo.png";
-const BUTTON_STYLE = " text-white text-shadow-lg  font-semibold py-2 px-4 rounded-lg hover:bg-[#39AC73] transition justify-between";
+
+const BUTTON_STYLE = "text-white font-semibold py-2 px-4 hover:opacity-80 transition";
+
 function Header({ setBaseMapUrl, setBaseMapAttribution }: { setBaseMapUrl: (url: string) => void; setBaseMapAttribution: (attribution: string) => void }) {
-  const [open, setOpen] = useState(false);
+  const [openBaseMapSet, setOpenBaseMapSet] = useState(false);
 
   return (
     <div className="w-full bg-linear-to-r from-[#0D73A5] to-[#99E0B9] text-white px-4 py-2 flex items-center justify-between">
 
-      <div className="relative">
+      <div className="flex gap-4">
         <button
-          data-testid="edit-menu-button"
-          onClick={() => setOpen(!open)}
+          data-testid="settings-button"
+          onClick={() => {}}
           onMouseDown={(e) => e.stopPropagation()}
           className={BUTTON_STYLE}
         >
-          Edit
+          Settings
         </button>
 
-        <EditMenu open={open} setBaseMapUrl={setBaseMapUrl} setBaseMapAttribution={setBaseMapAttribution} setOpen={setOpen} />
+        <button
+          data-testid="edit-basemap-button"
+          onClick={() => setOpenBaseMapSet(!openBaseMapSet)}
+          onMouseDown={(e) => e.stopPropagation()}
+          className={BUTTON_STYLE}
+        >
+          Basemap
+        </button>
+
+        <BaseMapSettings 
+          openBaseMapSet={openBaseMapSet} 
+          onClose={() => setOpenBaseMapSet(false)} 
+          setBaseMapUrl={setBaseMapUrl} 
+          setBaseMapAttribution={setBaseMapAttribution} 
+        />
       </div>
 
       <img
