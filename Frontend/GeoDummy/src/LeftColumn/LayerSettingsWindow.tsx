@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { Layer } from "./LayerSidebar";
 import { LAYER_COLOR_PALETTE } from "../Design/DesignTokens";
-import { colors, typography, radii, spacing, shadows } from "../Design/DesignTokens";
+import { colors, typography, radii, spacing } from "../Design/DesignTokens";
 
 /**
  * Small floating window for per-layer settings.
@@ -12,7 +12,6 @@ import { colors, typography, radii, spacing, shadows } from "../Design/DesignTok
 interface LayerSettingsWindowProps {
   isOpen: boolean;
   layer: Layer | null;
-  position: { top: number; left: number } | null;
   onClose: () => void;
   onOpacityChange: (layerId: string, opacity: number) => void;
   onRestoreOpacity: (layerId: string) => void;
@@ -30,7 +29,6 @@ interface LayerSettingsWindowProps {
 export default function LayerSettingsWindow({
   isOpen,
   layer,
-  position,
   onClose,
   onOpacityChange,
   onRestoreOpacity,
@@ -45,15 +43,9 @@ export default function LayerSettingsWindow({
   onStrokeWidthChange,
 }: LayerSettingsWindowProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
-
-  // Adjusted position that keeps the window inside the viewport
-  const [adjustedPosition, setAdjustedPosition] = useState<{
-    top: number;
-    left: number;
-  } | null>(null);
-
   const [isColorPaletteOpen, setIsColorPaletteOpen] = useState(false);
   const [isStrokeColorPaletteOpen, setIsStrokeColorPaletteOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Close with ESC key
   useEffect(() => {
@@ -69,68 +61,16 @@ export default function LayerSettingsWindow({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Close when clicking outside the panel
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleClickOutside = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
-
-    window.addEventListener("mousedown", handleClickOutside);
-    return () => window.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen, onClose]);
-
-  // Clamp the window inside the viewport so it does not go out of view
-  useEffect(() => {
-    if (!isOpen || !position) {
-      setAdjustedPosition(null);
-      return;
-    }
-
-    const panel = panelRef.current;
-    const padding = 8;
-    let top = position.top;
-    let left = position.left;
-
-    // If we don't have the panel yet, use the raw position for the first paint
-    if (!panel) {
-      setAdjustedPosition({ top, left });
-      return;
-    }
-
-    const rect = panel.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-
-    // If the window would overflow below the viewport, move it up
-    if (top + rect.height + padding > viewportHeight) {
-      top = Math.max(padding, viewportHeight - rect.height - padding);
-    }
-
-    // If the window would overflow to the right, move it left
-    if (left + rect.width + padding > viewportWidth) {
-      left = Math.max(padding, viewportWidth - rect.width - padding);
-    }
-
-    // Guard against negative positions
-    top = Math.max(padding, top);
-    left = Math.max(padding, left);
-
-    setAdjustedPosition({ top, left });
-  }, [isOpen, position]);
-
   // Reset palette state when opening/closing or switching layer
   useEffect(() => {
     if (!isOpen) return;
     setIsColorPaletteOpen(false);
     setIsStrokeColorPaletteOpen(false);
+    setIsCollapsed(false);
   }, [isOpen, layer?.id]);
 
   // If closed or missing data, render nothing
-  if (!isOpen || !layer || !position) return null;
+  if (!isOpen || !layer) return null;
 
   const isVector = layer.kind === "vector" || !!layer.vectorData;
   const currentOpacity = layer.opacity ?? 1;
@@ -195,8 +135,6 @@ export default function LayerSettingsWindow({
     // @ts-expect-error custom CSS variable
     "--value": opacityPercent,
   };
-
-  const effectivePosition = adjustedPosition ?? position;
 
   return (
     <>
@@ -267,17 +205,12 @@ export default function LayerSettingsWindow({
       <div
         ref={panelRef}
         style={{
-          position: "fixed",
-          top: effectivePosition.top,
-          left: effectivePosition.left,
-          zIndex: 1000000,
           backgroundColor: colors.cardBackground,
           borderRadius: radii.md,
-          border: "none",
-          boxShadow: shadows.subtle,
-          minWidth: 260,
-          maxWidth: 320,
+          border: `1px solid ${colors.borderStroke}`,
+          width: "100%",
           overflow: "hidden",
+          margin: spacing.sm,
         }}
       >
         {/* Header */}
@@ -301,43 +234,75 @@ export default function LayerSettingsWindow({
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
-              maxWidth: 220,
+              maxWidth: 180,
             }}
           >
             {layer.title}
           </h2>
 
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close layer settings"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 4,
-              border: "none",
-              background: "transparent",
-              borderRadius: radii.sm,
-              cursor: "pointer",
-            }}
-          >
-            <X size={20} strokeWidth={3} />
-          </button>
+          <div style={{ display: "flex", gap: 4 }}>
+            <button
+              type="button"
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              aria-label={isCollapsed ? "Expand settings" : "Collapse settings"}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 4,
+                border: "none",
+                background: "transparent",
+                borderRadius: radii.sm,
+                cursor: "pointer",
+                color: colors.primaryForeground,
+              }}
+            >
+              {isCollapsed ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                  <polyline points="18 15 12 9 6 15"></polyline>
+                </svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              )}
+            </button>
+            
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close layer settings"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 4,
+                border: "none",
+                background: "transparent",
+                borderRadius: radii.sm,
+                cursor: "pointer",
+              }}
+            >
+              <X size={20} strokeWidth={3} />
+            </button>
+          </div>
         </div>
 
         {/* Body */}
-        <div
-          style={{
-            padding: 12,
-            fontFamily: typography.normalFont,
-            color: colors.sidebarForeground,
-            fontSize: typography.sizeSm,
-            display: "flex",
-            flexDirection: "column",
-            rowGap: spacing.sm,
-          }}
-        >
+        {!isCollapsed && (
+          <div
+            style={{
+              padding: 12,
+              fontFamily: typography.normalFont,
+              color: colors.sidebarForeground,
+              fontSize: typography.sizeSm,
+              display: "flex",
+              flexDirection: "column",
+              rowGap: spacing.sm,
+              maxHeight: "50vh",
+              overflowY: "auto",
+            }}
+          >
           {/* Source file */}
           <div
             style={{
@@ -566,9 +531,11 @@ export default function LayerSettingsWindow({
                   max={30}
                   value={currentPointSize}
                   onChange={(e) => onPointSizeChange(layer.id, Number(e.target.value))}
+                  className="opacity-slider"
                   style={{
                     width: "100%",
-                    accentColor: colors.primary,
+                    // @ts-expect-error custom CSS variable
+                    "--value": (currentPointSize - 2) / (30 - 2) * 100,
                   }}
                 />
               </div>
@@ -597,9 +564,11 @@ export default function LayerSettingsWindow({
                   max={20}
                   value={currentLineWidth}
                   onChange={(e) => onLineWidthChange(layer.id, Number(e.target.value))}
+                  className="opacity-slider"
                   style={{
                     width: "100%",
-                    accentColor: colors.primary,
+                    // @ts-expect-error custom CSS variable
+                    "--value": (currentLineWidth - 1) / (20 - 1) * 100,
                   }}
                 />
               </div>
@@ -751,9 +720,11 @@ export default function LayerSettingsWindow({
                   max={10}
                   value={currentStrokeWidth}
                   onChange={(e) => onStrokeWidthChange(layer.id, Number(e.target.value))}
+                  className="opacity-slider"
                   style={{
                     width: "100%",
-                    accentColor: colors.primary,
+                    // @ts-expect-error custom CSS variable
+                    "--value": (currentStrokeWidth / 10) * 100,
                   }}
                 />
               </div>
@@ -845,7 +816,8 @@ export default function LayerSettingsWindow({
               </button>
             </div>
           </div>
-        </div>
+          </div>
+        )}
       </div>
     </>
   );

@@ -10,7 +10,7 @@ interface LayerCardProps {
   layer: Layer;
   selected: boolean;
   onSelect: () => void;
-  onSettings: (layerId: string, rect: DOMRect) => void;
+  onSettings: (layerId: string) => void;
   onToggleVisibility: (layerId: string) => void;
   onRename: (layerId: string, newTitle: string) => void;
 }
@@ -60,9 +60,7 @@ function LayerCardComponent({ layer, selected, onSelect, onSettings, onToggleVis
   const isHidden = (layer.opacity ?? 1) <= 0.01;
 
   const handleSettingsOpen = () => {
-    if (!cardRef.current) return;
-    const rect = cardRef.current.getBoundingClientRect();
-    onSettings(layer.id, rect);
+    onSettings(layer.id);
   };
 
   const handleToggleVisibilityClick = () => {
@@ -107,12 +105,18 @@ function LayerCardComponent({ layer, selected, onSelect, onSettings, onToggleVis
         boxShadow: selected ? shadows.medium : shadows.none,
       }}
 
-      onClick={onSelect}
-      {...attributes}
-      onContextMenu={(e) => {
-        e.preventDefault();      // evita o menu do browser
-        handleSettingsOpen();    // abre as settings no right-click
+      onClick={(e) => {
+        e.preventDefault();
+        // If clicking the already selected layer, unselect it (which will close settings)
+        if (selected) {
+          onSelect(); // This will deselect via parent logic
+        } else {
+          // Select the layer and open settings
+          onSelect();
+          handleSettingsOpen();
+        }
       }}
+      {...attributes}
     >
       <div
         style={{

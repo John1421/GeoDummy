@@ -214,7 +214,7 @@ interface LayerSidebarProps {
   layers: Layer[];
   setLayers: React.Dispatch<React.SetStateAction<Layer[]>>;
   selectedLayerId: string | null;
-  setSelectedLayerId: (id: string) => void;
+  setSelectedLayerId: (id: string | null) => void;
   onAddLayerRef?: (addLayerFn: (layer_id: string, metadata: BackendLayerMetadata) => Promise<void>) => void;
 }
 
@@ -294,11 +294,7 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
 export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSelectedLayerId, onAddLayerRef }: LayerSidebarProps) {
   const [isWindowOpen, setIsWindowOpen] = useState(false);
-
   const [settingsLayerId, setSettingsLayerId] = useState<string | null>(null);
-  const [settingsPosition, setSettingsPosition] = useState<{ top: number; left: number } | null>(
-    null
-  );
 
   const selectedSettingsLayer = useMemo(
     () => layers.find((l) => l.id === settingsLayerId) ?? null,
@@ -805,10 +801,21 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
   );
 
   /** Open settings window. */
-  const handleSettings = useCallback((layerId: string, rect: DOMRect) => {
+  const handleSettings = useCallback((layerId: string) => {
     setSettingsLayerId(layerId);
-    setSettingsPosition({ top: rect.top, left: rect.right + 8 });
   }, []);
+
+  /** Handle layer selection - toggle if clicking same layer */
+  const handleSelectLayer = useCallback((layerId: string) => {
+    // If clicking the same layer, unselect it
+    if (selectedLayerId === layerId) {
+      setSettingsLayerId(null); // Close settings when unselecting
+      setSelectedLayerId(null);
+    } else {
+      // Otherwise, select the new layer
+      setSelectedLayerId(layerId);
+    }
+  }, [selectedLayerId, setSelectedLayerId]);
 
   /** Opacity change (stores previous non-zero opacity). */
   const handleOpacityChange = useCallback(
@@ -963,7 +970,6 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
     (layerId: string) => {
       setLayers((prev) => prev.filter((l) => l.id !== layerId));
       setSettingsLayerId(null);
-      setSettingsPosition(null);
     },
     [setLayers]
   );
@@ -971,7 +977,6 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
   /** Close settings window. */
   const handleCloseSettings = useCallback(() => {
     setSettingsLayerId(null);
-    setSettingsPosition(null);
   }, []);
 
   /**
@@ -1042,15 +1047,63 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
         onAdd={() => setIsWindowOpen(true)}
         headerActions={headerActions}
       >
-        <LayerCardList
-          layers={layers}
-          setLayers={setLayers}
-          onSettings={handleSettings}
-          onToggleVisibility={handleToggleVisibility}
-          onRename={handleRenameLayer}
-          selectedLayerId={selectedLayerId}
-          onSelectLayer={setSelectedLayerId}
-        />
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            height: "100%",
+            position: "relative",
+          }}
+        >
+          {/* Scrollable layer list */}
+          <div
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              overflowX: "hidden",
+              minHeight: 0,
+              paddingBottom: settingsLayerId ? 8 : 0,
+            }}
+          >
+            <LayerCardList
+              layers={layers}
+              setLayers={setLayers}
+              onSettings={handleSettings}
+              onToggleVisibility={handleToggleVisibility}
+              onRename={handleRenameLayer}
+              selectedLayerId={selectedLayerId}
+              onSelectLayer={handleSelectLayer}
+            />
+          </div>
+          
+          {/* Fixed settings window at bottom */}
+          {settingsLayerId && (
+            <div
+              style={{
+                flexShrink: 0,
+                borderTop: `1px solid ${colors.borderStroke}`,
+                backgroundColor: colors.sidebarBackground,
+              }}
+            >
+              <LayerSettingsWindow
+                isOpen={!!settingsLayerId}
+                layer={selectedSettingsLayer}
+                onClose={handleCloseSettings}
+                onOpacityChange={handleOpacityChange}
+                onRestoreOpacity={handleRestoreOpacity}
+                onDeleteLayer={handleDeleteLayer}
+                onColorChange={handleColorChange}
+                onPointSymbolChange={handlePointSymbolChange}
+                onCustomSymbolChange={handleCustomSymbolChange}
+                onPointSizeChange={handlePointSizeChange}
+                onLineWidthChange={handleLineWidthChange}
+                onLineStyleChange={handleLineStyleChange}
+                onStrokeColorChange={handleStrokeColorChange}
+                onStrokeWidthChange={handleStrokeWidthChange}
+              />
+            </div>
+          )}
+        </div>
       </SidebarPanel>
 
       <NewLayerWindow
@@ -1059,24 +1112,6 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
         onSelect={handleAddLayer}
         existingFileNames={layers.map(l => l.fileName || '').filter(Boolean)}
         existingFileLastModified={layers.map(l => l.fileLastModified || 0).filter(Boolean)}
-      />
-
-      <LayerSettingsWindow
-        isOpen={!!settingsLayerId}
-        layer={selectedSettingsLayer}
-        position={settingsPosition}
-        onClose={handleCloseSettings}
-        onOpacityChange={handleOpacityChange}
-        onRestoreOpacity={handleRestoreOpacity}
-        onDeleteLayer={handleDeleteLayer}
-        onColorChange={handleColorChange}
-        onPointSymbolChange={handlePointSymbolChange}
-        onCustomSymbolChange={handleCustomSymbolChange}
-        onPointSizeChange={handlePointSizeChange}
-        onLineWidthChange={handleLineWidthChange}
-        onLineStyleChange={handleLineStyleChange}
-        onStrokeColorChange={handleStrokeColorChange}
-        onStrokeWidthChange={handleStrokeWidthChange}
       />
     </>
   );

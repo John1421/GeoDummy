@@ -30,6 +30,9 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
   // Rendered overlays keyed by layer id
   const vectorOverlaysRef = useRef<Map<string, L.GeoJSON>>(new Map());
   const rasterOverlaysRef = useRef<Map<string, L.Layer>>(new Map());
+  
+  // Track previous point symbol to detect changes
+  const previousPointSymbolRef = useRef<Map<string, string>>(new Map());
 
   // Keep track of which panes we created, so we can manage them if needed
   const panesRef = useRef<Map<string, string>>(new Map());
@@ -289,6 +292,9 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
 
       const existing = vectorOverlaysRef.current.get(layer.id);
       if (!existing) {
+        const currentSymbol = layer.pointSymbol ?? "circle";
+        previousPointSymbolRef.current.set(layer.id, currentSymbol);
+        
         const gj = L.geoJSON(layer.vectorData, {
           pane,
           style: (feat) => leafletStyleForFeature(feat as GjFeature, opacity, color, layer),
@@ -298,11 +304,15 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
         gj.addTo(map);
         vectorOverlaysRef.current.set(layer.id, gj);
       } else {
-        // For updates, we need to recreate if point symbol changed (non-circle markers use different classes)
-        const needsRecreate = layer.pointSymbol && layer.pointSymbol !== "circle";
+        // For updates, we need to recreate if point symbol changed (different marker types use different Leaflet classes)
+        const currentSymbol = layer.pointSymbol ?? "circle";
+        const previousSymbol = previousPointSymbolRef.current.get(layer.id) ?? "circle";
+        const needsRecreate = currentSymbol !== previousSymbol;
+        
         if (needsRecreate) {
           map.removeLayer(existing);
           vectorOverlaysRef.current.delete(layer.id);
+          previousPointSymbolRef.current.set(layer.id, currentSymbol);
           
           const gj = L.geoJSON(layer.vectorData, {
             pane,
