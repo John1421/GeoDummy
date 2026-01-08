@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { Wrench as ToolsIcon } from "lucide-react";
 import SidebarPanel from "../TemplateModals/SidebarModal";
 import { colors, icons } from "../Design/DesignTokens";
@@ -49,6 +49,39 @@ export default function ScriptList({ onAddLayer }: ScriptListProps) {
   const [showAddNew, setShowAddNew] = useState(false);
   const [scripts, setScripts] = useState<Script[]>([]);
   const [loadingScripts, setLoadingScripts] = useState<Record<string, boolean>>({});
+
+  // Fetch scripts from backend on mount
+  useEffect(() => {
+    const fetchScripts = async () => {
+      try {
+        const response = await fetch("http://localhost:5050/scripts");
+        
+        if (!response.ok) {
+          throw new Error("Error retrieving scripts");
+        }
+
+        const data = await response.json();
+        const { scripts_ids, scripts_metadata } = data;
+
+        // Transform the response into Script objects
+        const fetchedScripts: Script[] = scripts_ids.map((id: string, index: number) => {
+          const metadata = scripts_metadata[index] || {};
+          return {
+            id,
+            name: metadata.name || id,
+            description: metadata.description || "",
+            category: metadata.category || "Uncategorized",
+          };
+        });
+
+        setScripts(fetchedScripts);
+      } catch (err) {
+        console.error("Failed to fetch scripts", err);
+      }
+    };
+
+    fetchScripts();
+  }, []);
 
   const handleAddScript = useCallback(
     (id: string, name: string, category: string, description: string) => {
