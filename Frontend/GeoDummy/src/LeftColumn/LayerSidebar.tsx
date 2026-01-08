@@ -52,6 +52,19 @@ export interface Layer {
 
   // Vector styling (raster ignores this for now)
   color?: string; // hex like "#22C55E"
+  
+  // Point-specific styling
+  pointSymbol?: "circle" | "square" | "triangle" | "custom"; // Point symbology type
+  customSymbol?: string; // Unicode character for custom symbols
+  pointSize?: number; // Point marker size (radius for circle, side for square, etc.)
+  
+  // Line-specific styling
+  lineWidth?: number; // Line stroke width
+  lineStyle?: "solid" | "dashed" | "dotted"; // Line dash pattern
+  
+  // Polygon-specific styling
+  strokeColor?: string; // Polygon contour/border color
+  strokeWidth?: number; // Polygon contour/border width
 }
 type BackendLayerMetadata =
   | {
@@ -875,6 +888,76 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
     [setLayers]
   );
 
+  /** Change point symbol type. */
+  const handlePointSymbolChange = useCallback(
+    (layerId: string, symbol: "circle" | "square" | "triangle" | "custom") => {
+      setLayers((prev) =>
+        prev.map((l) => (l.id === layerId ? { ...l, pointSymbol: symbol } : l))
+      );
+    },
+    [setLayers]
+  );
+
+  /** Change custom point symbol (unicode character). */
+  const handleCustomSymbolChange = useCallback(
+    (layerId: string, customSymbol: string) => {
+      setLayers((prev) =>
+        prev.map((l) => (l.id === layerId ? { ...l, customSymbol } : l))
+      );
+    },
+    [setLayers]
+  );
+
+  /** Change point size. */
+  const handlePointSizeChange = useCallback(
+    (layerId: string, size: number) => {
+      setLayers((prev) =>
+        prev.map((l) => (l.id === layerId ? { ...l, pointSize: size } : l))
+      );
+    },
+    [setLayers]
+  );
+
+  /** Change line width. */
+  const handleLineWidthChange = useCallback(
+    (layerId: string, width: number) => {
+      setLayers((prev) =>
+        prev.map((l) => (l.id === layerId ? { ...l, lineWidth: width } : l))
+      );
+    },
+    [setLayers]
+  );
+
+  /** Change line style. */
+  const handleLineStyleChange = useCallback(
+    (layerId: string, style: "solid" | "dashed" | "dotted") => {
+      setLayers((prev) =>
+        prev.map((l) => (l.id === layerId ? { ...l, lineStyle: style } : l))
+      );
+    },
+    [setLayers]
+  );
+
+  /** Change polygon stroke color. */
+  const handleStrokeColorChange = useCallback(
+    (layerId: string, strokeColor: string) => {
+      setLayers((prev) =>
+        prev.map((l) => (l.id === layerId ? { ...l, strokeColor } : l))
+      );
+    },
+    [setLayers]
+  );
+
+  /** Change polygon stroke width. */
+  const handleStrokeWidthChange = useCallback(
+    (layerId: string, strokeWidth: number) => {
+      setLayers((prev) =>
+        prev.map((l) => (l.id === layerId ? { ...l, strokeWidth } : l))
+      );
+    },
+    [setLayers]
+  );
+
   /** Delete layer. */
   const handleDeleteLayer = useCallback(
     (layerId: string) => {
@@ -987,6 +1070,13 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
         onRestoreOpacity={handleRestoreOpacity}
         onDeleteLayer={handleDeleteLayer}
         onColorChange={handleColorChange}
+        onPointSymbolChange={handlePointSymbolChange}
+        onCustomSymbolChange={handleCustomSymbolChange}
+        onPointSizeChange={handlePointSizeChange}
+        onLineWidthChange={handleLineWidthChange}
+        onLineStyleChange={handleLineStyleChange}
+        onStrokeColorChange={handleStrokeColorChange}
+        onStrokeWidthChange={handleStrokeWidthChange}
       />
     </>
   );

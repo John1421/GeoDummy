@@ -102,15 +102,19 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
   const leafletStyleForFeature = (
     feature: GeoJSON.Feature | undefined,
     opacity: number,
-    color: string
+    color: string,
+    layer?: Layer
   ): L.PathOptions => {
     const t = feature?.geometry?.type;
 
     if (t === "Polygon" || t === "MultiPolygon") {
+      const strokeWidth = layer?.strokeWidth ?? 0;
+      const strokeColor = layer?.strokeColor ?? "#000000";
       return {
-        stroke: false,
-        weight: 0,
-        opacity: 0,
+        stroke: strokeWidth > 0,
+        color: strokeColor,
+        weight: strokeWidth,
+        opacity: strokeWidth > 0 ? opacity : 0,
         fill: true,
         fillColor: color,
         fillOpacity: opacity,
@@ -118,12 +122,21 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
     }
 
     if (t === "LineString" || t === "MultiLineString") {
+      const lineWidth = layer?.lineWidth ?? 3;
+      const lineStyle = layer?.lineStyle ?? "solid";
+      let dashArray: string | undefined;
+      if (lineStyle === "dashed") {
+        dashArray = "10, 10";
+      } else if (lineStyle === "dotted") {
+        dashArray = "2, 6";
+      }
       return {
         stroke: true,
         color,
-        weight: 3,
+        weight: lineWidth,
         opacity: opacity,
         fillOpacity: 0,
+        dashArray,
       };
     }
 
@@ -138,14 +151,80 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
     };
   };
 
-  const applyVectorStyle = useCallback((gj: L.GeoJSON, opacity: number, color: string) => {
-    gj.setStyle((feat) => leafletStyleForFeature(feat as GjFeature, opacity, color));
+  const applyVectorStyle = useCallback((gj: L.GeoJSON, opacity: number, color: string, layer?: Layer) => {
+    gj.setStyle((feat) => leafletStyleForFeature(feat as GjFeature, opacity, color, layer));
     gj.eachLayer((child) => {
       if (child instanceof L.CircleMarker) {
+        const pointSize = layer?.pointSize ?? 6;
         child.setStyle({ stroke: false, opacity: 0, fill: true, fillColor: color, fillOpacity: opacity });
+        child.setRadius(pointSize);
       }
     });
   }, []);
+
+  /**
+   * Create a point marker based on the layer's symbol configuration.
+   * Supports circle, square, triangle, and custom unicode symbols.
+   */
+  const createPointMarker = (
+    latlng: L.LatLng,
+    layer: Layer,
+    opacity: number,
+    color: string,
+    pane?: string
+  ): L.Marker | L.CircleMarker => {
+    const pointSymbol = layer.pointSymbol ?? "circle";
+    const pointSize = layer.pointSize ?? 6;
+    const customSymbol = layer.customSymbol ?? "★";
+
+    if (pointSymbol === "custom") {
+      // Use a DivIcon for custom symbols
+      const icon = L.divIcon({
+        html: `<div style="font-size: ${pointSize * 2}px; color: ${color}; opacity: ${opacity}; line-height: 1; transform: translate(-50%, -50%);">${customSymbol}</div>`,
+        className: "",
+        iconSize: [pointSize * 2, pointSize * 2],
+        iconAnchor: [pointSize, pointSize],
+      });
+      return L.marker(latlng, { icon, pane });
+    }
+
+    if (pointSymbol === "square") {
+      // Use a custom SVG for square
+      const svgIcon = L.divIcon({
+        html: `<svg width="${pointSize * 2}" height="${pointSize * 2}" xmlns="http://www.w3.org/2000/svg">
+          <rect width="${pointSize * 2}" height="${pointSize * 2}" fill="${color}" opacity="${opacity}" />
+        </svg>`,
+        className: "",
+        iconSize: [pointSize * 2, pointSize * 2],
+        iconAnchor: [pointSize, pointSize],
+      });
+      return L.marker(latlng, { icon: svgIcon, pane });
+    }
+
+    if (pointSymbol === "triangle") {
+      // Use a custom SVG for triangle
+      const svgIcon = L.divIcon({
+        html: `<svg width="${pointSize * 2}" height="${pointSize * 2}" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="${pointSize},0 ${pointSize * 2},${pointSize * 2} 0,${pointSize * 2}" fill="${color}" opacity="${opacity}" />
+        </svg>`,
+        className: "",
+        iconSize: [pointSize * 2, pointSize * 2],
+        iconAnchor: [pointSize, pointSize * 1.5],
+      });
+      return L.marker(latlng, { icon: svgIcon, pane });
+    }
+
+    // Default: circle
+    return L.circleMarker(latlng, {
+      pane,
+      radius: pointSize,
+      stroke: false,
+      opacity: 0,
+      fill: true,
+      fillColor: color,
+      fillOpacity: opacity,
+    });
+  };
 
 
   const createRasterLayer = (desc: RasterDescriptor, opacity: number, pane?: string): L.Layer => {
@@ -212,23 +291,30 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
       if (!existing) {
         const gj = L.geoJSON(layer.vectorData, {
           pane,
-          style: (feat) => leafletStyleForFeature(feat as GjFeature, opacity, color),
-          pointToLayer: (_feature, latlng) =>
-            L.circleMarker(latlng, {
-              pane,
-              radius: 6,
-              stroke: false,
-              opacity: 0,
-              fill: true,
-              fillColor: color,
-              fillOpacity: opacity,
-            }),
+          style: (feat) => leafletStyleForFeature(feat as GjFeature, opacity, color, layer),
+          pointToLayer: (_feature, latlng) => createPointMarker(latlng, layer, opacity, color, pane),
         });
 
         gj.addTo(map);
         vectorOverlaysRef.current.set(layer.id, gj);
       } else {
-        applyVectorStyle(existing, opacity, color);
+        // For updates, we need to recreate if point symbol changed (non-circle markers use different classes)
+        const needsRecreate = layer.pointSymbol && layer.pointSymbol !== "circle";
+        if (needsRecreate) {
+          map.removeLayer(existing);
+          vectorOverlaysRef.current.delete(layer.id);
+          
+          const gj = L.geoJSON(layer.vectorData, {
+            pane,
+            style: (feat) => leafletStyleForFeature(feat as GjFeature, opacity, color, layer),
+            pointToLayer: (_feature, latlng) => createPointMarker(latlng, layer, opacity, color, pane),
+          });
+          
+          gj.addTo(map);
+          vectorOverlaysRef.current.set(layer.id, gj);
+        } else {
+          applyVectorStyle(existing, opacity, color, layer);
+        }
       }
     }
 

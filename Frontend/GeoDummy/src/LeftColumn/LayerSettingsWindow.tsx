@@ -18,6 +18,13 @@ interface LayerSettingsWindowProps {
   onRestoreOpacity: (layerId: string) => void;
   onDeleteLayer: (layerId: string) => void;
   onColorChange: (layerId: string, color: string) => void;
+  onPointSymbolChange: (layerId: string, symbol: "circle" | "square" | "triangle" | "custom") => void;
+  onCustomSymbolChange: (layerId: string, customSymbol: string) => void;
+  onPointSizeChange: (layerId: string, size: number) => void;
+  onLineWidthChange: (layerId: string, width: number) => void;
+  onLineStyleChange: (layerId: string, style: "solid" | "dashed" | "dotted") => void;
+  onStrokeColorChange: (layerId: string, strokeColor: string) => void;
+  onStrokeWidthChange: (layerId: string, strokeWidth: number) => void;
 }
 
 export default function LayerSettingsWindow({
@@ -29,6 +36,13 @@ export default function LayerSettingsWindow({
   onRestoreOpacity,
   onDeleteLayer,
   onColorChange,
+  onPointSymbolChange,
+  onCustomSymbolChange,
+  onPointSizeChange,
+  onLineWidthChange,
+  onLineStyleChange,
+  onStrokeColorChange,
+  onStrokeWidthChange,
 }: LayerSettingsWindowProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
 
@@ -39,6 +53,7 @@ export default function LayerSettingsWindow({
   } | null>(null);
 
   const [isColorPaletteOpen, setIsColorPaletteOpen] = useState(false);
+  const [isStrokeColorPaletteOpen, setIsStrokeColorPaletteOpen] = useState(false);
 
   // Close with ESC key
   useEffect(() => {
@@ -111,6 +126,7 @@ export default function LayerSettingsWindow({
   useEffect(() => {
     if (!isOpen) return;
     setIsColorPaletteOpen(false);
+    setIsStrokeColorPaletteOpen(false);
   }, [isOpen, layer?.id]);
 
   // If closed or missing data, render nothing
@@ -120,6 +136,34 @@ export default function LayerSettingsWindow({
   const currentOpacity = layer.opacity ?? 1;
   const opacityPercent = Math.round(currentOpacity * 100);
   const currentColor = layer.color ?? "#2563EB";
+  
+  // Detect geometry type
+  const geomType = normalizeGeomKey(layer.geometryType);
+  const isPoint = geomType === "point";
+  const isLine = geomType === "line";
+  const isPolygon = geomType === "polygon";
+  
+  // Point settings
+  const currentPointSymbol = layer.pointSymbol ?? "circle";
+  const currentCustomSymbol = layer.customSymbol ?? "★";
+  const currentPointSize = layer.pointSize ?? 6;
+  
+  // Line settings
+  const currentLineWidth = layer.lineWidth ?? 3;
+  const currentLineStyle = layer.lineStyle ?? "solid";
+  
+  // Polygon settings
+  const currentStrokeColor = layer.strokeColor ?? "#000000";
+  const currentStrokeWidth = layer.strokeWidth ?? 2;
+  
+  // Helper to detect geometry from geometryType string
+  function normalizeGeomKey(geometryType?: string) {
+    const t = (geometryType ?? "").toLowerCase();
+    if (t.includes("point")) return "point";
+    if (t.includes("line")) return "line";
+    if (t.includes("polygon")) return "polygon";
+    return "unknown";
+  }
 
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = Number(e.target.value);
@@ -424,6 +468,296 @@ export default function LayerSettingsWindow({
                 </div>
               )}
             </div>
+          )}
+
+          {/* Point-specific settings */}
+          {isVector && isPoint && (
+            <>
+              {/* Point Symbology */}
+              <div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 6,
+                  }}
+                >
+                  <span style={{ fontWeight: 600 }}>Symbol</span>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {["circle", "square", "triangle", "custom"].map((sym) => {
+                    const symbol = sym as "circle" | "square" | "triangle" | "custom";
+                    const selected = currentPointSymbol === symbol;
+                    return (
+                      <button
+                        key={sym}
+                        type="button"
+                        onClick={() => onPointSymbolChange(layer.id, symbol)}
+                        style={{
+                          paddingInline: 10,
+                          paddingBlock: 4,
+                          borderRadius: radii.sm,
+                          border: selected ? `2px solid ${colors.primary}` : `1px solid ${colors.borderStroke}`,
+                          backgroundColor: selected ? colors.primary : colors.cardBackground,
+                          color: selected ? colors.primaryForeground : colors.sidebarForeground,
+                          cursor: "pointer",
+                          fontSize: typography.sizeSm,
+                          textTransform: "capitalize",
+                        }}
+                      >
+                        {sym}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Custom Symbol Input */}
+              {currentPointSymbol === "custom" && (
+                <div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: 6,
+                    }}
+                  >
+                    <span style={{ fontWeight: 600 }}>Custom Symbol</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={currentCustomSymbol}
+                    onChange={(e) => onCustomSymbolChange(layer.id, e.target.value)}
+                    placeholder="Paste unicode symbol (e.g., ★, ●, ▲)"
+                    maxLength={5}
+                    style={{
+                      width: "100%",
+                      paddingInline: 10,
+                      paddingBlock: 6,
+                      borderRadius: radii.sm,
+                      border: `1px solid ${colors.borderStroke}`,
+                      backgroundColor: colors.cardBackground,
+                      color: colors.sidebarForeground,
+                      fontSize: typography.sizeSm,
+                      fontFamily: typography.normalFont,
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Point Size */}
+              <div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 4,
+                  }}
+                >
+                  <span style={{ fontWeight: 600 }}>Symbol Size</span>
+                  <span style={{ opacity: 0.8 }}>{currentPointSize}px</span>
+                </div>
+                <input
+                  type="range"
+                  min={2}
+                  max={30}
+                  value={currentPointSize}
+                  onChange={(e) => onPointSizeChange(layer.id, Number(e.target.value))}
+                  style={{
+                    width: "100%",
+                    accentColor: colors.primary,
+                  }}
+                />
+              </div>
+            </>
+          )}
+
+          {/* Line-specific settings */}
+          {isVector && isLine && (
+            <>
+              {/* Line Width */}
+              <div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 4,
+                  }}
+                >
+                  <span style={{ fontWeight: 600 }}>Line Width</span>
+                  <span style={{ opacity: 0.8 }}>{currentLineWidth}px</span>
+                </div>
+                <input
+                  type="range"
+                  min={1}
+                  max={20}
+                  value={currentLineWidth}
+                  onChange={(e) => onLineWidthChange(layer.id, Number(e.target.value))}
+                  style={{
+                    width: "100%",
+                    accentColor: colors.primary,
+                  }}
+                />
+              </div>
+
+              {/* Line Style */}
+              <div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 6,
+                  }}
+                >
+                  <span style={{ fontWeight: 600 }}>Line Style</span>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {["solid", "dashed", "dotted"].map((style) => {
+                    const lineStyle = style as "solid" | "dashed" | "dotted";
+                    const selected = currentLineStyle === lineStyle;
+                    return (
+                      <button
+                        key={style}
+                        type="button"
+                        onClick={() => onLineStyleChange(layer.id, lineStyle)}
+                        style={{
+                          flex: 1,
+                          paddingInline: 10,
+                          paddingBlock: 4,
+                          borderRadius: radii.sm,
+                          border: selected ? `2px solid ${colors.primary}` : `1px solid ${colors.borderStroke}`,
+                          backgroundColor: selected ? colors.primary : colors.cardBackground,
+                          color: selected ? colors.primaryForeground : colors.sidebarForeground,
+                          cursor: "pointer",
+                          fontSize: typography.sizeSm,
+                          textTransform: "capitalize",
+                        }}
+                      >
+                        {style}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Polygon-specific settings */}
+          {isVector && isPolygon && (
+            <>
+              {/* Stroke Color */}
+              <div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 6,
+                  }}
+                >
+                  <span style={{ fontWeight: 600 }}>Contour Color</span>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span
+                      title={currentStrokeColor}
+                      style={{
+                        width: 16,
+                        height: 16,
+                        borderRadius: 999,
+                        backgroundColor: currentStrokeColor,
+                        border: `1px solid ${colors.borderStroke}`,
+                        display: "inline-block",
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setIsStrokeColorPaletteOpen((v) => !v)}
+                      style={{
+                        paddingInline: 10,
+                        paddingBlock: 4,
+                        borderRadius: radii.sm,
+                        border: `1px solid ${colors.borderStroke}`,
+                        backgroundColor: colors.cardBackground,
+                        cursor: "pointer",
+                        fontSize: typography.sizeSm,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {isStrokeColorPaletteOpen ? "Close" : "Change"}
+                    </button>
+                  </div>
+                </div>
+
+                {isStrokeColorPaletteOpen && (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 8,
+                      padding: 10,
+                      borderRadius: radii.md,
+                      border: `1px solid ${colors.borderStroke}`,
+                      backgroundColor: colors.cardBackground,
+                    }}
+                  >
+                    {LAYER_COLOR_PALETTE.map((c) => {
+                      const selected = c.toLowerCase() === currentStrokeColor.toLowerCase();
+                      return (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => {
+                            onStrokeColorChange(layer.id, c);
+                            setIsStrokeColorPaletteOpen(false);
+                          }}
+                          title={c}
+                          style={{
+                            width: 22,
+                            height: 22,
+                            borderRadius: 999,
+                            border: selected ? `2px solid ${colors.primary}` : `1px solid ${colors.borderStroke}`,
+                            backgroundColor: c,
+                            cursor: "pointer",
+                            padding: 0,
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Stroke Width */}
+              <div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 4,
+                  }}
+                >
+                  <span style={{ fontWeight: 600 }}>Contour Thickness</span>
+                  <span style={{ opacity: 0.8 }}>{currentStrokeWidth}px</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={10}
+                  value={currentStrokeWidth}
+                  onChange={(e) => onStrokeWidthChange(layer.id, Number(e.target.value))}
+                  style={{
+                    width: "100%",
+                    accentColor: colors.primary,
+                  }}
+                />
+              </div>
+            </>
           )}
 
           {/* Opacity controls */}
