@@ -544,7 +544,7 @@ def add_layer():
 
         case ".gpkg":
             selected_layers = selected_layers if selected_layers else None
-            layer_id, metadata = layer_manager.add_gpkg_layers(temp_path, selected_layers)
+            layer_id, metadata = layer_manager.add_gpkg_layers(temp_path, selected_layers=selected_layers)
 
         case _:
             if os.path.exists(temp_path):
