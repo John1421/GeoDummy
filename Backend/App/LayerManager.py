@@ -764,6 +764,19 @@ class LayerManager:
             }
 
     @staticmethod
+    def _sanitize_for_json(data):
+        """Recursively replace NaN/Infinity with None so metadata is valid JSON."""
+        if isinstance(data, float):
+            if math.isnan(data) or math.isinf(data):
+                return None
+            return data
+        if isinstance(data, dict):
+            return {k: LayerManager._sanitize_for_json(v) for k, v in data.items()}
+        if isinstance(data, list):
+            return [LayerManager._sanitize_for_json(v) for v in data]
+        return data
+
+    @staticmethod
     def __move_to_permanent(temp_layer_path, layer_id, metadata_dict):
         # Move layer file to permanent storage
         _, ext = os.path.splitext(temp_layer_path)
@@ -782,7 +795,8 @@ class LayerManager:
 
         try:
             with open(meta_path, 'w') as f:
-                json.dump(metadata_dict, f, indent=4)
+                clean_metadata = LayerManager._sanitize_for_json(metadata_dict)
+                json.dump(clean_metadata, f, indent=4, allow_nan=False)
         except Exception as e:
             raise ValueError(f"Failed to save layer metadata: {e}")
 

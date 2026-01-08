@@ -1,5 +1,6 @@
 
 import json
+import math
 from flask import Flask, request, after_this_request, jsonify, send_file, abort, g
 from werkzeug.exceptions import HTTPException, BadRequest, NotFound, InternalServerError, UnprocessableEntity
 import geopandas as gpd
@@ -118,6 +119,19 @@ def log_response(response):
 log_manager = LogManager(disable_console=False, disable_werkzeug=False)
 
 log_manager.configure_flask_logger(app)
+
+
+def _sanitize_for_json(data):
+    """Recursively replace NaN/Infinity with None to keep responses JSON-parseable."""
+    if isinstance(data, float):
+        if math.isnan(data) or math.isinf(data):
+            return None
+        return data
+    if isinstance(data, dict):
+        return {k: _sanitize_for_json(v) for k, v in data.items()}
+    if isinstance(data, list):
+        return [_sanitize_for_json(v) for v in data]
+    return data
 
 @app.route('/')
 def home():
@@ -465,12 +479,13 @@ def list_layers():
             # Read metadata file
             try:
                 with open(metadata_path, "r") as f:
-                    layer_metadata = json.load(f)
+                    layer_metadata = _sanitize_for_json(json.load(f))
+                # Only append if successful
+                layer_ids.append(layer_id)
+                metadata.append(layer_metadata)
             except Exception:
-                layer_metadata = None
-                layer_id = None  
-            layer_ids.append(layer_id)
-            metadata.append(layer_metadata)
+                # Skip this layer entirely if metadata cannot be read
+                continue
 
     return jsonify({ "layer_id": layer_ids, "metadata": metadata}), 200
 
@@ -601,11 +616,12 @@ def get_layer(layer_id):
     
     return send_file(export_file_abs, as_attachment=True, download_name=f"{layer_id}{extension}")
 
+'''
 @app.route('/layers', methods=['GET'])
 def list_layer_ids_endpoint():
     ids, metadata = layer_manager.list_layer_ids()
     return jsonify({"layer_ids": ids, "metadata": metadata}), 200
-
+'''
 
 
 '''

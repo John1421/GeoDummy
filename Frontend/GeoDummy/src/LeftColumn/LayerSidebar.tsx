@@ -205,6 +205,22 @@ interface LayerSidebarProps {
   onAddLayerRef?: (addLayerFn: (layer_id: string, metadata: BackendLayerMetadata) => Promise<void>) => void;
 }
 
+// Fetch existing layers on app load
+async function fetchExistingLayers(): Promise<{
+  ids: string[];
+  metadata: BackendLayerMetadata[];
+}> {
+  const res = await fetch("http://localhost:5050/layers");
+  
+  if (!res.ok) throw new Error("Failed to fetch layers");
+
+  const data = await res.json();
+  return {
+    ids: data.layer_id,
+    metadata: data.metadata,
+  };
+}
+
 
 async function postLayerFile(
   file: File,
@@ -672,6 +688,84 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
     [getNextOrder, setLayers]
   );
 
+  // useEffect used once to fetch existing layers on app load
+  useEffect(() => {
+    let cancelled = false;
+
+    async function bootstrap() {
+      try {
+        const { ids, metadata } = await fetchExistingLayers();
+
+        if (cancelled) return;
+
+        const baseOrder = 0;
+
+        setLayers(
+          ids.map((id, i) => ({
+            id,
+            title: metadata[i]?.layer_name || id,
+            order: baseOrder + i,
+            opacity: 1,
+            previousOpacity: 1,
+            origin: "backend",
+            status: "active",
+          }))
+        );
+
+        // Now fetch actual data per layer
+        for (let i = 0; i < ids.length; i++) {
+          const id = ids[i];
+          const meta = metadata[i];
+
+          if (meta.type === "vector") {
+            const geojson = await getVectorLayerData(id);
+            if (cancelled) return;
+
+            setLayers(prev =>
+              prev.map(l =>
+                l.id === id
+                  ? {
+                      ...l,
+                      kind: "vector",
+                      geometryType: meta.geometry_type,
+                      vectorData: geojson,
+                      color: defaultColorForGeometryType(meta.geometry_type),
+                      projection: meta.crs ?? "EPSG:4326",
+                    }
+                  : l
+              )
+            );
+          }
+
+          if (meta.type === "raster") {
+            if (cancelled) return;
+
+            setLayers(prev =>
+              prev.map(l =>
+                l.id === id
+                  ? {
+                      ...l,
+                      kind: "raster",
+                      geometryType: "Raster",
+                      rasterData: getRasterDescriptor(id, meta),
+                      projection: meta.crs ?? "EPSG:4326",
+                    }
+                  : l
+              )
+            );
+          }
+        }
+      } catch (err) {
+        console.error("Failed to bootstrap layers:", err);
+      }
+    }
+
+    bootstrap();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [setLayers]);
 
 
   // Expose handleAddLayer to parent component
@@ -682,10 +776,10 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
   }, [getLayer, onAddLayerRef]);
 
   // Seed demo layers only when the list is empty (first app open)
-  useEffect(() => {
+  /*useEffect(() => {
     if (layers.length > 0) return;
     setLayers(DEMO_LAYERS);
-  }, [layers.length, setLayers]);
+  }, [layers.length, setLayers]);*/
 
   /** Rename layer title (double-click edit in card). */
   const handleRenameLayer = useCallback(
