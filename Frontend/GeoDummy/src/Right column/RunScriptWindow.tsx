@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import PopUpWindowModal from '../TemplateModals/PopUpWindowModal';
 import { Play } from "lucide-react";
+import type { BackendLayerMetadata } from '../LeftColumn/LayerSidebar';
 
 interface RunScriptWindowProps {
   isOpen: boolean;
   onClose: () => void;
   scriptId: string;
-  onAddLayer: (layer_id: string, metadata: unknown) => Promise<void>;
+  onAddLayer: (layer_id: string, metadata: BackendLayerMetadata) => Promise<void>;
   onScriptStart: () => void;
   onScriptEnd: () => void;
 }
@@ -114,11 +115,11 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
         const normalizedParameters: Record<string, Parameter> =
           Array.isArray(rawMetadata.parameters)
             ? Object.fromEntries(
-                rawMetadata.parameters.map((p) => [
-                  p.name,
-                  { type: p.type, value: '' }
-                ])
-              )
+              rawMetadata.parameters.map((p) => [
+                p.name,
+                { type: p.type, value: '' }
+              ])
+            )
             : rawMetadata.parameters;
 
         setMetadata({
@@ -309,7 +310,7 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
               if (response.ok) {
                 const data = await response.json();
                 const layersReturned: string[] = data.layer_ids || [];
-                const metadatasReturned: LayerMetadata[] = data.metadatas || [];
+                const metadatasReturned: BackendLayerMetadata[] = data.metadatas || [];
 
                 console.log('Script executed successfully:', data);
 

@@ -52,21 +52,21 @@ export interface Layer {
 
   // Vector styling (raster ignores this for now)
   color?: string; // hex like "#22C55E"
-  
+
   // Point-specific styling
   pointSymbol?: "circle" | "square" | "triangle" | "custom"; // Point symbology type
   customSymbol?: string; // Unicode character for custom symbols
   pointSize?: number; // Point marker size (radius for circle, side for square, etc.)
-  
+
   // Line-specific styling
   lineWidth?: number; // Line stroke width
   lineStyle?: "solid" | "dashed" | "dotted"; // Line dash pattern
-  
+
   // Polygon-specific styling
   strokeColor?: string; // Polygon contour/border color
   strokeWidth?: number; // Polygon contour/border width
 }
-type BackendLayerMetadata =
+export type BackendLayerMetadata =
   | {
     type: "vector";
     layer_name: string;
@@ -172,42 +172,42 @@ const DEMO_POLYGONS: GeoJSON.FeatureCollection = {
 */
 // Demo layers to show on first app open
 // const DEMO_LAYERS: Layer[] = [
-  /*  {
-      id: "demo_raster_osm",
-      title: "Demo Raster (Satellite)",
-      order: 0,
-      opacity: 1,
-      kind: "raster",
-      rasterData: {
-        kind: "xyz",
-        urlTemplate:
-          "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        minZoom: 0,
-        maxZoom: 19,
-      },
-      // raster ignores color for now
+/*  {
+    id: "demo_raster_osm",
+    title: "Demo Raster (Satellite)",
+    order: 0,
+    opacity: 1,
+    kind: "raster",
+    rasterData: {
+      kind: "xyz",
+      urlTemplate:
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      minZoom: 0,
+      maxZoom: 19,
     },
-   {
-      id: "demo_points",
-      title: "Demo Points",
-      order: 1,
-      opacity: 1,
-      kind: "vector",
-      geometryType: "Point",
-      vectorData: DEMO_POINTS,
-      color: defaultColorForGeometryType("Point"),
-    },
-    {
-      id: "demo_polygons",
-      title: "Demo Polygons",
-      order: 2,
-      opacity: 1,
-      kind: "vector",
-      geometryType: "Polygon",
-      vectorData: DEMO_POLYGONS,
-      color: defaultColorForGeometryType("Polygon"),
-    },
-    */
+    // raster ignores color for now
+  },
+ {
+    id: "demo_points",
+    title: "Demo Points",
+    order: 1,
+    opacity: 1,
+    kind: "vector",
+    geometryType: "Point",
+    vectorData: DEMO_POINTS,
+    color: defaultColorForGeometryType("Point"),
+  },
+  {
+    id: "demo_polygons",
+    title: "Demo Polygons",
+    order: 2,
+    opacity: 1,
+    kind: "vector",
+    geometryType: "Polygon",
+    vectorData: DEMO_POLYGONS,
+    color: defaultColorForGeometryType("Polygon"),
+  },
+  */
 // ];
 
 interface LayerSidebarProps {
@@ -224,7 +224,7 @@ async function fetchExistingLayers(): Promise<{
   metadata: BackendLayerMetadata[];
 }> {
   const res = await fetch("http://localhost:5050/layers");
-  
+
   if (!res.ok) throw new Error("Failed to fetch layers");
 
   const data = await res.json();
@@ -735,13 +735,13 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
               prev.map(l =>
                 l.id === id
                   ? {
-                      ...l,
-                      kind: "vector",
-                      geometryType: meta.geometry_type,
-                      vectorData: geojson,
-                      color: defaultColorForGeometryType(meta.geometry_type),
-                      projection: meta.crs ?? "EPSG:4326",
-                    }
+                    ...l,
+                    kind: "vector",
+                    geometryType: meta.geometry_type,
+                    vectorData: geojson,
+                    color: defaultColorForGeometryType(meta.geometry_type),
+                    projection: meta.crs ?? "EPSG:4326",
+                  }
                   : l
               )
             );
@@ -754,12 +754,12 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
               prev.map(l =>
                 l.id === id
                   ? {
-                      ...l,
-                      kind: "raster",
-                      geometryType: "Raster",
-                      rasterData: getRasterDescriptor(id, meta),
-                      projection: meta.crs ?? "EPSG:4326",
-                    }
+                    ...l,
+                    kind: "raster",
+                    geometryType: "Raster",
+                    rasterData: getRasterDescriptor(id, meta),
+                    projection: meta.crs ?? "EPSG:4326",
+                  }
                   : l
               )
             );
@@ -990,9 +990,9 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
       setLayers((prev) =>
         prev.map((l) => {
           if (l.id !== layerId) return l;
-          
+
           const defaultColor = defaultColorForGeometryType(l.geometryType);
-          
+
           return {
             ...l,
             color: defaultColor,
@@ -1125,7 +1125,7 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
               onSelectLayer={handleSelectLayer}
             />
           </div>
-          
+
           {/* Fixed settings window at bottom */}
           {settingsLayerId && (
             <div

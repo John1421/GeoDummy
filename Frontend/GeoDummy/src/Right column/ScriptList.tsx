@@ -6,6 +6,7 @@ import { colors, icons } from "../Design/DesignTokens";
 import ToolCategoryToggle from "./ToolCategoryToggle";
 import ScriptCard from "./ScriptCard";
 import AddNewScript from "./AddNewScript";
+import type { BackendLayerMetadata } from "../LeftColumn/LayerSidebar";
 
 export interface Script {
   id: string;
@@ -42,7 +43,7 @@ export interface Script {
 // ];
 
 interface ScriptListProps {
-  onAddLayer: (layer_id: string, metadata: unknown) => Promise<void>;
+  onAddLayer: (layer_id: string, metadata: BackendLayerMetadata) => Promise<void>;
 }
 
 export default function ScriptList({ onAddLayer }: ScriptListProps) {
@@ -55,7 +56,7 @@ export default function ScriptList({ onAddLayer }: ScriptListProps) {
     const fetchScripts = async () => {
       try {
         const response = await fetch("http://localhost:5050/scripts");
-        
+
         if (!response.ok) {
           throw new Error("Error retrieving scripts");
         }

@@ -23,7 +23,7 @@ import type { Layer } from "./LayerSidebar";
 interface Props {
   layers: Layer[];
   setLayers: React.Dispatch<React.SetStateAction<Layer[]>>;
-  onSettings: (layerId: string, rect: DOMRect) => void;
+  onSettings: (layerId: string) => void;
   onToggleVisibility: (layerId: string) => void;
   onRename: (layerId: string, newTitle: string) => void;
   selectedLayerId: string | null;
