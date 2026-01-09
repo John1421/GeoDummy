@@ -465,7 +465,7 @@ class LayerManager:
         # If neither raster nor vector layer found, raise error
         raise ValueError(f"Layer '{layer_id}' not found in rasters or GeoPackage")
 
-    def get_layer_for_script(self, layer_id):
+    def get_layer_path(self, layer_id):
         """
         Get the file path for a layer to be used in scripts.
 

@@ -376,7 +376,7 @@ class ScriptManager:
 
         # Process each argument
         for layer in layers:
-            layer = layer_manager.get_layer_for_script(layer)
+            layer = layer_manager.get_layer_path(layer)
 
             if layer is not None:
                 # Copy layer onto the execution_dir_input folder

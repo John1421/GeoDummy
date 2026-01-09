@@ -772,16 +772,25 @@ def get_layer_preview(layer_id):
         raise ValueError(f"Error serving tile: {e}")
 
 
-@app.route('/layers/<layer_id>', methods=['PUT'])
+@app.route('/layers/export/<layer_id>', methods=['GET'])
 def export_layer(layer_id):
-    data = request.get_json()
-
     if not layer_id:
         raise BadRequest("layer_id is required")
 
-    # TODO: remove layer
+    layer = layer_manager.get_layer_path(layer_id)
+    extension = layer_manager.get_layer_extension(layer_id)
 
-    return jsonify({"message": f"Layer {layer_id} exported"}), 200
+    export_file_abs = os.path.abspath(layer)
+    if not os.path.isfile(export_file_abs):
+        raise InternalServerError(f"Exported file not found: {export_file_abs}")
+    
+    app.logger.info(
+        "[%s] %s",
+        g.request_id,
+        f"Exported layer {layer}"
+    )
+
+    return send_file(export_file_abs, as_attachment=True, download_name=f"{layer_id}{extension}")
 
 @app.route('/layers/<layer_id>', methods=['DELETE'])
 def remove_layer(layer_id):

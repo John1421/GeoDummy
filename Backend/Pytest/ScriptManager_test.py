@@ -34,8 +34,8 @@ class TestScriptManager:
             # Fix TypeError: Ensure MAX_LAYER_FILE_SIZE is an int, not a Mock
             mock_lm.MAX_LAYER_FILE_SIZE = 100 * 1024 * 1024 
             
-            # Fix OSError: Ensure get_layer_for_script returns a string path
-            mock_lm.get_layer_for_script.return_value = None 
+            # Fix OSError: Ensure get_layer_path returns a string path
+            mock_lm.get_layer_path.return_value = None 
             
             yield mock_fm, mock_lm
 
@@ -259,7 +259,7 @@ class TestScriptManager:
         
         # Setup mock layer paths
         execution_dir = "/tmp/exec/inputs"
-        mock_lm.get_layer_for_script.side_effect = ["/data/layer1.geojson", "/data/layer2.tif"]
+        mock_lm.get_layer_path.side_effect = ["/data/layer1.geojson", "/data/layer2.tif"]
         
         data = {"layers": ["id1", "id2"], "other_param": 123}
         
@@ -283,7 +283,7 @@ class TestScriptManager:
         """
         _, mock_lm = mock_deps
         mock_isdir.return_value = True
-        mock_lm.get_layer_for_script.return_value = None
+        mock_lm.get_layer_path.return_value = None
         
         data = {"layers": ["missing_layer"]}
         execution_dir = "/tmp/exec/inputs"

@@ -186,16 +186,16 @@ class TestLayerManager:
             with pytest.raises(ValueError, match="Error reading GeoPackage: Disk Error"):
                 layer_manager.get_layer_information("corrupt_layer")
 
-    # --- get_layer_for_script Method Tests ---
+    # --- get_layer_path Method Tests ---
 
-    def test_get_layer_for_script_raster(self, layer_manager: LayerManager) -> None:
+    def test_get_layer_path_raster(self, layer_manager: LayerManager) -> None:
         """Test that it returns the raster path immediately if the ID is a raster."""
         mock_path = "/path/to/raster.tif"
         with patch.object(layer_manager, 'is_raster', return_value=mock_path):
-            result = layer_manager.get_layer_for_script("my_raster")
+            result = layer_manager.get_layer_path("my_raster")
             assert result == mock_path
 
-    def test_get_layer_for_script_vector_extraction(self, layer_manager: LayerManager, mock_file_manager: MagicMock) -> None:
+    def test_get_layer_path_vector_extraction(self, layer_manager: LayerManager, mock_file_manager: MagicMock) -> None:
         """
         Fixed test: Normalizes both expected and actual paths to resolve OS-specific slash mismatches.
         """
@@ -206,14 +206,14 @@ class TestLayerManager:
         with patch('os.path.isfile', return_value=True), \
              patch('App.LayerManager.LayerManager.is_raster', return_value=None):
             
-            result = layer_manager.get_layer_for_script(layer_id)
+            result = layer_manager.get_layer_path(layer_id)
             
             # Use os.path.normpath on the result as well for a safe comparison
             assert os.path.normpath(result) == expected_path
             # Check that the directory part is correct
             assert os.path.normpath(mock_file_manager.layers_dir) in os.path.normpath(result)
 
-    def test_get_layer_for_script_vector_missing(self, layer_manager: LayerManager, mock_file_manager: MagicMock) -> None:
+    def test_get_layer_path_vector_missing(self, layer_manager: LayerManager, mock_file_manager: MagicMock) -> None:
         """
         Fixed test: Ensures it returns None when the specific .gpkg file is missing.
         """
@@ -223,7 +223,7 @@ class TestLayerManager:
         with patch('App.LayerManager.LayerManager.is_raster', return_value=None), \
              patch('os.path.isfile', return_value=False):
             
-            result = layer_manager.get_layer_for_script(layer_id)
+            result = layer_manager.get_layer_path(layer_id)
             
             # This should now pass as the source code returns None if the file isn't found
             assert result is None
