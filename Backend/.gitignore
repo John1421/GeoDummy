@@ -4,3 +4,7 @@
 Pytest/coverage_report
 Pytest/__pycache__
 data
+.venv/
+.env/
+venv/
+logs/

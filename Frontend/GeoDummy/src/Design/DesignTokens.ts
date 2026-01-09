@@ -38,16 +38,17 @@ export const colors = {
 };
 
 export const LAYER_COLOR_PALETTE: string[] = [
-  "#4B5563", // gray
-  "#0F172A", // slate
-  "#6936c3ff", // purple
-  "#1e52c1ff", // blue
+  "#d7dce4ff", // white
+  "#595e66ff", // gray
+  "#0d131fff", // slate
+  "#643baaff", // purple
+  "#174b9fff", // blue
   "#0891B2", // cyan
-  "#49aa6dff", // green
-  "#CA8A04", // amber
-  "#F97316", // orange
-  "#ca5887ff", // pink
-  "#bf1717ff", // red
+  "#2ed169ff", // green
+  "#edc224ff", // yellow
+  "#f77213ff", // orange
+  "#f996bfff", // pink
+  "#d31414ff", // red
 ];
 
 export const typography = {

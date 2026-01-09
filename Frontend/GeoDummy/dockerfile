@@ -2,19 +2,20 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-# Copiar ficheiros de dependências
-COPY package.json package-lock.json ./
+
+# Copiar o restante projeto
+COPY package.json .
+COPY package-lock.json .
 
 RUN npm ci
 
-# Copiar o restante projeto
+RUN npm install -g http-server
+
 COPY . .
 
 # Build Vite
 RUN npm run build
 
-# Instalar o http-server globalmente
-RUN npm install -g http-server
 
 # Create group and user before changing ownership
 RUN addgroup -S appgroup && adduser -S user -G appgroup
@@ -22,13 +23,11 @@ RUN addgroup -S appgroup && adduser -S user -G appgroup
 # Change ownership of the /app folder
 RUN chown -R user:appgroup /app
 
-
-
 # Switch to the new user
 USER user
 
 # Expor porta
-EXPOSE 80
+EXPOSE 5173
 
 # Servir a pasta dist
-CMD ["http-server", "dist", "-p", "80"]
+CMD ["http-server", "dist", "-p", "5173"]

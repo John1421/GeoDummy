@@ -1,12 +1,5 @@
 import json
 import pytest
-import pathlib
-import sys
-
-# # Ensure repo root is on sys.path so `import Backend...` works when cwd is Backend/Pytest
-# repo_root = pathlib.Path(__file__).resolve().parents[2]  # two levels up -> repo root
-# sys.path.insert(0, str(repo_root))
-
 from App.BasemapManager import BasemapManager
 
 @pytest.fixture

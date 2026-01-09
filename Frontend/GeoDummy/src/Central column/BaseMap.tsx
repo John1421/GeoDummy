@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Layer, RasterDescriptor } from "../LeftColumn/LayerSidebar";
@@ -11,6 +11,8 @@ type Props = {
   initialUrl: string;
   initialAttribution?: string;
   layers: Layer[];
+  enableHoverHighlight?: boolean;
+  enableClickPopup?: boolean;
 };
 
 type GjFeature = GeoJSON.Feature<GeoJSON.Geometry, GeoJSON.GeoJsonProperties>;
@@ -23,16 +25,28 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
  */
 const paneNameForLayerId = (id: string) => `layer-pane-${id.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
 
-export default function BaseMap({ initialUrl, initialAttribution, layers }: Props) {
+export default function BaseMap({ 
+  initialUrl, 
+  initialAttribution, 
+  layers,
+  enableHoverHighlight = true,
+  enableClickPopup = true
+}: Props) {
   const mapRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
 
   // Rendered overlays keyed by layer id
   const vectorOverlaysRef = useRef<Map<string, L.GeoJSON>>(new Map());
   const rasterOverlaysRef = useRef<Map<string, L.Layer>>(new Map());
+  
+  // Track previous point symbol to detect changes
+  const previousPointSymbolRef = useRef<Map<string, string>>(new Map());
 
   // Keep track of which panes we created, so we can manage them if needed
   const panesRef = useRef<Map<string, string>>(new Map());
+  
+  // Track interaction settings to trigger layer recreation when they change
+  const prevInteractionSettingsRef = useRef({ hover: enableHoverHighlight, click: enableClickPopup });
 
 
   // Init map once
@@ -102,15 +116,19 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
   const leafletStyleForFeature = (
     feature: GeoJSON.Feature | undefined,
     opacity: number,
-    color: string
+    color: string,
+    layer?: Layer
   ): L.PathOptions => {
     const t = feature?.geometry?.type;
 
     if (t === "Polygon" || t === "MultiPolygon") {
+      const strokeWidth = layer?.strokeWidth ?? 2;
+      const strokeColor = layer?.strokeColor ?? "#000000";
       return {
-        stroke: false,
-        weight: 0,
-        opacity: 0,
+        stroke: true,
+        color: strokeColor,
+        weight: strokeWidth,
+        opacity: opacity,
         fill: true,
         fillColor: color,
         fillOpacity: opacity,
@@ -118,12 +136,21 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
     }
 
     if (t === "LineString" || t === "MultiLineString") {
+      const lineWidth = layer?.lineWidth ?? 3;
+      const lineStyle = layer?.lineStyle ?? "solid";
+      let dashArray: string | undefined;
+      if (lineStyle === "dashed") {
+        dashArray = "10, 10";
+      } else if (lineStyle === "dotted") {
+        dashArray = "2, 6";
+      }
       return {
         stroke: true,
         color,
-        weight: 3,
+        weight: lineWidth,
         opacity: opacity,
         fillOpacity: 0,
+        dashArray,
       };
     }
 
@@ -138,14 +165,80 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
     };
   };
 
-  const applyVectorStyle = useCallback((gj: L.GeoJSON, opacity: number, color: string) => {
-    gj.setStyle((feat) => leafletStyleForFeature(feat as GjFeature, opacity, color));
+  const applyVectorStyle = useCallback((gj: L.GeoJSON, opacity: number, color: string, layer?: Layer) => {
+    gj.setStyle((feat) => leafletStyleForFeature(feat as GjFeature, opacity, color, layer));
     gj.eachLayer((child) => {
       if (child instanceof L.CircleMarker) {
+        const pointSize = layer?.pointSize ?? 6;
         child.setStyle({ stroke: false, opacity: 0, fill: true, fillColor: color, fillOpacity: opacity });
+        child.setRadius(pointSize);
       }
     });
   }, []);
+
+  /**
+   * Create a point marker based on the layer's symbol configuration.
+   * Supports circle, square, triangle, and custom unicode symbols.
+   */
+  const createPointMarker = (
+    latlng: L.LatLng,
+    layer: Layer,
+    opacity: number,
+    color: string,
+    pane?: string
+  ): L.Marker | L.CircleMarker => {
+    const pointSymbol = layer.pointSymbol ?? "circle";
+    const pointSize = layer.pointSize ?? 6;
+    const customSymbol = layer.customSymbol ?? "★";
+
+    if (pointSymbol === "custom") {
+      // Use a DivIcon for custom symbols
+      const icon = L.divIcon({
+        html: `<div style="font-size: ${pointSize * 2}px; color: ${color}; opacity: ${opacity}; line-height: 1; transform: translate(-50%, -50%);">${customSymbol}</div>`,
+        className: "",
+        iconSize: [pointSize * 2, pointSize * 2],
+        iconAnchor: [pointSize, pointSize],
+      });
+      return L.marker(latlng, { icon, pane });
+    }
+
+    if (pointSymbol === "square") {
+      // Use a custom SVG for square
+      const svgIcon = L.divIcon({
+        html: `<svg width="${pointSize * 2}" height="${pointSize * 2}" xmlns="http://www.w3.org/2000/svg">
+          <rect width="${pointSize * 2}" height="${pointSize * 2}" fill="${color}" opacity="${opacity}" />
+        </svg>`,
+        className: "",
+        iconSize: [pointSize * 2, pointSize * 2],
+        iconAnchor: [pointSize, pointSize],
+      });
+      return L.marker(latlng, { icon: svgIcon, pane });
+    }
+
+    if (pointSymbol === "triangle") {
+      // Use a custom SVG for triangle
+      const svgIcon = L.divIcon({
+        html: `<svg width="${pointSize * 2}" height="${pointSize * 2}" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="${pointSize},0 ${pointSize * 2},${pointSize * 2} 0,${pointSize * 2}" fill="${color}" opacity="${opacity}" />
+        </svg>`,
+        className: "",
+        iconSize: [pointSize * 2, pointSize * 2],
+        iconAnchor: [pointSize, pointSize * 1.5],
+      });
+      return L.marker(latlng, { icon: svgIcon, pane });
+    }
+
+    // Default: circle
+    return L.circleMarker(latlng, {
+      pane,
+      radius: pointSize,
+      stroke: false,
+      opacity: 0,
+      fill: true,
+      fillColor: color,
+      fillOpacity: opacity,
+    });
+  };
 
 
   const createRasterLayer = (desc: RasterDescriptor, opacity: number, pane?: string): L.Layer => {
@@ -174,6 +267,19 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+
+    // If interaction settings changed, clear all vector layers to force recreation
+    const interactionSettingsChanged = 
+      prevInteractionSettingsRef.current.hover !== enableHoverHighlight ||
+      prevInteractionSettingsRef.current.click !== enableClickPopup;
+    
+    if (interactionSettingsChanged) {
+      for (const gj of vectorOverlaysRef.current.values()) {
+        map.removeLayer(gj);
+      }
+      vectorOverlaysRef.current.clear();
+      prevInteractionSettingsRef.current = { hover: enableHoverHighlight, click: enableClickPopup };
+    }
 
     const incomingIds = new Set(layers.map((l) => l.id));
 
@@ -209,26 +315,187 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
       const pane = panesRef.current.get(layer.id);
 
       const existing = vectorOverlaysRef.current.get(layer.id);
+      
+      // Remove layer if opacity is 0 (hidden)
+      if (opacity === 0) {
+        if (existing) {
+          map.removeLayer(existing);
+          vectorOverlaysRef.current.delete(layer.id);
+        }
+        continue;
+      }
+      
       if (!existing) {
+        const currentSymbol = layer.pointSymbol ?? "circle";
+        previousPointSymbolRef.current.set(layer.id, currentSymbol);
+        
         const gj = L.geoJSON(layer.vectorData, {
           pane,
-          style: (feat) => leafletStyleForFeature(feat as GjFeature, opacity, color),
-          pointToLayer: (_feature, latlng) =>
-            L.circleMarker(latlng, {
-              pane,
-              radius: 6,
-              stroke: false,
-              opacity: 0,
-              fill: true,
-              fillColor: color,
-              fillOpacity: opacity,
-            }),
+          style: (feat) => leafletStyleForFeature(feat as GjFeature, opacity, color, layer),
+          pointToLayer: (_feature, latlng) => createPointMarker(latlng, layer, opacity, color, pane),
+          onEachFeature: (feature, featureLayer) => {
+            // Create popup content from feature properties
+            if (enableClickPopup && feature.properties) {
+              const props = feature.properties;
+              const popupContent = Object.entries(props)
+                .map(([key, value]) => `<strong>${key}:</strong> ${value}`)
+                .join('<br>');
+              
+              if (popupContent) {
+                featureLayer.bindPopup(popupContent);
+              }
+            }
+
+            // Store original style for hover effect
+            let originalStyle: L.PathOptions | null = null;
+
+            // Add hover highlight
+            if (enableHoverHighlight) {
+              featureLayer.on('mouseover', (e) => {
+                const target = e.target;
+                
+                if (target instanceof L.CircleMarker) {
+                  originalStyle = {
+                    fillColor: target.options.fillColor,
+                    fillOpacity: target.options.fillOpacity,
+                  };
+                  target.setStyle({
+                    fillColor: '#ffff00',
+                    fillOpacity: 0.8,
+                  });
+                } else if (target instanceof L.Marker) {
+                  // For custom markers, add brightness
+                  const icon = target.getElement();
+                  if (icon) {
+                    icon.style.filter = 'brightness(1.5)';
+                  }
+                } else if (target.setStyle) {
+                  originalStyle = {
+                    color: target.options.color,
+                    weight: target.options.weight,
+                    fillColor: target.options.fillColor,
+                    fillOpacity: target.options.fillOpacity,
+                  };
+                  target.setStyle({
+                    color: '#ffff00',
+                    weight: (target.options.weight || 3) + 2,
+                    fillColor: '#ffff00',
+                    fillOpacity: 0.8,
+                  });
+                }
+              });
+
+              featureLayer.on('mouseout', (e) => {
+                const target = e.target;
+                
+                if (target instanceof L.Marker) {
+                  const icon = target.getElement();
+                  if (icon) {
+                    icon.style.filter = '';
+                  }
+                } else if (originalStyle && target.setStyle) {
+                  target.setStyle(originalStyle);
+                }
+              });
+            }
+          }
         });
 
         gj.addTo(map);
         vectorOverlaysRef.current.set(layer.id, gj);
       } else {
-        applyVectorStyle(existing, opacity, color);
+        // For updates, we need to recreate if:
+        // 1. Point symbol type changed (different marker types use different Leaflet classes)
+        // 2. Symbol is not circle (DivIcon markers can't be easily updated, need recreation)
+        const currentSymbol = layer.pointSymbol ?? "circle";
+        const previousSymbol = previousPointSymbolRef.current.get(layer.id) ?? "circle";
+        const symbolChanged = currentSymbol !== previousSymbol;
+        const isNonCircleMarker = currentSymbol !== "circle";
+        
+        // Recreate if symbol changed OR if it's a non-circle marker (to update icon properties)
+        if (symbolChanged || isNonCircleMarker) {
+          map.removeLayer(existing);
+          vectorOverlaysRef.current.delete(layer.id);
+          previousPointSymbolRef.current.set(layer.id, currentSymbol);
+          
+          const gj = L.geoJSON(layer.vectorData, {
+            pane,
+            style: (feat) => leafletStyleForFeature(feat as GjFeature, opacity, color, layer),
+            pointToLayer: (_feature, latlng) => createPointMarker(latlng, layer, opacity, color, pane),
+            onEachFeature: (feature, featureLayer) => {
+              // Create popup content from feature properties
+              if (enableClickPopup && feature.properties) {
+                const props = feature.properties;
+                const popupContent = Object.entries(props)
+                  .map(([key, value]) => `<strong>${key}:</strong> ${value}`)
+                  .join('<br>');
+                
+                if (popupContent) {
+                  featureLayer.bindPopup(popupContent);
+                }
+              }
+
+              // Store original style for hover effect
+              let originalStyle: L.PathOptions | null = null;
+
+              // Add hover highlight
+              if (enableHoverHighlight) {
+                featureLayer.on('mouseover', (e) => {
+                  const target = e.target;
+                  
+                  if (target instanceof L.CircleMarker) {
+                    originalStyle = {
+                      fillColor: target.options.fillColor,
+                      fillOpacity: target.options.fillOpacity,
+                    };
+                    target.setStyle({
+                      fillColor: '#ffff00',
+                      fillOpacity: 0.8,
+                    });
+                  } else if (target instanceof L.Marker) {
+                    // For custom markers, add brightness
+                    const icon = target.getElement();
+                    if (icon) {
+                      icon.style.filter = 'brightness(1.5)';
+                    }
+                  } else if (target.setStyle) {
+                    originalStyle = {
+                      color: target.options.color,
+                      weight: target.options.weight,
+                      fillColor: target.options.fillColor,
+                      fillOpacity: target.options.fillOpacity,
+                    };
+                    target.setStyle({
+                      color: '#ffff00',
+                      weight: (target.options.weight || 3) + 2,
+                      fillColor: '#ffff00',
+                      fillOpacity: 0.8,
+                    });
+                  }
+                });
+
+                featureLayer.on('mouseout', (e) => {
+                  const target = e.target;
+                  
+                  if (target instanceof L.Marker) {
+                    const icon = target.getElement();
+                    if (icon) {
+                      icon.style.filter = '';
+                    }
+                  } else if (originalStyle && target.setStyle) {
+                    target.setStyle(originalStyle);
+                  }
+                });
+              }
+            }
+          });
+          
+          gj.addTo(map);
+          vectorOverlaysRef.current.set(layer.id, gj);
+        } else {
+          // Only circle markers can be updated without recreation
+          applyVectorStyle(existing, opacity, color, layer);
+        }
       }
     }
 
@@ -240,6 +507,16 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
       const pane = panesRef.current.get(layer.id);
 
       const existing = rasterOverlaysRef.current.get(layer.id);
+      
+      // Remove layer if opacity is 0 (hidden)
+      if (opacity === 0) {
+        if (existing) {
+          map.removeLayer(existing);
+          rasterOverlaysRef.current.delete(layer.id);
+        }
+        continue;
+      }
+      
       if (!existing) {
         const rl = createRasterLayer(layer.rasterData, opacity, pane);
         rl.addTo(map);
@@ -249,7 +526,7 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
         // Pane is stable per layer id; zIndex is controlled by pane element style.
       }
     }
-  }, [layers, applyVectorStyle]);
+  }, [layers, enableHoverHighlight, enableClickPopup, applyVectorStyle]);
 
   return (
     <div className="flex-1 flex items-start justify-center w-full h-full">

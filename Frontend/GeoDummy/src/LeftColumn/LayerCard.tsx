@@ -4,15 +4,18 @@ import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Eye, EyeOff } from "lucide-react";
 import type { Layer } from "./LayerSidebar";
 import { colors, typography, radii, shadows } from "../Design/DesignTokens";
+//import { Select } from "@mui/material";
 
 interface LayerCardProps {
   layer: Layer;
-  onSettings: (layerId: string, rect: DOMRect) => void;
+  selected: boolean;
+  onSelect: () => void;
+  onSettings: (layerId: string) => void;
   onToggleVisibility: (layerId: string) => void;
   onRename: (layerId: string, newTitle: string) => void;
 }
 
-function LayerCardComponent({ layer, onSettings, onToggleVisibility, onRename }: LayerCardProps) {
+function LayerCardComponent({ layer, selected, onSelect, onSettings, onToggleVisibility, onRename }: LayerCardProps) {
   const {
     setNodeRef,
     attributes,
@@ -57,9 +60,7 @@ function LayerCardComponent({ layer, onSettings, onToggleVisibility, onRename }:
   const isHidden = (layer.opacity ?? 1) <= 0.01;
 
   const handleSettingsOpen = () => {
-    if (!cardRef.current) return;
-    const rect = cardRef.current.getBoundingClientRect();
-    onSettings(layer.id, rect);
+    onSettings(layer.id);
   };
 
   const handleToggleVisibilityClick = () => {
@@ -93,16 +94,29 @@ function LayerCardComponent({ layer, onSettings, onToggleVisibility, onRename }:
 
   return (
     <div
+      data-testid={`layer-card-${layer.id}`}
       ref={(node) => {
         setNodeRef(node);
         cardRef.current = node;
       }}
-      style={cardStyle}
-      {...attributes}
-      onContextMenu={(e) => {
-        e.preventDefault();      // evita o menu do browser
-        handleSettingsOpen();    // abre as settings no right-click
+      style={{
+        ...cardStyle,
+        borderColor: selected ? colors.primary : colors.borderStroke,
+        boxShadow: selected ? shadows.medium : shadows.none,
       }}
+
+      onClick={(e) => {
+        e.preventDefault();
+        // If clicking the already selected layer, unselect it (which will close settings)
+        if (selected) {
+          onSelect(); // This will deselect via parent logic
+        } else {
+          // Select the layer and open settings
+          onSelect();
+          handleSettingsOpen();
+        }
+      }}
+      {...attributes}
     >
       <div
         style={{
@@ -178,7 +192,10 @@ function LayerCardComponent({ layer, onSettings, onToggleVisibility, onRename }:
         {/* Visibility icon (eye or eye-off) */}
         <button
           aria-label={isHidden ? "Show layer" : "Hide layer"}
-          onClick={handleToggleVisibilityClick}
+          onClick={(e) => {
+            e.stopPropagation();          // prevents the click from moving up to the card.
+            handleToggleVisibilityClick(); // It only deals with visibility.
+          }}
           style={{
             padding: 4,
             borderRadius: radii.sm,

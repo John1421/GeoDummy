@@ -1,15 +1,20 @@
 import { useEffect, useState, useRef } from "react";
-import { FolderOpen, Plus } from "lucide-react";
+import { FolderOpen, Plus, X } from "lucide-react";
 import WindowTemplate from "../TemplateModals/PopUpWindowModal";
-import { colors, typography, radii, spacing, icons } from "../Design/DesignTokens";
+import { colors, typography, radii, spacing, icons, shadows } from "../Design/DesignTokens";
 import { ThreeDot } from "react-loading-indicators"
 
 type AddNewScriptProps = {
     onClose: () => void;
-    onAddScript: (name: string, category: string, description: string) => void;
+    onAddScript: (id: string, name: string, category: string, description: string) => void;
     existingCategories: string[];
 };
 type SaveStatus = "unsaved" | "saving" | "saved";
+type Layer = {
+    id: string;
+    type: "raster" | "vetorial" | "both";
+};
+type Parameter = { name: string; type: string };
 
 export default function AddNewScript({ onClose, onAddScript, existingCategories }: AddNewScriptProps) {
     const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
@@ -17,12 +22,63 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
     const [name, setName] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [paramsOpen, setParamsOpen] = useState(false);
-    const [selectedParams, setSelectedParams] = useState<string[]>([]);
-    const [layerType, setLayerType] = useState<string>("");
+    
+    const [layers, setLayers] = useState<Layer[]>([]);
     const [description, setDescription] = useState("");
+    const [params, setParams] = useState<Parameter[]>([]);
     const [isUploading, setIsUploading] = useState(false);
     const [saveStatus, setSaveStatus] = useState<SaveStatus>("unsaved");
+    const [scriptFile, setScriptFile] = useState<File | null>(null);
+    
+    const [showAddMenu, setShowAddMenu] = useState(false);
+    const addMenuRef = useRef<HTMLDivElement | null>(null);
+    const [showLayerTypeDropdown, setShowLayerTypeDropdown] = useState<string | null>(null);
+    const [showDropdown, setShowDropdown] = useState(false);
 
+    // Backend Communication
+    async function postScript(
+        file: File,
+        metadata: {
+            name: string;
+            category: string;
+            description: string;
+            layers: string[];
+            parameters: Record<
+            string,
+            {
+                type: string;
+            }
+    >;
+            
+        }
+    ) {
+        const formData = new FormData();
+
+        // file field expected by backend
+        formData.append("file", file);
+
+        // include metadata as individual form fields so backend's request.form is not empty
+        formData.append("name", metadata.name);
+        formData.append("category", metadata.category);
+        formData.append("description", metadata.description || "");
+
+        // include arrays/objects as JSON strings
+        formData.append("layers", JSON.stringify(metadata.layers || []));
+        formData.append("parameters", JSON.stringify(metadata.parameters || []));
+        console.log(JSON.stringify(metadata.parameters || []))
+        const res = await fetch("http://localhost:5050/scripts", {
+            method: "POST",
+            body: formData,
+        });
+
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(`Error saving script: ${res.status} ${text}`);
+        }
+        return res.json();
+    }
+
+    
     useEffect(() => {
         // reset when opened (component is mounted each time in current usage)
         setSelectedFileName(null);
@@ -30,10 +86,13 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
         setName("");
         setError(null);
         setParamsOpen(false);
-        setSelectedParams([]);
-        setLayerType("");
+       
+        setLayers([]);
         setDescription("");
+        setParams([]);
         setSaveStatus("unsaved");
+        setShowAddMenu(false);
+        setShowLayerTypeDropdown(null);
     }, []);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -53,45 +112,148 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
 
         setError(null);
         setSelectedFileName(file.name);
+        setScriptFile(file);
         setSaveStatus("unsaved");
-    };
-
-
-    const handleParamToggle = (paramType: string) => {
-        setSelectedParams((prev) =>
-            prev.includes(paramType) ? [] : [paramType]
-        );
     };
 
     const handleUpload = async () => {
         // Basic validation
-        if (!selectedFileName) {
+        if (!scriptFile) {
             setError("Please choose a script file.");
             return;
         }
+        if (!name || !category){
+            setError("Please fill in all required fields.");
+            return;
+        }
+
         setIsUploading(true);
         setSaveStatus("saving");
-        await new Promise((resolve) => setTimeout(resolve, 1200));
+        setError(null);
+        const metadata = {
+            name,
+            category,
+            description,
+            layers: layers.map(l => l.type),
+            parameters: Object.fromEntries(
+                    params
+                        .filter(p => p.name && p.type)
+                        .map(p => [
+                            p.name,
+                            { type: p.type }
+            ])
+    ),
+        };
+        try{
+            const saved = await postScript(scriptFile, metadata);
+            setSaveStatus("saved");
+
+            // backend returns { message, script_id }
+            const fallbackId = scriptFile ? scriptFile.name.replace(/\.[^/.]+$/, '') : crypto.randomUUID();
+            const scriptId = saved?.script_id || (saved?.id) || fallbackId;
+            onAddScript(scriptId, name, category, description);
+            setTimeout(onClose, 500);
+        } catch (err) {
+            console.error("Upload error:", err);
+            setError("Failed to upload script. Please try again.");
+            setSaveStatus("unsaved");
+           
+        }finally{
+            setIsUploading(false);
+        }
+        /*await new Promise((resolve) => setTimeout(resolve, 1200));
+
+        const paramsString = params.length
+            ? `\nParams: ${params
+                .filter((p) => p.name || p.type)
+                .map((p) => `${p.name || "?"}:${p.type || "?"}`)
+                .join(", ")}`
+            : "";
+        const descriptionWithParams = `${description}${paramsString}`;
+
         // Call parent handler with the form data
-        onAddScript(name, category, description);
+        onAddScript(name, category, descriptionWithParams);
         
         setSaveStatus("saved");
         setIsUploading(false);
         setTimeout(() => {
             onClose();
-        }, 600);
-    };
-    const [showDropdown, setShowDropdown] = useState(false);
+        }, 600);*/
+        /*
+        // Mock function to simulate backend upload (commented out - kept for reference)
+        async function postScriptMock(
+            file: File,
+            metadata: {
+                name: string;
+                category: string;
+                description: string;
+                layers: string[];
+                parameters: Parameter[];
+            }
+        ) {
+            console.log("📦 Mock upload script");
+            console.log("File:", file);
+            console.log("Metadata:", metadata);
+
+            // simula latência de rede
+            await new Promise((r) => setTimeout(r, 800));
+
+            // simula resposta do backend
+            return {
+                id: crypto.randomUUID(),
+                name: metadata.name,
+                category: metadata.category,
+                description: metadata.description,
+            };
+        }
+        */
+    }
 
     const filteredCategories = existingCategories.filter((cat) =>
         cat.toLowerCase().includes(category.toLowerCase())
         );
 
     const wrapperRef = useRef<HTMLDivElement | null>(null);
+    const layerTypeWrapperRef = useRef<HTMLDivElement | null>(null);
+
+    // Handlers para adicionar layers e parâmetros
+    const handleAddLayer = () => {
+        const newLayer: Layer = {
+            id: crypto.randomUUID(),
+            type: "" as "raster" | "vetorial" | "both",
+        };
+        setLayers([...layers, newLayer]);
+        setSaveStatus("unsaved");
+        setShowAddMenu(false);
+    };
+
+    const handleAddParam = () => {
+        setParams([...params, { name: "", type: "" }]);
+        setSaveStatus("unsaved");
+        setShowAddMenu(false);
+    };
+
+    const handleRemoveLayer = (id: string) => {
+        setLayers(layers.filter(l => l.id !== id));
+        setSaveStatus("unsaved");
+    };
+
+    const handleLayerTypeChange = (id: string, newType: "raster" | "vetorial" | "both") => {
+        setLayers(layers.map(l => l.id === id ? { ...l, type: newType } : l));
+        setSaveStatus("unsaved");
+        setShowLayerTypeDropdown(null);
+    };
+
     useEffect(() => {
         function handleClickOutside(e: MouseEvent) {
             if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
                 setShowDropdown(false);
+            }
+            if (layerTypeWrapperRef.current && !layerTypeWrapperRef.current.contains(e.target as Node)) {
+                setShowLayerTypeDropdown(null);
+            }
+            if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) {
+                setShowAddMenu(false);
             }
         }
 
@@ -235,19 +397,23 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
                             {showDropdown && filteredCategories.length > 0 && (
                             <div
                                 style={{
-                                        width: "100%",
-                                        paddingInline: 12,
-                                        paddingBlock: 8,
+                                        position: "absolute",
+                                        top: "100%",
+                                        left: 0,
+                                        right: 0,
+                                        marginTop: 4,
+                                        maxHeight: 200,
+                                        overflowY: "auto",
                                         borderRadius: radii.md,
                                         borderStyle: "solid",
                                         borderWidth: 1,
-                                        backgroundColor: colors.borderStroke,
+                                        backgroundColor: colors.cardBackground,
                                         borderColor: colors.borderStroke,
-                                        outline: "none",
                                         fontSize: typography.sizeSm,
                                         fontFamily: typography.normalFont,
                                         color: colors.foreground,
-                                        cursor: "pointer",
+                                        boxShadow: shadows.subtle,
+                                        zIndex: 1000,
                                     }}
                             >
                                 {filteredCategories.map((cat) => (
@@ -257,10 +423,18 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
                                     setCategory(cat);
                                     setShowDropdown(false);
                                     }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.backgroundColor = colors.borderStroke;
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.backgroundColor = "transparent";
+                                    }}
                                     style={{
-                                    padding: "8px 12px",
+                                    paddingInline: 12,
+                                    paddingBlock: 8,
                                     cursor: "pointer",
                                     fontFamily: typography.normalFont,
+                                    transition: "background-color 0.15s ease",
                                     }}
                                 >
                                     {cat}
@@ -304,75 +478,257 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
                             />
                         </div>
                     </div>
-                {/* Parameters Toggle */}
-                <div style={{ borderBottom: `1px solid ${colors.borderStroke}` }}>
+                {/* Parameters and Layers Toggle */}
+                <div style={{  }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <h4 style={{ margin: 0, fontSize: typography.sizeMd, fontWeight: 600, color: colors.foreground, fontFamily: typography.normalFont }}>Parameters</h4>
 
-                        <Plus
-                            size={20}
-                            onClick={() => setParamsOpen(!paramsOpen)}
-                            style={{ cursor: "pointer", color: colors.foreground }}
-                        />
-                    </div>
-
-                    {paramsOpen && (
-                        <div style={{ padding: `${spacing.md} 0`, display: "flex", flexDirection: "column", gap: spacing.sm }}>
-                            <button
-                                onClick={() => handleParamToggle("number")}
-                                style={{
-                                    padding: `${spacing.sm} ${spacing.md}`,
-                                    backgroundColor: selectedParams.includes("number") ? colors.primary : colors.cardBackground,
-                                    color: selectedParams.includes("number") ? colors.primaryForeground : colors.foreground,
-                                    border: `1px solid ${colors.borderStroke}`,
-                                    borderRadius: radii.md,
-                                    fontSize: typography.sizeSm,
-                                    fontFamily: typography.normalFont,
-                                    cursor: "pointer",
-                                }}
-                            >
-                                Number
-                            </button>
-
-                            <div style={{ display: "flex", flexDirection: "column", gap: spacing.sm }}>
-                                <label
+                        <div ref={addMenuRef} style={{ position: "relative" }}>
+                            <Plus
+                                size={20}
+                                onClick={() => setShowAddMenu(!showAddMenu)}
+                                style={{ cursor: "pointer", color: colors.foreground }}
+                            />
+                            {showAddMenu && (
+                                <div
                                     style={{
-                                        fontSize: typography.sizeSm,
-                                        fontWeight: 600,
-                                        color: colors.foreground,
-                                        fontFamily: typography.normalFont,
-                                    }}
-                                >
-                                    Layer Type
-                                </label>
-                                <select
-                                    value={layerType}
-                                    onChange={(e) => {
-                                        setLayerType(e.target.value);
-                                        setSaveStatus("unsaved");
-                                    }}
-                                    style={{
-                                        width: "100%",
-                                        paddingInline: 12,
-                                        paddingBlock: 8,
+                                        position: "absolute",
+                                        top: "100%",
+                                        right: 0,
+                                        marginTop: 8,
                                         borderRadius: radii.md,
                                         borderStyle: "solid",
                                         borderWidth: 1,
-                                        backgroundColor: colors.borderStroke,
+                                        backgroundColor: colors.cardBackground,
                                         borderColor: colors.borderStroke,
-                                        outline: "none",
                                         fontSize: typography.sizeSm,
                                         fontFamily: typography.normalFont,
                                         color: colors.foreground,
-                                        cursor: "pointer",
+                                        boxShadow: shadows.subtle,
+                                        zIndex: 1001,
+                                        minWidth: 150,
                                     }}
                                 >
-                                    <option value="">Select layer type...</option>
-                                    <option value="raster">Raster</option>
-                                    <option value="vetorial">Vetorial</option>
-                                    <option value="both">Ambos</option>
-                                </select>
-                            </div>
+                                    <div
+                                        onClick={handleAddLayer}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = colors.borderStroke;
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = "transparent";
+                                        }}
+                                        style={{
+                                            paddingInline: 12,
+                                            paddingBlock: 8,
+                                            cursor: "pointer",
+                                            transition: "background-color 0.15s ease",
+                                        }}
+                                    >
+                                        Add Layer
+                                    </div>
+                                    <div
+                                        onClick={handleAddParam}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = colors.borderStroke;
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = "transparent";
+                                        }}
+                                        style={{
+                                            paddingInline: 12,
+                                            paddingBlock: 8,
+                                            cursor: "pointer",
+                                            borderTop: `1px solid ${colors.borderStroke}`,
+                                            transition: "background-color 0.15s ease",
+                                        }}
+                                    >
+                                        Add Parameter
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    
+                    {(params.length > 0 || layers.length > 0 || paramsOpen) && (
+                        <div style={{ padding: `${spacing.md} 0`, display: "flex", flexDirection: "column", gap: spacing.sm }}>
+                            {/* Layers Section */}
+                            {layers.length > 0 && (
+                                <div style={{ display: "flex", flexDirection: "column", gap: spacing.sm, paddingBottom: spacing.sm }}>
+                                    <p style={{ margin: 0, fontSize: typography.sizeSm, fontWeight: 600, color: colors.foreground, fontFamily: typography.normalFont }}>Layers</p>
+                                    {layers.map((layer) => (
+                                        <div key={layer.id} style={{ display: "flex", alignItems: "center", columnGap: 8 }}>
+                                            <div ref={layerTypeWrapperRef} style={{ flex: 1, position: "relative" }}>
+                                                <input
+                                                    value={layer.type === "raster" ? "Raster" : layer.type === "vetorial" ? "Vetorial" : layer.type === "both" ? "Both" : ""}
+                                                    readOnly
+                                                    placeholder="Select Layer Type"
+                                                    onClick={() => setShowLayerTypeDropdown(showLayerTypeDropdown === layer.id ? null : layer.id)}
+                                                    
+                                                    style={{
+                                                        width: "100%",
+                                                        paddingInline: 12,
+                                                        paddingBlock: 8,
+                                                        borderRadius: radii.md,
+                                                        borderStyle: "solid",
+                                                        borderWidth: 1,
+                                                        backgroundColor: colors.borderStroke,
+                                                        borderColor: colors.borderStroke,
+                                                        outline: "none",
+                                                        fontSize: typography.sizeSm,
+                                                        fontFamily: typography.normalFont,
+                                                        color: colors.foreground,
+                                                        cursor: "pointer",
+                                                    }}
+                                                />
+                                                {showLayerTypeDropdown === layer.id && (
+                                                    <div
+                                                        style={{
+                                                            position: "absolute",
+                                                            top: "100%",
+                                                            left: 0,
+                                                            right: 0,
+                                                            marginTop: 4,
+                                                            borderRadius: radii.md,
+                                                            borderStyle: "solid",
+                                                            borderWidth: 1,
+                                                            backgroundColor: colors.cardBackground,
+                                                            borderColor: colors.borderStroke,
+                                                            fontSize: typography.sizeSm,
+                                                            fontFamily: typography.normalFont,
+                                                            color: colors.foreground,
+                                                            boxShadow: shadows.subtle,
+                                                            zIndex: 1000,
+                                                        }}
+                                                    >
+                                                        {[
+                                                            { value: "raster", label: "Raster" },
+                                                            { value: "vetorial", label: "Vetorial" },
+                                                            { value: "both", label: "Ambos" },
+                                                        ].map((option) => (
+                                                            <div
+                                                                key={option.value}
+                                                                onClick={() => handleLayerTypeChange(layer.id, option.value as "raster" | "vetorial" | "both")}
+                                                                onMouseEnter={(e) => {
+                                                                    e.currentTarget.style.backgroundColor = colors.borderStroke;
+                                                                }}
+                                                                onMouseLeave={(e) => {
+                                                                    e.currentTarget.style.backgroundColor = "transparent";
+                                                                }}
+                                                                style={{
+                                                                    paddingInline: 12,
+                                                                    paddingBlock: 8,
+                                                                    cursor: "pointer",
+                                                                    fontFamily: typography.normalFont,
+                                                                    transition: "background-color 0.15s ease",
+                                                                }}
+                                                            >
+                                                                {option.label}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <button
+                                                onClick={() => handleRemoveLayer(layer.id)}
+                                                style={{
+                                                    padding: 8,
+                                                    backgroundColor: "transparent",
+                                                    border: "none",
+                                                    cursor: "pointer",
+                                                    color: colors.error,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                }}
+                                            >
+                                                <X size={18} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            
+                            {/* Parameters Section */}
+                            {params.length > 0 && (
+                                <div style={{ display: "flex", flexDirection: "column", gap: spacing.sm, paddingBottom: spacing.sm}}>
+                                    <p style={{ margin: 0, fontSize: typography.sizeSm, fontWeight: 600, color: colors.foreground, fontFamily: typography.normalFont }}>Common Parameters</p>
+                                    {params.map((p, idx) => (
+                                        <div key={idx} style={{ display: "flex", columnGap: spacing.md }}>
+                                            <input
+                                                value={p.name}
+                                                onChange={(e) => {
+                                                    const value = e.target.value;
+                                                    setParams((prev) => prev.map((item, i) => i === idx ? { ...item, name: value } : item));
+                                                    setSaveStatus("unsaved");
+                                                }}
+                                                placeholder="Parameter name"
+                                                style={{
+                                                    flex: 1,
+                                                    paddingInline: 12,
+                                                    paddingBlock: 8,
+                                                    borderRadius: radii.md,
+                                                    borderStyle: "solid",
+                                                    borderWidth: 1,
+                                                    backgroundColor: colors.borderStroke,
+                                                    borderColor: colors.borderStroke,
+                                                    outline: "none",
+                                                    fontSize: typography.sizeSm,
+                                                    fontFamily: typography.normalFont,
+                                                    color: colors.foreground,
+                                                }}
+                                            />
+                                            <select
+                                                value={p.type}
+                                                onChange={(e) => {
+                                                    const value = e.target.value;
+                                                    setParams((prev) => prev.map((item, i) => i === idx ? { ...item, type: value } : item));
+                                                    setSaveStatus("unsaved");
+                                                }}
+                                                style={{
+                                                    flexBasis: "40%",
+                                                    paddingInline: 12,
+                                                    paddingBlock: 8,
+                                                    borderRadius: radii.md,
+                                                    borderStyle: "solid",
+                                                    borderWidth: 1,
+                                                    backgroundColor: colors.cardBackground,
+                                                    borderColor: colors.borderStroke,
+                                                    outline: "none",
+                                                    fontSize: typography.sizeSm,
+                                                    fontFamily: typography.normalFont,
+                                                    color: colors.foreground,
+                                                    cursor: "pointer",
+                                                }}
+                                            >
+                                                <option value="">Type</option>
+                                                <option value="int">int</option>
+                                                <option value="float">float</option>
+                                                <option value="bool">bool</option>
+                                                <option value="string">string</option>
+                                                <option value="number">number</option>
+                                            </select>
+                                            <button
+                                                onClick={() => {
+                                                    setParams(params.filter((_, i) => i !== idx));
+                                                    setSaveStatus("unsaved");
+                                                }}
+                                                style={{
+                                                    padding: 8,
+                                                    backgroundColor: "transparent",
+                                                    border: "none",
+                                                    cursor: "pointer",
+                                                    color: colors.error,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                }}
+                                            >
+                                                <X size={18} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

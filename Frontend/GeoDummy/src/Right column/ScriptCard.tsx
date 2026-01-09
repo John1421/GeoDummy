@@ -3,27 +3,50 @@ import { colors, typography, radii, shadows } from "../Design/DesignTokens";
 import { FileCode, Play } from "lucide-react";
 import { ThreeDot } from "react-loading-indicators"
 import RunScriptWindow from "./RunScriptWindow";
+import type { BackendLayerMetadata } from "../LeftColumn/LayerSidebar";
 
 interface ScriptCardProps {
+  id: string;
   name: string;
   description: string;
+  loading: boolean;
+  setLoading: (loading: boolean) => void;
+  onAddLayer: (layer_id: string, metadata: BackendLayerMetadata) => Promise<void>;
 }
 
-function ScriptCard({ name, description }: ScriptCardProps) {
-  const [loading, setLoading] = useState(false);
+function ScriptCard({ id, name, description, loading, setLoading, onAddLayer }: ScriptCardProps) {
   const [isRunScriptWindowOpen, setIsRunScriptWindowOpen] = useState(false);
 
   const handleRun = () => {
     setIsRunScriptWindowOpen(true);
   };
 
-  const handleRunScriptFromWindow = () => {
-    setLoading(true);
-    // Simulação de tempo de execução (substituir com lógica real)
-    setTimeout(() => {
-      setLoading(false);
-    }, 2000);
-  };
+  // Mock de execução no backend recebendo o scriptId
+  // async function runScriptMock(
+  //   scriptId: string,
+  //   payload: { inputFilePath: string; numberValue: number; listValue: number[] }
+  // ): Promise<{ status: string; output: string }>{
+  //   console.log("▶️ Mock run: sending to backend", { scriptId, payload });
+  //   // Simula latência
+  //   await new Promise(r => setTimeout(r, 800));
+  //   // Simula resposta
+  //   return { status: "ok", output: `Script ${scriptId} executed with ${payload.listValue.length} items` };
+  // }
+
+  // const handleRunScriptFromWindow = async (
+  //   scriptId: string,
+  //   inputFilePath: string,
+  //   numberValue: number,
+  //   listValue: number[]
+  // ) => {
+  //   setLoading(true);
+  //   try {
+  //     const res = await runScriptMock(scriptId, { inputFilePath, numberValue, listValue });
+  //     console.log("✅ Mock result:", res);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   return (
     <div
@@ -104,7 +127,10 @@ function ScriptCard({ name, description }: ScriptCardProps) {
       <RunScriptWindow
         isOpen={isRunScriptWindowOpen}
         onClose={() => setIsRunScriptWindowOpen(false)}
-        onRunScript={handleRunScriptFromWindow}
+        scriptId={id}
+        onAddLayer={onAddLayer}
+        onScriptStart={() => setLoading(true)}
+        onScriptEnd={() => setLoading(false)}
       />
     </div>
   );

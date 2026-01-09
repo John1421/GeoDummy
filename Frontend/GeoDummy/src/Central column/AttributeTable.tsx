@@ -75,7 +75,7 @@ const AttributeTable: React.FC<AttributeTableProps> = ({ layerId }) => {
       setError(null);
 
       try {
-        const response = await fetch(`http://localhost:5000/layers/${layerId}/table`,
+        const response = await fetch(`http://localhost:5050/layers/${layerId}/table`,
           { signal: controller.signal }
         );
 
@@ -94,6 +94,7 @@ const AttributeTable: React.FC<AttributeTableProps> = ({ layerId }) => {
         }
 
         setData(result);
+        setLoading(false);
       } catch (err: unknown) {
         if (err instanceof Error) {
           setError(err.message);

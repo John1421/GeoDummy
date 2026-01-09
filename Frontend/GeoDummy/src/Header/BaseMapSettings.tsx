@@ -42,7 +42,7 @@ function BaseMapSettings({
 
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
                 try {
-                    const response = await fetch("http://localhost:5000/basemaps");
+                    const response = await fetch("http://localhost:5050/basemaps");
                     if (!response.ok) {
                         throw new Error(`Failed to fetch basemap: ${response.statusText}`);
                     }
@@ -131,6 +131,7 @@ function BaseMapSettings({
 
                 <div className="relative mt-2 z-9999999">
                     <button
+                        data-testid="basemap-dropdown"
                         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                         className="w-full text-left p-2 rounded-lg bg-[#DADFE7] text-black hover:bg-[#39AC73] hover:text-white flex justify-between items-center"
                         disabled={loading}
@@ -149,6 +150,7 @@ function BaseMapSettings({
                             {basemaps.map((map) => (
                                 <button
                                     key={map.id}
+                                     data-testid={`basemap-option-${map.id}`}
                                     onClick={() => {
                                         setSelectedBasemapId(map.id);
                                         setIsDropdownOpen(false);
@@ -165,6 +167,7 @@ function BaseMapSettings({
                 {error && <p className="text-red-500 text-sm mt-2"> {error}</p>}
 
                 <button
+                    data-testid="basemap-save"
                     onClick={save_basemap}
                     className="ml-auto mt-5 block rounded-lg bg-[#0D73A5] text-white hover:bg-[#39AC73] w-1/5 py-1 "
                     disabled={loading || !currentBasemapUrl}
