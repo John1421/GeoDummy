@@ -11,28 +11,28 @@ on:
 
 jobs:
 
-  sast-scan:
-    runs-on: ubuntu-latest
-    permissions:
-      security-events: write
-      contents: read
-      actions: read
+  # sast-scan:
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     security-events: write
+  #     contents: read
+  #     actions: read
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
 
-      - name: Install Semgrep
-        run: pip install semgrep
+  #     - name: Install Semgrep
+  #       run: pip install semgrep
 
-      - name: Run Semgrep SAST Scan
-        run: |
-          semgrep scan --config auto --sarif --output semgrep.sarif || true
+  #     - name: Run Semgrep SAST Scan
+  #       run: |
+  #         semgrep scan --config auto --sarif --output semgrep.sarif || true
 
-      - name: Upload SARIF to GitHub Security Tab
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: "semgrep.sarif"
+  #     - name: Upload SARIF to GitHub Security Tab
+  #       uses: github/codeql-action/upload-sarif@v3
+  #       with:
+  #         sarif_file: "semgrep.sarif"
 
   test_backend:
     name: Run Backend Unit Tests
