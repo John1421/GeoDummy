@@ -12,7 +12,8 @@ function App() {
   const [baseMapAttribution, setBaseMapAttribution] = useState<string | null>(null);
   useInitializeBasemap(setBaseMapUrl, setBaseMapAttribution);
 
-
+  const [enableHoverHighlight, setEnableHoverHighlight] = useState<boolean>(true);
+  const [enableClickPopup, setEnableClickPopup] = useState<boolean>(true);
 
   const [layers, setLayers] = useState<Layer[]>([]);
 
@@ -25,7 +26,14 @@ function App() {
       className="h-screen flex flex-col overflow-hidden"
       style={{ backgroundColor: colors.background, color: colors.foreground }}
     >
-      <Header setBaseMapUrl={setBaseMapUrl} setBaseMapAttribution={setBaseMapAttribution} />
+      <Header 
+        setBaseMapUrl={setBaseMapUrl} 
+        setBaseMapAttribution={setBaseMapAttribution}
+        enableHoverHighlight={enableHoverHighlight}
+        setEnableHoverHighlight={setEnableHoverHighlight}
+        enableClickPopup={enableClickPopup}
+        setEnableClickPopup={setEnableClickPopup}
+      />
 
       <div className="flex flex-1 min-h-0">
         <div
@@ -48,6 +56,8 @@ function App() {
                 initialUrl={baseMapUrl}
                 initialAttribution={baseMapAttribution}
                 layers={layers}
+                enableHoverHighlight={enableHoverHighlight}
+                enableClickPopup={enableClickPopup}
               />
             )}
           </div>

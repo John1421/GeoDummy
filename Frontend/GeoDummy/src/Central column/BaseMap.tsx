@@ -11,6 +11,8 @@ type Props = {
   initialUrl: string;
   initialAttribution?: string;
   layers: Layer[];
+  enableHoverHighlight?: boolean;
+  enableClickPopup?: boolean;
 };
 
 type GjFeature = GeoJSON.Feature<GeoJSON.Geometry, GeoJSON.GeoJsonProperties>;
@@ -23,7 +25,13 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
  */
 const paneNameForLayerId = (id: string) => `layer-pane-${id.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
 
-export default function BaseMap({ initialUrl, initialAttribution, layers }: Props) {
+export default function BaseMap({ 
+  initialUrl, 
+  initialAttribution, 
+  layers,
+  enableHoverHighlight = true,
+  enableClickPopup = true
+}: Props) {
   const mapRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
 
@@ -36,6 +44,9 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
 
   // Keep track of which panes we created, so we can manage them if needed
   const panesRef = useRef<Map<string, string>>(new Map());
+  
+  // Track interaction settings to trigger layer recreation when they change
+  const prevInteractionSettingsRef = useRef({ hover: enableHoverHighlight, click: enableClickPopup });
 
 
   // Init map once
@@ -257,6 +268,19 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
     const map = mapRef.current;
     if (!map) return;
 
+    // If interaction settings changed, clear all vector layers to force recreation
+    const interactionSettingsChanged = 
+      prevInteractionSettingsRef.current.hover !== enableHoverHighlight ||
+      prevInteractionSettingsRef.current.click !== enableClickPopup;
+    
+    if (interactionSettingsChanged) {
+      for (const gj of vectorOverlaysRef.current.values()) {
+        map.removeLayer(gj);
+      }
+      vectorOverlaysRef.current.clear();
+      prevInteractionSettingsRef.current = { hover: enableHoverHighlight, click: enableClickPopup };
+    }
+
     const incomingIds = new Set(layers.map((l) => l.id));
 
     // Remove vector overlays that no longer exist
@@ -291,6 +315,16 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
       const pane = panesRef.current.get(layer.id);
 
       const existing = vectorOverlaysRef.current.get(layer.id);
+      
+      // Remove layer if opacity is 0 (hidden)
+      if (opacity === 0) {
+        if (existing) {
+          map.removeLayer(existing);
+          vectorOverlaysRef.current.delete(layer.id);
+        }
+        continue;
+      }
+      
       if (!existing) {
         const currentSymbol = layer.pointSymbol ?? "circle";
         previousPointSymbolRef.current.set(layer.id, currentSymbol);
@@ -299,6 +333,72 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
           pane,
           style: (feat) => leafletStyleForFeature(feat as GjFeature, opacity, color, layer),
           pointToLayer: (_feature, latlng) => createPointMarker(latlng, layer, opacity, color, pane),
+          onEachFeature: (feature, featureLayer) => {
+            // Create popup content from feature properties
+            if (enableClickPopup && feature.properties) {
+              const props = feature.properties;
+              const popupContent = Object.entries(props)
+                .map(([key, value]) => `<strong>${key}:</strong> ${value}`)
+                .join('<br>');
+              
+              if (popupContent) {
+                featureLayer.bindPopup(popupContent);
+              }
+            }
+
+            // Store original style for hover effect
+            let originalStyle: L.PathOptions | null = null;
+
+            // Add hover highlight
+            if (enableHoverHighlight) {
+              featureLayer.on('mouseover', (e) => {
+                const target = e.target;
+                
+                if (target instanceof L.CircleMarker) {
+                  originalStyle = {
+                    fillColor: target.options.fillColor,
+                    fillOpacity: target.options.fillOpacity,
+                  };
+                  target.setStyle({
+                    fillColor: '#ffff00',
+                    fillOpacity: 0.8,
+                  });
+                } else if (target instanceof L.Marker) {
+                  // For custom markers, add brightness
+                  const icon = target.getElement();
+                  if (icon) {
+                    icon.style.filter = 'brightness(1.5)';
+                  }
+                } else if (target.setStyle) {
+                  originalStyle = {
+                    color: target.options.color,
+                    weight: target.options.weight,
+                    fillColor: target.options.fillColor,
+                    fillOpacity: target.options.fillOpacity,
+                  };
+                  target.setStyle({
+                    color: '#ffff00',
+                    weight: (target.options.weight || 3) + 2,
+                    fillColor: '#ffff00',
+                    fillOpacity: 0.8,
+                  });
+                }
+              });
+
+              featureLayer.on('mouseout', (e) => {
+                const target = e.target;
+                
+                if (target instanceof L.Marker) {
+                  const icon = target.getElement();
+                  if (icon) {
+                    icon.style.filter = '';
+                  }
+                } else if (originalStyle && target.setStyle) {
+                  target.setStyle(originalStyle);
+                }
+              });
+            }
+          }
         });
 
         gj.addTo(map);
@@ -322,6 +422,72 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
             pane,
             style: (feat) => leafletStyleForFeature(feat as GjFeature, opacity, color, layer),
             pointToLayer: (_feature, latlng) => createPointMarker(latlng, layer, opacity, color, pane),
+            onEachFeature: (feature, featureLayer) => {
+              // Create popup content from feature properties
+              if (enableClickPopup && feature.properties) {
+                const props = feature.properties;
+                const popupContent = Object.entries(props)
+                  .map(([key, value]) => `<strong>${key}:</strong> ${value}`)
+                  .join('<br>');
+                
+                if (popupContent) {
+                  featureLayer.bindPopup(popupContent);
+                }
+              }
+
+              // Store original style for hover effect
+              let originalStyle: L.PathOptions | null = null;
+
+              // Add hover highlight
+              if (enableHoverHighlight) {
+                featureLayer.on('mouseover', (e) => {
+                  const target = e.target;
+                  
+                  if (target instanceof L.CircleMarker) {
+                    originalStyle = {
+                      fillColor: target.options.fillColor,
+                      fillOpacity: target.options.fillOpacity,
+                    };
+                    target.setStyle({
+                      fillColor: '#ffff00',
+                      fillOpacity: 0.8,
+                    });
+                  } else if (target instanceof L.Marker) {
+                    // For custom markers, add brightness
+                    const icon = target.getElement();
+                    if (icon) {
+                      icon.style.filter = 'brightness(1.5)';
+                    }
+                  } else if (target.setStyle) {
+                    originalStyle = {
+                      color: target.options.color,
+                      weight: target.options.weight,
+                      fillColor: target.options.fillColor,
+                      fillOpacity: target.options.fillOpacity,
+                    };
+                    target.setStyle({
+                      color: '#ffff00',
+                      weight: (target.options.weight || 3) + 2,
+                      fillColor: '#ffff00',
+                      fillOpacity: 0.8,
+                    });
+                  }
+                });
+
+                featureLayer.on('mouseout', (e) => {
+                  const target = e.target;
+                  
+                  if (target instanceof L.Marker) {
+                    const icon = target.getElement();
+                    if (icon) {
+                      icon.style.filter = '';
+                    }
+                  } else if (originalStyle && target.setStyle) {
+                    target.setStyle(originalStyle);
+                  }
+                });
+              }
+            }
           });
           
           gj.addTo(map);
@@ -341,6 +507,16 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
       const pane = panesRef.current.get(layer.id);
 
       const existing = rasterOverlaysRef.current.get(layer.id);
+      
+      // Remove layer if opacity is 0 (hidden)
+      if (opacity === 0) {
+        if (existing) {
+          map.removeLayer(existing);
+          rasterOverlaysRef.current.delete(layer.id);
+        }
+        continue;
+      }
+      
       if (!existing) {
         const rl = createRasterLayer(layer.rasterData, opacity, pane);
         rl.addTo(map);
@@ -350,7 +526,7 @@ export default function BaseMap({ initialUrl, initialAttribution, layers }: Prop
         // Pane is stable per layer id; zIndex is controlled by pane element style.
       }
     }
-  }, [layers]);
+  }, [layers, enableHoverHighlight, enableClickPopup]);
 
   return (
     <div className="flex-1 flex items-start justify-center w-full h-full">
