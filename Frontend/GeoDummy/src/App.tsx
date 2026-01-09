@@ -2,7 +2,7 @@ import Header from "./Header/Header";
 import BaseMap from "./Central column/BaseMap";
 import AttributeTable from "./Central column/AttributeTable";
 import ScriptList from "./Right column/ScriptList";
-import LayerSidebar, { type Layer } from "./LeftColumn/LayerSidebar";
+import LayerSidebar, { type Layer, type BackendLayerMetadata } from "./LeftColumn/LayerSidebar";
 import { colors } from "./Design/DesignTokens";
 import { useState, useRef } from "react";
 import { useInitializeBasemap } from "./hooks/useInitializeBasemap";
@@ -19,7 +19,7 @@ function App() {
 
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
 
-  const addLayerRef = useRef<((layer_id: string, metadata: any) => Promise<void>) | null>(null);
+  const addLayerRef = useRef<((layer_id: string, metadata: BackendLayerMetadata) => Promise<void>) | null>(null);
 
   return (
     <div

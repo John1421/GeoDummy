@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import PopUpWindowModal from '../TemplateModals/PopUpWindowModal';
 import { Play } from "lucide-react";
+import { type BackendLayerMetadata } from "../LeftColumn/LayerSidebar";
 
 interface RunScriptWindowProps {
   isOpen: boolean;
   onClose: () => void;
   scriptId: string;
-  onAddLayer: (layer_id: string, metadata: any) => Promise<void>;
+  onAddLayer: (layer_id: string, metadata: BackendLayerMetadata) => Promise<void>;
   onScriptStart: () => void;
   onScriptEnd: () => void;
 }
@@ -316,10 +317,11 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
                 // For each returned layer, fetch and add to the application
                 for (let i = 0; i < layersReturned.length; i++) {
                   const layerId = layersReturned[i];
-                  const metadata = metadatasReturned[i] || {};
+                  const metadata = metadatasReturned[i];
 
-
-                  onAddLayer(layerId, metadata)
+                  if (metadata) {
+                    await onAddLayer(layerId, metadata as BackendLayerMetadata);
+                  }
                 }
               } else {
                 console.error('Script execution failed:', response.status);
