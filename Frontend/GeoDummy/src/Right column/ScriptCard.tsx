@@ -3,7 +3,6 @@ import { colors, typography, radii, shadows } from "../Design/DesignTokens";
 import { FileCode, Play } from "lucide-react";
 import { ThreeDot } from "react-loading-indicators"
 import RunScriptWindow from "./RunScriptWindow";
-import { type BackendLayerMetadata } from "../LeftColumn/LayerSidebar";
 
 interface ScriptCardProps {
   id: string;
@@ -11,7 +10,7 @@ interface ScriptCardProps {
   description: string;
   loading: boolean;
   setLoading: (loading: boolean) => void;
-  onAddLayer: (layer_id: string, metadata: BackendLayerMetadata) => Promise<void>;
+  onAddLayer: (layer_id: string, metadata: any) => Promise<void>;
 }
 
 function ScriptCard({ id, name, description, loading, setLoading, onAddLayer }: ScriptCardProps) {

@@ -66,7 +66,7 @@ export interface Layer {
   strokeColor?: string; // Polygon contour/border color
   strokeWidth?: number; // Polygon contour/border width
 }
-export type BackendLayerMetadata =
+type BackendLayerMetadata =
   | {
     type: "vector";
     layer_name: string;
@@ -171,7 +171,7 @@ const DEMO_POLYGONS: GeoJSON.FeatureCollection = {
 };
 */
 // Demo layers to show on first app open
-/*const DEMO_LAYERS: Layer[] = [
+const DEMO_LAYERS: Layer[] = [
   /*  {
       id: "demo_raster_osm",
       title: "Demo Raster (Satellite)",
@@ -207,8 +207,8 @@ const DEMO_POLYGONS: GeoJSON.FeatureCollection = {
       vectorData: DEMO_POLYGONS,
       color: defaultColorForGeometryType("Polygon"),
     },
-    
-];*/
+    */
+];
 
 interface LayerSidebarProps {
   layers: Layer[];
@@ -307,7 +307,7 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
     return Math.max(...layers.map((l) => (typeof l.order === "number" ? l.order : 0))) + 1;
   }, [layers]);
 
-  const createTempLayer = useCallback(async (file: File, layerId: string) => {
+  const createTempLayer = async (file: File, layerId: string) => {
     const ext = file.name.split(".").pop()?.toLowerCase();
     const nextOrder = getNextOrder();
     // Create a single temporary layer now (may later become multiple layers if backend returns multiple ids)
@@ -378,9 +378,9 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
       }
     }
 
-  }, [getNextOrder, setLayers]);
+  };
 
-  const getLayer = useCallback(async (layer_id: string, metadata: BackendLayerMetadata) => {
+  const getLayer = async (layer_id: string, metadata: BackendLayerMetadata) => {
     console.log("==".repeat(20))
     console.log('Adding layer from script:', layer_id, metadata);
     console.log("==".repeat(20))
@@ -470,8 +470,7 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
         );
       }
     }
-  }, [createTempLayer, setLayers]);
-
+  }
   /**
    * Add new layer workflow (prepared for backend):
    * 1) Create a temporary UI layer (so the UI responds instantly).
