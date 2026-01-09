@@ -295,6 +295,7 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSelectedLayerId, onAddLayerRef }: LayerSidebarProps) {
   const [isWindowOpen, setIsWindowOpen] = useState(false);
   const [settingsLayerId, setSettingsLayerId] = useState<string | null>(null);
+  const [isLoadingLayers, setIsLoadingLayers] = useState(true);
 
   const selectedSettingsLayer = useMemo(
     () => layers.find((l) => l.id === settingsLayerId) ?? null,
@@ -766,6 +767,10 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
         }
       } catch (err) {
         console.error("Failed to bootstrap layers:", err);
+      } finally {
+        if (!cancelled) {
+          setIsLoadingLayers(false);
+        }
       }
     }
 
@@ -775,6 +780,20 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
       cancelled = true;
     };
   }, [setLayers]);
+
+  // Prevent page refresh while layers are loading
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isLoadingLayers) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isLoadingLayers]);
 
 
   // Expose handleAddLayer to parent component
