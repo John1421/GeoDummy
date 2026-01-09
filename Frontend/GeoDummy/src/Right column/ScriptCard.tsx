@@ -10,7 +10,7 @@ interface ScriptCardProps {
   description: string;
   loading: boolean;
   setLoading: (loading: boolean) => void;
-  onAddLayer: (layer_id: string, metadata: unknown) => Promise<void>;
+  onAddLayer: (layer_id: string, metadata: any) => Promise<void>;
 }
 
 function ScriptCard({ id, name, description, loading, setLoading, onAddLayer }: ScriptCardProps) {

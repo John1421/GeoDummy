@@ -6,7 +6,7 @@ interface RunScriptWindowProps {
   isOpen: boolean;
   onClose: () => void;
   scriptId: string;
-  onAddLayer: (layer_id: string, metadata: unknown) => Promise<void>;
+  onAddLayer: (layer_id: string, metadata: any) => Promise<void>;
   onScriptStart: () => void;
   onScriptEnd: () => void;
 }

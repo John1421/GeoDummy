@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Layer, RasterDescriptor } from "../LeftColumn/LayerSidebar";
@@ -165,7 +165,7 @@ export default function BaseMap({
     };
   };
 
-  const applyVectorStyle = useCallback((gj: L.GeoJSON, opacity: number, color: string, layer?: Layer) => {
+  const applyVectorStyle = (gj: L.GeoJSON, opacity: number, color: string, layer?: Layer) => {
     gj.setStyle((feat) => leafletStyleForFeature(feat as GjFeature, opacity, color, layer));
     gj.eachLayer((child) => {
       if (child instanceof L.CircleMarker) {
@@ -174,7 +174,7 @@ export default function BaseMap({
         child.setRadius(pointSize);
       }
     });
-  }, []);
+  };
 
   /**
    * Create a point marker based on the layer's symbol configuration.
@@ -526,7 +526,7 @@ export default function BaseMap({
         // Pane is stable per layer id; zIndex is controlled by pane element style.
       }
     }
-  }, [layers, enableHoverHighlight, enableClickPopup, applyVectorStyle]);
+  }, [layers, enableHoverHighlight, enableClickPopup]);
 
   return (
     <div className="flex-1 flex items-start justify-center w-full h-full">
