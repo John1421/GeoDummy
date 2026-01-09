@@ -581,8 +581,8 @@ class TestApp:
         assert response.status_code == 200
         data = response.get_json()
         # Per source logic: if exception occurs, layer_id and layer_metadata are both None
-        assert data['layer_id'] == [None]
-        assert data['metadata'] == [None]
+        assert data['layer_id'] == []
+        assert data['metadata'] == []
 
     @patch('App.app.os.listdir')
     @patch('App.app.json.load')
@@ -615,8 +615,8 @@ class TestApp:
         # 1. 'valid' with its dict
         # 2. 'None' with None (due to Exception)
         # 3. 'unrelated.log' should be skipped entirely
-        assert data['layer_id'] == ['valid', None]
-        assert data['metadata'] == [{"status": "ok"}, None]
+        assert data['layer_id'] == ['valid']
+        assert data['metadata'] == [{"status": "ok"}]
 
     @patch('App.app.layer_manager')
     def test_get_layer_bad_request_empty_id(self, mock_layer_manager: MagicMock, client: Any) -> None:

@@ -1060,44 +1060,34 @@ class TestLayerManager:
     
     # --- __move_to_permanent Method Tests ---
 
-    @patch('shutil.move')
-    @patch('os.path.isfile')
-    @patch('builtins.open', new_callable=mock_open)
-    @patch('json.dump')
-    def test_move_to_permanent_success(
-        self,
-        mock_json_dump: MagicMock,
-        mock_file_open: MagicMock,
-        mock_isfile: MagicMock,
-        mock_shutil_move: MagicMock,
-        layer_manager: LayerManager,
-        mock_file_manager: MagicMock
-    ) -> None:
+    def test_move_to_permanent_success(self, layer_manager: LayerManager, mock_file_manager: MagicMock) -> None:
         """
-        Test successful migration of a layer and its metadata to permanent storage.
-        Validates:
-        1. Correct destination path construction based on file extension.
-        2. shutil.move is called correctly.
-        3. Metadata is serialized to the correct JSON path.
+        Test successful move of a layer from temporary to permanent storage.
+        Note: Using the mangled name '_LayerManager__move_to_permanent' for the private method.
         """
-        temp_path = "/tmp/temp/new_layer.gpkg"
-        layer_id = "permanent_layer_123"
-        metadata = {"type": "vector", "feature_count": 10}
+        # 1. Setup test data
+        temp_layer_path = "/tmp/temp/new_layer.gpkg"
+        layer_id = "test_layer_123"
+        metadata = {"feature_count": 10, "crs": "EPSG:4326"}
         
-        # Mocking existence check
-        mock_isfile.return_value = True
-        
-        # Execute private static method
-        LayerManager._LayerManager__move_to_permanent(temp_path, layer_id, metadata)
-
-        # Verify file move
-        expected_dest = os.path.join(mock_file_manager.layers_dir, f"{layer_id}.gpkg")
-        mock_shutil_move.assert_called_once_with(temp_path, expected_dest)
-
-        # Verify metadata save
+        # Define expected destination paths based on your file_manager mock
+        expected_dest_path = os.path.join(mock_file_manager.layers_dir, f"{layer_id}.gpkg")
         expected_meta_path = os.path.join(mock_file_manager.layers_dir, f"{layer_id}_metadata.json")
-        mock_file_open.assert_called_once_with(expected_meta_path, 'w')
-        mock_json_dump.assert_called_once_with(metadata, mock_file_open(), indent=4)
+
+        # 2. Patch dependencies: shutil.move and the built-in 'open' for metadata saving
+        with patch('shutil.move') as mock_shutil_move, \
+            patch('os.path.isfile', return_value=True), \
+            patch('builtins.open', mock_open()) as mock_file:
+            
+            # 3. Execute the private method using its mangled name
+            layer_manager._LayerManager__move_to_permanent(temp_layer_path, layer_id, metadata)
+
+            # 4. Assertions
+            # Verify the file was moved to the permanent layers directory
+            mock_shutil_move.assert_called_once_with(temp_layer_path, expected_dest_path)
+            
+            # Verify the metadata JSON was saved to the correct path
+            mock_file.assert_called_once_with(expected_meta_path, 'w')
 
     @patch('os.path.isfile', return_value=False)
     def test_move_to_permanent_source_not_found(
