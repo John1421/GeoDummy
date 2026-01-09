@@ -42,7 +42,7 @@ export interface Script {
 // ];
 
 interface ScriptListProps {
-  onAddLayer: (layer_id: string, metadata: any) => Promise<void>;
+  onAddLayer: (layer_id: string, metadata: unknown) => Promise<void>;
 }
 
 export default function ScriptList({ onAddLayer }: ScriptListProps) {

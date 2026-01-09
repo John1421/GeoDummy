@@ -19,7 +19,23 @@ function App() {
 
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
 
-  const addLayerRef = useRef<((layer_id: string, metadata: any) => Promise<void>) | null>(null);
+  type BackendLayerMetadata =
+    | {
+        type: "vector";
+        layer_name: string;
+        geometry_type: string;
+        crs?: string;
+      }
+    | {
+        type: "raster";
+        layer_name?: string;
+        zoom_min?: number;
+        zoom_max?: number;
+        crs?: string;
+        bbox: { min_lon: number; min_lat: number; max_lon: number; max_lat: number };
+      };
+
+  const addLayerRef = useRef<((layer_id: string, metadata: BackendLayerMetadata) => Promise<void>) | null>(null);
 
   return (
     <div
