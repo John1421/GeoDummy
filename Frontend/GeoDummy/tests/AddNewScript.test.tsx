@@ -80,6 +80,7 @@ describe('AddNewScript Component', () => {
     const uploadButton = screen.getByText('Upload');
     fireEvent.click(uploadButton);
 
+    // Should show error because name and category are missing (description is optional)
     await waitFor(() => {
       expect(screen.getByText('Please fill in all required fields.')).toBeInTheDocument();
     });
@@ -424,6 +425,9 @@ describe('AddNewScript Component', () => {
     expect(formData.get('category')).toBe('Analysis');
     expect(formData.get('description')).toBe('This script analyzes geographical data');
     expect(formData.get('file')).toBeInstanceOf(File);
+    // Verify layers and parameters are sent as JSON strings
+    expect(formData.get('layers')).toBe('[]');
+    expect(formData.get('parameters')).toBe('{}');
 
     // Step 5: Verify callback was triggered with correct parameters
     await waitFor(() => {
