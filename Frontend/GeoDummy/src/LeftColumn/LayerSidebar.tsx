@@ -218,12 +218,43 @@ interface LayerSidebarProps {
   onAddLayerRef?: (addLayerFn: (layer_id: string, metadata: BackendLayerMetadata) => Promise<void>) => void;
 }
 
+async function fetchWithRetry(
+    url: string,
+    options: RequestInit = {},
+    retries = 5,
+    delayMs = 1000
+): Promise<Response> {
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            const response = await fetch(url, options);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            return response;
+        } catch (error) {
+            lastError = error;
+
+            if (attempt === retries) {
+                break;
+            }
+
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+    }
+
+    throw lastError;
+}
+
 // Fetch existing layers on app load
 async function fetchExistingLayers(): Promise<{
   ids: string[];
   metadata: BackendLayerMetadata[];
 }> {
-  const res = await fetch("http://localhost:5050/layers");
+  const res = await fetchWithRetry("http://localhost:5050/layers");
 
   if (!res.ok) throw new Error("Failed to fetch layers");
 
