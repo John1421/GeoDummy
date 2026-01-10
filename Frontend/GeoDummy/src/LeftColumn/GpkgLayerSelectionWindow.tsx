@@ -97,7 +97,7 @@ export default function GpkgLayerSelectionWindow({ isOpen, onClose, onSelect, gp
               opacity: isConfirmDisabled ? 0.7 : 1,
             }}
           >
-            Send selected to backend
+            Send Layers
           </button>
         </div>
       }
@@ -111,7 +111,7 @@ export default function GpkgLayerSelectionWindow({ isOpen, onClose, onSelect, gp
             color: colors.dragIcon,
           }}
         >
-          Pick the layers from this GeoPackage you want to send to the backend.
+          Pick the layers from this GeoPackage you want to use.
         </p>
 
         {!isLoading && layersToShow.length > 0 && (
