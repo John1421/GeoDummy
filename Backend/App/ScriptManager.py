@@ -51,11 +51,11 @@ class ScriptManager:
         # If file does not exist, create it
         if not os.path.isfile(self.metadata_path):
             initial_structure = {"scripts": {}}
-            with open(self.metadata_path, 'w') as f:
+            with open(self.metadata_path, 'w', encoding="utf-8") as f:
                 json.dump(initial_structure, f, indent=4)
 
         # Load metadata
-        with open(self.metadata_path, 'r') as f:
+        with open(self.metadata_path, 'r', encoding="utf-8") as f:
             self.metadata = json.load(f)
 
         self._validate_script_files()
@@ -240,7 +240,7 @@ class ScriptManager:
         Persist metadata to disk.
         """
 
-        with open(self.metadata_path, 'w') as f:
+        with open(self.metadata_path, 'w', encoding="utf-8") as f:
             json.dump(self.metadata, f, indent=4)
 
     def _load_metadata(self):
@@ -250,7 +250,7 @@ class ScriptManager:
         :return: Dictionary containing all script metadata.
         """
 
-        with open(self.metadata_path, 'r') as f:
+        with open(self.metadata_path, 'r', encoding="utf-8") as f:
             self.metadata = json.load(f)
         return self.metadata
 
@@ -349,7 +349,7 @@ class ScriptManager:
                 script_metadata = self.get_metadata(script_id)
                 script_metadatas.append(script_metadata)
         except Exception as e:
-            raise ValueError(f"Error retrieving scripts: {str(e)}")
+            raise ValueError(f"Error retrieving scripts: {str(e)}") from e
 
         return script_ids, script_metadatas
 

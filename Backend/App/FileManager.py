@@ -65,7 +65,7 @@ class FileManager:
         try:
             shutil.move(source_path, destination_path)
         except Exception as e:
-            raise ValueError(f"Error moving file: {e}")
+            raise ValueError(f"Error moving file: {e}") from e
         return True
 
 
@@ -87,7 +87,7 @@ class FileManager:
         try:
             shutil.copy(source_path, destination_file)
         except Exception as e:
-            raise ValueError(f"Error copying file: {e}")
+            raise ValueError(f"Error copying file: {e}") from e
         return True
 
     #=====================================================================================

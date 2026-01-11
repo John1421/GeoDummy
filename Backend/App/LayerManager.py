@@ -119,13 +119,13 @@ class LayerManager:
                 zf.extractall(temp_dir)
         except Exception as e:
             os.remove(zip_path)
-            raise ValueError(f"Error unzipping shapefile: {e}")
+            raise ValueError(f"Error unzipping shapefile: {e}") from e
 
         # 2. Delete zip file
         try:
             os.remove(zip_path)
         except Exception as e:
-            raise ValueError(f"Failed to delete the zip file after extraction: {e}")
+            raise ValueError(f"Failed to delete the zip file after extraction: {e}") from e
 
         # 3. Locate the .shp file
         shp_files = [f for f in os.listdir(temp_dir) if f.lower().endswith('.shp')]
@@ -140,7 +140,7 @@ class LayerManager:
             gdf = gpd.read_file(shp_path)
         except Exception as e:
             shutil.rmtree(temp_dir)
-            raise ValueError(f"Error reading shapefile with GeoPandas: {e}")
+            raise ValueError(f"Error reading shapefile with GeoPandas: {e}") from e
 
         try:
             # 5. Check CRS
@@ -177,7 +177,7 @@ class LayerManager:
             metadata = self.__get_gpkg_metadata(new_gpkg_path, original_crs)
             self.__move_to_permanent(new_gpkg_path, new_gpkg_id, metadata)
         except Exception as e:
-            raise ValueError(f"Error writing shapefile into GeoPackage: {e}")
+            raise ValueError(f"Error writing shapefile into GeoPackage: {e}") from e
 
         return new_gpkg_id, metadata
 
@@ -225,7 +225,7 @@ class LayerManager:
             metadata = self.__get_gpkg_metadata(new_gpkg_path, original_crs)
             self.__move_to_permanent(new_gpkg_path, new_gpkg_id, metadata)
         except Exception as e:
-            raise ValueError(f"Error writing GeoJSON into GeoPackage: {e}")
+            raise ValueError(f"Error writing GeoJSON into GeoPackage: {e}") from e
 
         return new_gpkg_id, metadata
 
@@ -260,13 +260,13 @@ class LayerManager:
                     self.__move_to_permanent(temp_path, layer_name, metadata)
                 except Exception as e:
                     os.remove(raster_path)
-                    raise ValueError(f"Failed convert raster system coordinates: {e}")
+                    raise ValueError(f"Failed convert raster system coordinates: {e}") from e
             else:
                 metadata = self.__get_raster_metadata(raster_path, target_crs)
                 self.__move_to_permanent(raster_path, layer_name, metadata)
         except Exception as e:
             os.remove(raster_path)
-            raise ValueError(f"Failed to add raster layer: {e}")
+            raise ValueError(f"Failed to add raster layer: {e}") from e
 
         return layer_name, metadata
 
@@ -321,7 +321,7 @@ class LayerManager:
                 all_gpkg_ids.append(new_gpkg_id)
                 all_metadata.append(metadata)
             except Exception as e:
-                raise ValueError(f"Failed to import layer '{layer_name}': {e}")
+                raise ValueError(f"Failed to import layer '{layer_name}': {e}") from e
 
         os.remove(geopackage_path)
 
@@ -377,7 +377,7 @@ class LayerManager:
                         dst.write(feature)
 
         except Exception as e:
-            raise ValueError(f"Failed to convert GeoPackage to GeoJSON: {e}")
+            raise ValueError(f"Failed to convert GeoPackage to GeoJSON: {e}") from e
 
         return geojson_path
 
@@ -411,7 +411,7 @@ class LayerManager:
             layers = fiona.listlayers(self.default_gpkg_path)
             if new_name in layers:
                 exists = True
-        except Exception:
+        except (OSError, IOError, fiona.errors.DriverError):
             # GPKG may not exist yet or unreadable
             pass
 
@@ -460,7 +460,7 @@ class LayerManager:
                         "feature_count": len(gdf)
                     }
             except Exception as e:
-                raise ValueError(f"Error reading GeoPackage: {e}")
+                raise ValueError(f"Error reading GeoPackage: {e}") from e
 
         # If neither raster nor vector layer found, raise error
         raise ValueError(f"Layer '{layer_id}' not found in rasters or GeoPackage")
@@ -599,7 +599,7 @@ class LayerManager:
         except ValueError as e:
             raise e
         except Exception as e:
-            raise ValueError(f"Error reading GeoPackage: {e}")
+            raise ValueError(f"Error reading GeoPackage: {e}") from e
 
     #=====================================================================================
     #                               HELPER METHODS
@@ -626,7 +626,7 @@ class LayerManager:
                 try:
                     with open(metadata_path, "r", encoding="utf-8") as f:
                         meta = json.load(f)
-                except Exception:
+                except (OSError, IOError, json.JSONDecodeError):
                     meta = None
 
                 layer_ids.append(layer_id)
@@ -655,7 +655,7 @@ class LayerManager:
 
                 return raster.rio.crs.to_string()
         except Exception as e:
-            raise ValueError(f"Error checking tif CRS: {e}")
+            raise ValueError(f"Error checking tif CRS: {e}") from e
 
 
     @staticmethod
@@ -683,7 +683,7 @@ class LayerManager:
 
             return raster_path
         except Exception as e:
-            raise ValueError(f"Error converting tif CRS: {e}")
+            raise ValueError(f"Error converting tif CRS: {e}") from e
 
     @staticmethod
     def __retrieve_spatial_layers_from_incoming_gpkg(new_geopackage_path):
@@ -698,7 +698,7 @@ class LayerManager:
         try:
             all_layers = fiona.listlayers(new_geopackage_path)
         except Exception as e:
-            raise ValueError(f"Invalid GeoPackage: {e}")
+            raise ValueError(f"Invalid GeoPackage: {e}") from e
 
         if not all_layers:
             raise ValueError("GeoPackage contains no layers.")
@@ -717,7 +717,7 @@ class LayerManager:
             except FionaValueError:
                 # Not a readable vector layer
                 continue
-            except Exception:
+            except (OSError, IOError):
                 continue
 
         if not incoming_layers:
@@ -751,7 +751,7 @@ class LayerManager:
                 "bounding_box": gdf.total_bounds.tolist()
             }
         except Exception as e:
-            raise ValueError(f"Error reading GeoPackage: {e}")
+            raise ValueError(f"Error reading GeoPackage: {e}") from e
 
     @staticmethod
     def __get_raster_metadata(raster_path, crs_original, tile_size=256):
@@ -834,17 +834,17 @@ class LayerManager:
 
             shutil.move(temp_layer_path, dest_path)
         except Exception as e:
-            raise ValueError(f"Failed to move layer to permanent storage: {e}")
+            raise ValueError(f"Failed to move layer to permanent storage: {e}") from e
 
         # Save layer metadata
         meta_path = os.path.join(file_manager.layers_dir, f"{layer_id}_metadata.json")
 
         try:
-            with open(meta_path, 'w') as f:
+            with open(meta_path, 'w', encoding="utf-8") as f:
                 clean_metadata = LayerManager._sanitize_for_json(metadata_dict)
                 json.dump(clean_metadata, f, indent=4, allow_nan=False)
         except Exception as e:
-            raise ValueError(f"Failed to save layer metadata: {e}")
+            raise ValueError(f"Failed to save layer metadata: {e}") from e
 
     def is_raster(self, layer_id):
         """
