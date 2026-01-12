@@ -258,6 +258,8 @@ def home():
 @app.route('/scripts', methods=['POST'])
 def add_script():
     """
+    Use Case: UC-B-09
+
     Upload and register a new Python script.
 
     Validates the uploaded script file and associated metadata, stores the
@@ -323,12 +325,12 @@ def add_script():
         "script_id": script_id,
         "metadata": metadata}), 200
 
-'''
-Use Case: UC-B-10
-'''
+
 @app.route('/scripts/<script_id>', methods=['GET'])
 def script_metadata(script_id):
     """
+    Use Case: UC-B-10
+
     Retrieve metadata associated with a stored script.
 
     Fetches and returns the metadata for the given script identifier,
@@ -361,6 +363,8 @@ def script_metadata(script_id):
 @app.route('/scripts', methods=['GET'])
 def list_scripts():
     """
+    Use Case: UC-B-10
+
     List all registered scripts and their metadata.
 
     Retrieves script identifiers and associated metadata from storage and
@@ -385,6 +389,11 @@ def list_scripts():
 @app.route('/scripts/<script_id>', methods=['POST'])
 def run_script(script_id):
     """
+    Use Case: UC-B-11
+    Use Case: UC-B-12
+    Use Case: UC-B-13
+    Use Case: UC-B-14 is in the background
+    
     Execute a stored script with provided parameters.
 
     Validates input, ensures no conflicting execution is running, executes the
@@ -677,15 +686,14 @@ def list_layers():
     return jsonify({ "layer_id": layer_ids, "metadata": metadata}), 200
 
 
-'''
-Use Case: UC-B-01
-Use Case: UC-B-02
-Use Case: UC-B-03
-Use Case: UC-B-04
-'''
 @app.route('/layers', methods=['POST'])
 def add_layer():
     """
+    Use Case: UC-B-01
+    Use Case: UC-B-02
+    Use Case: UC-B-03
+    Use Case: UC-B-04
+
     Upload and register a new spatial layer.
 
     Accepts vector or raster data via multipart upload, validates file size and
@@ -1091,12 +1099,11 @@ def set_layer_priority(layer_id,priority):
 
 # Layer Information Endpoints
 
-'''
-Use Case: UC-B-020
-'''
 @app.route('/layers/<layer_id>/information', methods=['GET'])
 def identify_layer_information(layer_id):
     """
+    Use Case: UC-B-020
+
     Retrieve descriptive information about a layer.
 
     Fetches and returns detailed information describing the given layer.
@@ -1112,12 +1119,11 @@ def identify_layer_information(layer_id):
     except ValueError as e:
         raise ValueError(f"Error in identifying layer information: {e}") from e
 
-'''
-Use Case: UC-B-05
-'''
 @app.route('/layers/<layer_id>/attributes', methods=['GET'])
 def get_layer_attributes(layer_id):
     """
+    Use Case: UC-B-05
+
     Retrieve attribute metadata for a vector layer.
 
     Returns the attribute definitions associated with the specified layer.
@@ -1136,12 +1142,11 @@ def get_layer_attributes(layer_id):
     except ValueError as e:
         raise NotFound(f"Error in retrieving layer attributes: {e}") from e
 
-'''
-Use Case: UC-B-06
-'''
 @app.route('/layers/<layer_id>/table', methods=['GET'])
 def extract_data_from_layer_for_table_view(layer_id):
     """
+    Use Case: UC-B-06
+
     Extract tabular data from a vector layer.
 
     Reads attribute data from a vector layer, formats it for tabular display,
