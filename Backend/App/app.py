@@ -802,12 +802,11 @@ def preview_geopackage_layers():
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
-'''
-UC-B-16
-'''
 @app.route('/layers/<layer_id>', methods=['GET'])
 def get_layer(layer_id):
     """
+    Use Case: UC-B-16
+
     Export and download a layer.
 
     Exports the requested layer to an appropriate format and returns it as a
@@ -844,12 +843,11 @@ def list_layer_ids_endpoint():
 '''
 
 
-'''
-UC-B-16
-'''
 @app.route("/layers/<layer_id>/tiles/<int:z>/<int:x>/<int:y>.png")
 def serve_tile(layer_id, z, x, y, tile_size=256):
     """
+    Use Case: UC-B-16
+
     Serve a map tile for a raster layer.
 
     Generates or retrieves a cached raster tile for the given layer and tile
