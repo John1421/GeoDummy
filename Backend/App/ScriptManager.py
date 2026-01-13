@@ -172,7 +172,7 @@ class ScriptManager:
                 cwd=execution_folder,
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=600,
                 check=True
             )
             status = "success"
@@ -180,7 +180,10 @@ class ScriptManager:
             status = "timeout"
             result = None  # optional
         except subprocess.CalledProcessError as e:
-            status = "failure"
+            if e.returncode == 15:
+                status = "terminated"
+            else:    
+                status = "failure"
             result = e  # contains stdout/stderr
 
 
