@@ -2,8 +2,8 @@
 *.pyc
 .coverage
 Pytest/coverage_report
-Pytest/__pycache__
-App/__pycache__
+Pytest/__pycache__/
+App/__pycache__/
 data
 .venv/
 .env/
