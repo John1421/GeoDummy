@@ -50,9 +50,15 @@ function BaseMapSettings({
                     const data = await response.json();
                     
                     setBasemaps(data);
-                    /*if (data.length > 0) {
+                    
+                    // Load saved basemap ID from localStorage
+                    const savedBasemapId = localStorage.getItem('selectedBasemapId');
+                    if (savedBasemapId && data.some((b: BasemapMetadata) => b.id === savedBasemapId)) {
+                        setSelectedBasemapId(savedBasemapId);
+                    } else if (data.length > 0) {
                         setSelectedBasemapId(data[0].id);
-                    }*/
+                    }
+                    
                     setLoading(false);
                     return; // Success, exit the function
                 } catch (err: unknown) {
@@ -104,9 +110,11 @@ function BaseMapSettings({
 
    
     async function save_basemap() {
-        if (currentBasemapUrl) {
+        if (currentBasemapUrl && selectedBasemapId) {
             setBaseMapUrl(currentBasemapUrl);
             setBaseMapAttribution(currentBasemapAttribution || "");
+            // Save to localStorage for persistence
+            localStorage.setItem('selectedBasemapId', selectedBasemapId);
             onClose();
         }
     }
