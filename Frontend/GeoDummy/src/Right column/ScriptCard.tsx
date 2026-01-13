@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { colors, typography, radii, shadows } from "../Design/DesignTokens";
 import { FileCode, Play, Square } from "lucide-react";
 import { ThreeDot } from "react-loading-indicators"
@@ -16,15 +16,36 @@ interface ScriptCardProps {
 
 function ScriptCard({ id, name, description, loading, setLoading, onAddLayer }: ScriptCardProps) {
   const [isRunScriptWindowOpen, setIsRunScriptWindowOpen] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const handleRun = () => {
     setIsRunScriptWindowOpen(true);
   };
 
-  const handleStop = () => {
-    // TODO: Add backend call to stop the script
-    setLoading(false);
-    console.log(`Stopping script ${id}`);
+  const handleStop = async () => {
+    // Abort the ongoing fetch request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:5050/execute_script/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Script stopped:', data.message);
+      } else {
+        const errorData = await response.json().catch(() => null);
+        console.error('Failed to stop script:', errorData);
+      }
+    } catch (err) {
+      console.error('Error stopping script:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Mock de execução no backend recebendo o scriptId
@@ -167,6 +188,7 @@ function ScriptCard({ id, name, description, loading, setLoading, onAddLayer }: 
         onAddLayer={onAddLayer}
         onScriptStart={() => setLoading(true)}
         onScriptEnd={() => setLoading(false)}
+        abortControllerRef={abortControllerRef}
       />
     </div>
   );
