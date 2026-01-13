@@ -443,7 +443,7 @@ def export_script(script_id):
         (application/zip).
     """
 
-    script_metadata = script_manager.get_metadata(script_id)
+    script_metadata_values = script_manager.get_metadata(script_id)
 
     zip_filename = f"{script_id}_export.zip"
     zip_path = os.path.join(file_manager.temp_dir, zip_filename)
@@ -453,7 +453,7 @@ def export_script(script_id):
             # Add metadata
             zipf.writestr(
                 "scripts_metadata.json",
-                json.dumps(script_metadata, indent=2)
+                json.dumps(script_metadata_values, indent=2)
             )
 
             # Add scripts at ZIP root
