@@ -11,3 +11,4 @@ xenon
 radon
 fiona
 Pillow
+psutil

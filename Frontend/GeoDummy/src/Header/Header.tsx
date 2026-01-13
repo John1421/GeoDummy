@@ -171,7 +171,11 @@ function Header({
         {/* FILE MENU */}
         <div className="relative" ref={fileRef}>
           <button
-            onClick={() => setOpenFileMenu(!openFileMenu)}
+            onClick={() => {
+              setOpenFileMenu(!openFileMenu);
+              setOpenBasemapMenu(false);
+              setOpenSettings(false);
+            }}
             onMouseDown={(e) => e.stopPropagation()}
             className={BUTTON_STYLE}
             disabled={exporting}
@@ -197,7 +201,11 @@ function Header({
         <div className="relative" ref={basemapRef}>
           <button
             data-testid="edit-basemap-button"
-            onClick={() => setOpenBasemapMenu(!openBasemapMenu)}
+            onClick={() => {
+              setOpenBasemapMenu(!openBasemapMenu);
+              setOpenFileMenu(false);
+              setOpenSettings(false);
+            }}
             onMouseDown={(e) => e.stopPropagation()}
             className={BUTTON_STYLE}
           >

@@ -27,7 +27,7 @@ function BaseMapSettings({
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [previousBasemapUrl, setPreviousBasemapUrl] = useState<string | null>(null);
-    const [initialBasemapUrl, setInitialBasemapUrl] = useState<string | null>(null);
+    const [savedBasemapId, setSavedBasemapId] = useState<string | null>(null);
 
     useEffect(() => {
         if (!openBaseMapSet) return;
@@ -55,8 +55,10 @@ function BaseMapSettings({
                     const savedBasemapId = localStorage.getItem('selectedBasemapId');
                     if (savedBasemapId && data.some((b: BasemapMetadata) => b.id === savedBasemapId)) {
                         setSelectedBasemapId(savedBasemapId);
+                        setSavedBasemapId(savedBasemapId);
                     } else if (data.length > 0) {
                         setSelectedBasemapId(data[0].id);
+                        setSavedBasemapId(data[0].id);
                     }
                     
                     setLoading(false);
@@ -88,10 +90,6 @@ function BaseMapSettings({
         }
 
         try {
-            if(initialBasemapUrl === null){
-                setInitialBasemapUrl(selectedBasemap.url);
-            }
-
             setPreviousBasemapUrl(currentBasemapUrl);
             setCurrentBasemapUrl(selectedBasemap.url);
             setCurrentBasemapAttribution(selectedBasemap.attribution || "");
@@ -106,7 +104,7 @@ function BaseMapSettings({
                 setBaseMapUrl(previousBasemapUrl);
             }
         }
-    }, [selectedBasemapId, basemaps, currentBasemapUrl, initialBasemapUrl, previousBasemapUrl, setBaseMapAttribution, setBaseMapUrl]);
+    }, [selectedBasemapId, basemaps, currentBasemapUrl, previousBasemapUrl, setBaseMapAttribution, setBaseMapUrl]);
 
    
     async function save_basemap() {
@@ -115,16 +113,22 @@ function BaseMapSettings({
             setBaseMapAttribution(currentBasemapAttribution || "");
             // Save to localStorage for persistence
             localStorage.setItem('selectedBasemapId', selectedBasemapId);
+            setSavedBasemapId(selectedBasemapId);
             onClose();
         }
     }
     function handleClose() {
-    
-        if (initialBasemapUrl) {
-        setBaseMapUrl(initialBasemapUrl);}
-
-    onClose();
-}
+        // Restore the last saved basemap when closing without saving
+        if (savedBasemapId) {
+            setSelectedBasemapId(savedBasemapId);
+            const savedBasemap = basemaps.find(b => b.id === savedBasemapId);
+            if (savedBasemap && savedBasemap.url) {
+                setBaseMapUrl(savedBasemap.url);
+                setBaseMapAttribution(savedBasemap.attribution || "");
+            }
+        }
+        onClose();
+    }
 
     return (
         <WindowTemplate
