@@ -6,6 +6,7 @@ API Endpoints:
         POST   /scripts                          - Upload and register a new Python script
         GET    /scripts                          - List all available scripts
         GET    /scripts/<script_id>              - Get metadata for a specific script
+        DELETE /scripts/<script_id>              - Delete a specific script
         GET    /scripts/export/<script_id>       - Export a specific script
         GET    /scripts/export/all               - Export all scripts as a ZIP archive
         POST   /scripts/<script_id>              - Execute a script with parameters
