@@ -101,6 +101,10 @@ function Header({
   const [openFileMenu, setOpenFileMenu] = useState(false);
   const fileRef = useRef<HTMLDivElement>(null);
 
+  // Basemap dropdown
+  const [openBasemapMenu, setOpenBasemapMenu] = useState(false);
+  const basemapRef = useRef<HTMLDivElement>(null);
+
   // Export UX
   const [exporting, setExporting] = useState(false);
   const [exportErrorOpen, setExportErrorOpen] = useState(false);
@@ -116,11 +120,14 @@ function Header({
       if (openFileMenu && fileRef.current && !fileRef.current.contains(target)) {
         setOpenFileMenu(false);
       }
+      if (openBasemapMenu && basemapRef.current && !basemapRef.current.contains(target)) {
+        setOpenBasemapMenu(false);
+      }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [openSettings, openFileMenu]);
+  }, [openSettings, openFileMenu, openBasemapMenu]);
 
   async function handleExportScripts() {
     setOpenFileMenu(false);
@@ -186,20 +193,30 @@ function Header({
           )}
         </div>
 
-        {/* SETTINGS MENU */}
-        <div className="relative" ref={settingsRef}>
+        {/* BASEMAP MENU */}
+        <div className="relative" ref={basemapRef}>
           <button
-            data-testid="settings-button"
-            onClick={() => setOpenSettings(!openSettings)}
+            data-testid="edit-basemap-button"
+            onClick={() => setOpenBasemapMenu(!openBasemapMenu)}
             onMouseDown={(e) => e.stopPropagation()}
             className={BUTTON_STYLE}
           >
-            Settings
+            Basemap
           </button>
 
-          {openSettings && (
+          {openBasemapMenu && (
             <div className="absolute top-full left-0 mt-2 bg-white rounded-lg shadow-xl p-4 z-50 min-w-[250px]">
-              <div className="space-y-3">
+              <button
+                onClick={() => {
+                  setOpenBasemapMenu(false);
+                  setOpenBaseMapSet(true);
+                }}
+                className="w-full text-left px-3 py-2 rounded-md text-gray-800 hover:bg-gray-100 mb-3"
+              >
+                Change basemap
+              </button>
+              
+              <div className="border-t border-gray-200 pt-3 space-y-3">
                 <div className="flex items-center gap-3">
                   <input
                     type="checkbox"
@@ -229,16 +246,6 @@ function Header({
             </div>
           )}
         </div>
-
-        {/* BASEMAP */}
-        <button
-          data-testid="edit-basemap-button"
-          onClick={() => setOpenBaseMapSet(!openBaseMapSet)}
-          onMouseDown={(e) => e.stopPropagation()}
-          className={BUTTON_STYLE}
-        >
-          Basemap
-        </button>
 
         <BaseMapSettings
           openBaseMapSet={openBaseMapSet}
