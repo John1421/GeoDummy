@@ -383,6 +383,21 @@ def list_scripts():
 
     return  jsonify({"scripts_ids": scripts_ids, "scripts_metadata": scripts_metadata}), 200
 
+@app.route('/scripts/export/<script_id>', methods=['GET'])
+def export_script(script_id):
+
+    return jsonify({"message": f"Export script {script_id} - Not implemented yet"}), 200
+
+@app.route('/scripts/export/all', methods=['GET'])
+def export_all_scripts():
+
+    return jsonify({"message": "Export all scripts - Not implemented yet"}), 200    
+
+@app.route('/scripts/import', methods=['POST'])
+def import_scripts():
+
+    return jsonify({"message": "Import scripts - Not implemented yet"}), 200
+
 # Script Execution Endpoints
 
 
@@ -614,7 +629,6 @@ def get_script_output(script_id):
     # TODO: retrieve output
 
     return jsonify({"script_id": script_id, "output": "Sample output here"}), 200
-
 
 # Map Interaction Endpoints
 
