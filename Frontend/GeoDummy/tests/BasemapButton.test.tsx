@@ -21,7 +21,7 @@ describe('BaseMapSettings', () => {
   ];
 
   let setBaseMapUrlMock: ReturnType<typeof vi.fn<(url: string) => void>>;
-  let setBaseMapAttributionMock: ReturnType<typeof vi.fn<(attribution: string) => void>>;
+  let setBaseMapAttributionMock: ReturnType<typeof vi.fn<(a: string) => void>>;
   let onCloseMock: ReturnType<typeof vi.fn<() => void>>;
 
   beforeEach(() => {
@@ -52,24 +52,30 @@ describe('BaseMapSettings', () => {
       />,
     );
 
-    // Espera o fetch e o primeiro basemap selecionado
     await waitFor(() =>
-      expect(setBaseMapUrlMock).toHaveBeenCalledWith(
-        'https://tiles.osm.org/{z}/{x}/{y}.png',
+      expect(screen.getByTestId('basemap-dropdown')).toHaveTextContent(
+        /selecionar basemap/i,
       ),
     );
 
     await user.click(screen.getByTestId('basemap-dropdown'));
-
     await user.click(screen.getByTestId('basemap-option-osm_standard'));
-
-    await user.click(screen.getByTestId('basemap-save'));
 
     expect(setBaseMapUrlMock).toHaveBeenLastCalledWith(
       'https://tiles.osm.org/{z}/{x}/{y}.png',
     );
     expect(setBaseMapAttributionMock).toHaveBeenLastCalledWith('© OSM');
 
+    const saveButton = screen.getByTestId('basemap-save');
+    expect(saveButton).not.toBeDisabled();
+
+
+    await user.click(saveButton);
+
+    expect(setBaseMapUrlMock).toHaveBeenLastCalledWith(
+      'https://tiles.osm.org/{z}/{x}/{y}.png',
+    );
+    expect(setBaseMapAttributionMock).toHaveBeenLastCalledWith('© OSM');
     expect(onCloseMock).toHaveBeenCalled();
   });
 });
