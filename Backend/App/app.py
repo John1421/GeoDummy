@@ -559,6 +559,38 @@ def export_all_scripts():
 
 @app.route('/scripts/import', methods=['POST'])
 def import_scripts():
+    """
+    Import and register multiple Python scripts from a ZIP archive.
+
+    Accepts a ZIP file uploaded via multipart/form-data containing one metadata
+    JSON file (matching '*metadata.json') and one or more Python scripts. The
+    metadata file must define a 'scripts' object mapping script identifiers to
+    their corresponding metadata. Each script file must be named using the
+    pattern '<script_id>.py' to be eligible for import.
+
+    The ZIP archive is extracted to a temporary directory, validated, and each
+    eligible script is copied, size-checked, stored in the scripts directory,
+    and registered in the system. Scripts that fail validation or are missing
+    required files are skipped. If no valid scripts are imported, the request
+    fails.
+
+    Temporary files and directories are cleaned up after processing, regardless
+    of success or failure.
+
+    :raises BadRequest:
+        - If no file is provided under the 'file' field.
+        - If the uploaded file is not a ZIP archive.
+        - If the ZIP file is invalid or corrupted.
+        - If no '*metadata.json' file is found, or if multiple metadata files exist.
+        - If the metadata file is invalid or does not contain a valid 'scripts' object.
+        - If no valid scripts are found to import.
+    :raises HTTPException:
+        - If an error occurs while storing or registering a script.
+    :return:
+        JSON response confirming successful import, including the number of
+        imported scripts and their associated metadata.
+    """
+
     # Recieve file from browser via multipart/form-data
     uploaded_zip = request.files.get('file')
     if not uploaded_zip:
