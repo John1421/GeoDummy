@@ -863,6 +863,7 @@ export default function LayerSettingsWindow({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                gap: 8,
                 padding: 8,
                 borderRadius: radii.sm,
                 border: `1px solid ${colors.borderStroke}`,
@@ -871,6 +872,7 @@ export default function LayerSettingsWindow({
                 color: colors.sidebarForeground,
               }}
             >
+              <span>Export layer</span>
               <Download size={20} strokeWidth={2} />
             </button>
           </div>
