@@ -386,6 +386,36 @@ def list_scripts():
 
     return  jsonify({"scripts_ids": scripts_ids, "scripts_metadata": scripts_metadata}), 200
 
+@app.route('/scripts/<script_id>', methods=['DELETE'])
+def delete_script(script_id):
+    """
+    Delete a script and its associated metadata.
+
+    Removes the specified script and its metadata from storage.
+
+    :param script_id: Unique identifier of the script to delete.
+    :raises BadRequest: If the script_id is missing or invalid.
+    :raises NotFound: If no script exists for the given script_id.
+    :raises InternalServerError: If an unexpected error occurs while deleting the script.
+    """
+
+    if not script_id:
+        raise BadRequest("script_id parameter is required")
+
+    try:
+        script_manager.delete_script(script_id)
+        
+        app.logger.info(
+            "[%s] %s",
+            g.request_id,
+            f"Deleted script {script_id}"
+        )
+        return jsonify({"message": "Script deleted successfully"}), 200
+    except FileNotFoundError as e:
+        raise NotFound(f"Script not found for deletion: {script_id}") from e
+    except Exception as e:
+        raise InternalServerError("Failed to delete script") from e
+
 @app.route('/scripts/export/<script_id>', methods=['GET'])
 def export_script(script_id):
     """

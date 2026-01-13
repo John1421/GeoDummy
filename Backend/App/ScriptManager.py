@@ -264,6 +264,22 @@ class ScriptManager:
 
         self.metadata = self._load_metadata()
         return self.metadata["scripts"][script_id]
+    
+    def delete_script(self, script_id):
+        """
+        Remove a script entry from the metadata registry.
+
+        :param script_id: Unique identifier for the script.
+        """
+
+        try:
+            if script_id in self.metadata.get("scripts", {}):
+                del self.metadata["scripts"][script_id]
+                self._save_metadata()
+
+            os.remove(os.path.join(file_manager.scripts_dir, f"{script_id}.py"))
+        except Exception as e:
+            raise ValueError(f"Error deleting script {script_id}: {str(e)}") from e    
 
 
     def _validate_script_files(self):
