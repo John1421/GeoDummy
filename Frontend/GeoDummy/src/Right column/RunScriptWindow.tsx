@@ -10,6 +10,7 @@ interface RunScriptWindowProps {
   onAddLayer: (layer_id: string, metadata: BackendLayerMetadata) => Promise<void>;
   onScriptStart: () => void;
   onScriptEnd: () => void;
+  abortControllerRef: React.MutableRefObject<AbortController | null>;
 }
 
 type Metadata = {
@@ -49,7 +50,7 @@ interface LayerMetadata {
   type?: string;
 }
 
-const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scriptId, onAddLayer, onScriptStart, onScriptEnd }) => {
+const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scriptId, onAddLayer, onScriptStart, onScriptEnd, abortControllerRef }) => {
   const [availableLayers, setAvailableLayers] = useState<string[]>([]);
   const [availableLayersMetadata, setAvailableLayersMetadata] = useState<LayerMetadata[]>([]);
   const [metadata, setMetadata] = useState<Metadata | null>(null);
@@ -300,6 +301,10 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
               onScriptStart();
               onClose();
 
+              // Create and store AbortController
+              const abortController = new AbortController();
+              abortControllerRef.current = abortController;
+
               const postPayload: PostPayload = {
                 layers: layersIds,
                 parameters: paramsObj,
@@ -309,6 +314,7 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(postPayload),
+                signal: abortController.signal,
               });
 
               if (response.ok) {
@@ -333,11 +339,17 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
                 if (errorData) console.error('Error details:', errorData); 
             
               }
-            } catch (err) {
-              console.error('Error running script:', err);
-              setRuntimeError('Unable to connect to the backend while executing the script.');
+            } catch (err: unknown) {
+              // Don't show error if request was aborted (script was stopped)
+              if (err instanceof Error && err.name === 'AbortError') {
+                console.log('Script execution was cancelled');
+              } else {
+                console.error('Error running script:', err);
+                setRuntimeError('Unable to connect to the backend while executing the script.');
+              }
             } finally {
-              // Stop loading animation
+              // Stop loading animation and clear abort controller
+              abortControllerRef.current = null;
               onScriptEnd();
             }
           }}
