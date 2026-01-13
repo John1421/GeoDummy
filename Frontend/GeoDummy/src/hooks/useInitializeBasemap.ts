@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 
 interface Basemap {
+  id: string;
   url: string;
   attribution?: string;
 }
@@ -28,10 +29,19 @@ export function useInitializeBasemap(
             throw new Error("Empty basemap list");
           }
 
-          const defaultBasemap = basemaps[0];
+          // Check for saved basemap in localStorage
+          const savedBasemapId = localStorage.getItem('selectedBasemapId');
+          let selectedBasemap = basemaps[0];
+          
+          if (savedBasemapId) {
+            const savedBasemap = basemaps.find((b: Basemap & { id: string }) => b.id === savedBasemapId);
+            if (savedBasemap) {
+              selectedBasemap = savedBasemap;
+            }
+          }
 
-          setBaseMapUrl(defaultBasemap.url);
-          setBaseMapAttribution(defaultBasemap.attribution ?? "");
+          setBaseMapUrl(selectedBasemap.url);
+          setBaseMapAttribution(selectedBasemap.attribution ?? "");
           return;
         } catch (err) {
           if (attempt === maxRetries) {

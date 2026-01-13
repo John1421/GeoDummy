@@ -3,7 +3,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import RunScriptWindow from '../src/Right Column/RunScriptWindow';
+import RunScriptWindow from '../src/Right column/RunScriptWindow';
 import type { BackendLayerMetadata } from '../src/LeftColumn/LayerSidebar';
 import '@testing-library/jest-dom';
 
