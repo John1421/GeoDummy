@@ -71,6 +71,7 @@ from datetime import datetime, timezone
 from threading import Lock
 import zipfile
 import psutil
+import signal
 
 import fiona
 import geopandas as gpd
@@ -862,7 +863,27 @@ def run_script(script_id):
 
 @app.route('/execute_script/<script_id>', methods=['DELETE'])
 def stop_script(script_id):
-    import signal
+    """
+    Stop a currently running script execution.
+
+    Attempts to terminate the active execution of the specified script by
+    sending a SIGTERM signal to all child processes spawned by the application
+    process. This is intended to gracefully stop the script and any subprocesses
+    it may have created.
+
+    If the script is not currently running, a conflict response is returned.
+
+    Notes:
+        - This endpoint terminates child processes of the current application
+          process, not arbitrary system processes (It is assumed only one scripts runs at a time).
+        - SIGTERM is used to allow scripts to perform graceful cleanup.
+        - Actual script termination depends on OS signal handling and script behavior.
+        - This does not guarantee immediate termination.
+
+    :param script_id: Identifier of the script execution to stop.
+    :raises BadRequest: If script_id is missing or invalid.
+    :return: JSON response indicating whether the script was stopped or not running.
+    """
     if not script_id:
         raise BadRequest("script_id is required")
 
