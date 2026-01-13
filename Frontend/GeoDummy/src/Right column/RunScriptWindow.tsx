@@ -56,7 +56,7 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
   const [selectedLayers, setSelectedLayers] = useState<Record<string, string>>({});
   const [parameterValues, setParameterValues] = useState<Record<string, string | number>>({});
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-
+  const [runtimeError, setRuntimeError] = useState<string | null>(null);
 
   // const handleRunScript = () => {
   //   // For now, listValue is a string, and we'll just split it by commas.
@@ -131,6 +131,7 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
         //console.log('parameters:', data?.output?.parameters ?? data?.parameters);
       } catch (err) {
         console.error('Error fetching script metadata:', err);
+        setRuntimeError('Unable to connect to the backend while loading script metadata.');
         setMetadata(null);
       }
 
@@ -139,6 +140,7 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
         const res = await fetch(`http://localhost:5050/layers`);
         if (!res.ok) {
           console.error('Failed to fetch layers', res.status);
+          setRuntimeError(`Failed to fetch available layers (HTTP ${res.status}).`);
           setAvailableLayers([]);
           return;
         }
@@ -149,6 +151,7 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
         // console.log('Available layers fetched:', data);
       } catch (err) {
         console.error('Error fetching layers:', err);
+        setRuntimeError('Unable to connect to the backend while loading available layers.');
         setAvailableLayers([]);
       }
     };
@@ -157,12 +160,13 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
   }, [isOpen, scriptId]);
 
   return (
-    <PopUpWindowModal
-      title="Execute Script"
-      isOpen={isOpen}
-      onClose={onClose}
-    >
-      <div className="flex flex-col p-4 space-y-4">
+    <>
+      <PopUpWindowModal
+        title="Execute Script"
+        isOpen={isOpen}
+        onClose={onClose}
+      >
+        <div className="flex flex-col p-4 space-y-4">
         {/* Layer Selections Section */}
         {metadata?.layers && metadata.layers.length > 0 && (
           <>
@@ -324,11 +328,14 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
                 }
               } else {
                 console.error('Script execution failed:', response.status);
+                setRuntimeError(`Script execution failed (HTTP ${response.status}).`);
                 const errorData = await response.json().catch(() => null);
-                if (errorData) console.error('Error details:', errorData);
+                if (errorData) console.error('Error details:', errorData); 
+            
               }
             } catch (err) {
               console.error('Error running script:', err);
+              setRuntimeError('Unable to connect to the backend while executing the script.');
             } finally {
               // Stop loading animation
               onScriptEnd();
@@ -343,7 +350,18 @@ const RunScriptWindow: React.FC<RunScriptWindowProps> = ({ isOpen, onClose, scri
           Run Script
         </button>
       </div>
-    </PopUpWindowModal >
+    </PopUpWindowModal>
+    <PopUpWindowModal
+      title="Error"
+      isOpen={runtimeError !== null}
+      onClose={() => setRuntimeError(null)}
+      disableOverlayClose
+    >
+      <div className="text-sm text-red-700">
+        {runtimeError}
+      </div>
+    </PopUpWindowModal>
+    </>
   );
 };
 

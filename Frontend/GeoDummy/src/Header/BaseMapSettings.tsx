@@ -50,9 +50,9 @@ function BaseMapSettings({
                     const data = await response.json();
                     
                     setBasemaps(data);
-                    if (data.length > 0) {
+                    /*if (data.length > 0) {
                         setSelectedBasemapId(data[0].id);
-                    }
+                    }*/
                     setLoading(false);
                     return; // Success, exit the function
                 } catch (err: unknown) {

@@ -6,6 +6,8 @@ API Endpoints:
         POST   /scripts                          - Upload and register a new Python script
         GET    /scripts                          - List all available scripts
         GET    /scripts/<script_id>              - Get metadata for a specific script
+        GET    /scripts/export/<script_id>       - Export a specific script
+        GET    /scripts/export/all               - Export all scripts as a ZIP archive
         POST   /scripts/<script_id>              - Execute a script with parameters
         DELETE /execute_script/<script_id>       - Stop a running script
         GET    /execute_script/<script_id>       - Get script execution status
@@ -65,6 +67,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 from threading import Lock
+import zipfile
 
 import fiona
 import geopandas as gpd
@@ -385,13 +388,142 @@ def list_scripts():
 
 @app.route('/scripts/export/<script_id>', methods=['GET'])
 def export_script(script_id):
+    """
+    Export a single registered script and its metadata as a ZIP archive.
 
-    return jsonify({"message": f"Export script {script_id} - Not implemented yet"}), 200
+    This endpoint packages the specified Python script together with its
+    associated metadata into a ZIP file stored in the application's temporary
+    directory. The resulting archive is then returned to the client as a
+    downloadable attachment.
+
+    ZIP contents:
+        - scripts_metadata.json : JSON file containing metadata for the script
+        - <script_id>.py        : The exported Python script file
+
+    :param script_id:
+        Unique identifier of the script to export.
+
+    :raises InternalServerError:
+        - If the ZIP archive cannot be created
+        - If the exported file cannot be found after creation
+
+    :return:
+        Flask response sending the ZIP archive as an attachment
+        (application/zip).
+    """
+
+    script_metadata = script_manager.get_metadata(script_id)
+
+    zip_filename = f"{script_id}_export.zip"
+    zip_path = os.path.join(file_manager.temp_dir, zip_filename)
+
+    try:
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            # Add metadata
+            zipf.writestr(
+                "scripts_metadata.json",
+                json.dumps(script_metadata, indent=2)
+            )
+
+            # Add scripts at ZIP root
+            script_path = os.path.join(
+                file_manager.scripts_dir,
+                f"{script_id}.py"
+            )
+
+            if os.path.exists(script_path):
+                zipf.write(
+                    script_path,
+                    arcname=f"{script_id}.py"
+                )
+
+    except Exception as e:
+        raise InternalServerError(
+            f"Failed to create ZIP archive: {e}"
+        ) from e
+    
+    export_file_abs = os.path.abspath(zip_path)
+    if not os.path.isfile(export_file_abs):
+        raise InternalServerError(f"Exported file not found: {export_file_abs}")
+    
+    app.logger.info(
+        "[%s] %s",
+        g.request_id,
+        f"Exported script {script_id} into {zip_filename}"
+    )
+
+    return send_file(export_file_abs,as_attachment=True,download_name=f"{script_id}_export.zip")
 
 @app.route('/scripts/export/all', methods=['GET'])
 def export_all_scripts():
+    """
+    Export all registered scripts and their metadata as a ZIP archive.
 
-    return jsonify({"message": "Export all scripts - Not implemented yet"}), 200
+    This endpoint collects all stored Python scripts along with their
+    associated metadata and packages them into a ZIP file saved in the
+    temporary directory. The resulting archive is then sent to the client
+    as a downloadable attachment.
+
+    ZIP contents:
+        - scripts_metadata.json : JSON file containing metadata for all scripts
+        - <script_id>.py        : One Python file per registered script
+
+    The ZIP file is created in the application's temporary directory and
+    validated before being returned.
+
+    :raises InternalServerError:
+        - If the ZIP archive cannot be created
+        - If the exported file cannot be found after creation
+
+    :return:
+        Flask response sending the ZIP archive as an attachment
+    """
+    scripts_ids, _ = script_manager.list_scripts()
+
+    scripts_metadata = script_manager._load_metadata()
+
+    
+    zip_filename = "all_scripts_export.zip"
+    zip_path = os.path.join(file_manager.temp_dir, zip_filename)
+
+    try:
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            # Add metadata
+            zipf.writestr(
+                "scripts_metadata.json",
+                json.dumps(scripts_metadata, indent=2)
+            )
+
+            # Add scripts at ZIP root
+            for script_id in scripts_ids:
+                script_path = os.path.join(
+                    file_manager.scripts_dir,
+                    f"{script_id}.py"
+                )
+
+                if os.path.exists(script_path):
+                    zipf.write(
+                        script_path,
+                        arcname=f"{script_id}.py"
+                    )
+
+    except Exception as e:
+        raise InternalServerError(
+            f"Failed to create ZIP archive: {e}"
+        ) from e
+    
+    export_file_abs = os.path.abspath(zip_path)
+    if not os.path.isfile(export_file_abs):
+        raise InternalServerError(f"Exported file not found: {export_file_abs}")
+    
+    app.logger.info(
+        "[%s] %s",
+        g.request_id,
+        f"Exported all scripts into {zip_filename} with {len(scripts_ids)} scripts"
+    )
+
+    return send_file(export_file_abs,as_attachment=True,download_name='all_scripts_export.zip')
+
 
 @app.route('/scripts/import', methods=['POST'])
 def import_scripts():
