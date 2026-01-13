@@ -66,6 +66,7 @@ import math
 import os
 import time
 import uuid
+import shutil
 from datetime import datetime, timezone
 from threading import Lock
 import zipfile
@@ -558,8 +559,132 @@ def export_all_scripts():
 
 @app.route('/scripts/import', methods=['POST'])
 def import_scripts():
+    # Recieve file from browser via multipart/form-data
+    uploaded_zip = request.files.get('file')
+    if not uploaded_zip:
+        raise BadRequest("Missing zip file under 'file' field.")
 
-    return jsonify({"message": "Import scripts - Not implemented yet"}), 200
+    # Validate filename and extension
+    original_id, file_extension = os.path.splitext(uploaded_zip.filename)
+
+    if not original_id:
+        raise BadRequest("Uploaded script has no filename.")
+
+    if file_extension.lower() != ".zip":
+        raise BadRequest("Only .zip files are supported.")
+
+    # Store file temporarily in temp_dir
+    temp_zip_path = os.path.join(file_manager.temp_dir, f"{uuid.uuid4()}.zip")
+    uploaded_zip.save(temp_zip_path)
+
+    imported_scripts = []
+    extract_dir = os.path.join(file_manager.temp_dir, str(uuid.uuid4()))
+
+    try:
+        os.makedirs(extract_dir, exist_ok=True)
+
+        # Extract files from the zip
+        with zipfile.ZipFile(temp_zip_path, 'r') as zip_ref:
+            zip_ref.extractall(extract_dir)
+
+        # Locate *metadata.json (anywhere inside ZIP)
+        metadata_files = []
+
+        for root, _, files in os.walk(extract_dir):
+            for filename in files:
+                if filename.lower().endswith("metadata.json"):
+                    metadata_files.append(os.path.join(root, filename))
+
+        if not metadata_files:
+            raise BadRequest("ZIP file must contain a *metadata.json file.")
+
+        if len(metadata_files) > 1:
+            raise BadRequest("ZIP file contains multiple metadata.json files; unable to determine which one to use.")
+
+        metadata_path = metadata_files[0]
+
+        # Load and validate metadata.json
+        try:
+            with open(metadata_path, "r", encoding="utf-8") as f:
+                metadata_root = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            raise BadRequest("Invalid metadata.json file.")
+
+        if not isinstance(metadata_root, dict) or "scripts" not in metadata_root:
+            raise BadRequest("metadata.json must contain a 'scripts' object.")
+
+        scripts_metadata = metadata_root["scripts"]
+
+        if not isinstance(scripts_metadata, dict):
+            raise BadRequest("'scripts' must be an object mapping script_id to metadata.")
+
+        # Import scripts by script_id
+        for script_id, metadata in scripts_metadata.items():
+            if not isinstance(metadata, dict):
+                continue
+
+            script_filename = f"{script_id}.py"
+            script_path = None
+
+            # Search for the script file
+            for root, _, files in os.walk(extract_dir):
+                if script_filename in files:
+                    script_path = os.path.join(root, script_filename)
+                    break
+
+            if not script_path:
+                continue
+
+            # Copy to temp dir using the same script_id
+            temp_script_path = os.path.join(file_manager.temp_dir, f"{script_id}.py")
+            shutil.copy(script_path, temp_script_path)
+
+            try:
+                # Validate size
+                if os.path.getsize(temp_script_path) > script_manager.MAX_SCRIPT_FILE_SIZE:
+                    os.remove(temp_script_path)
+                    continue
+
+                file_manager.move_file(temp_script_path, file_manager.scripts_dir)
+                script_manager.add_script(script_id, metadata)
+
+                imported_scripts.append({
+                    "script_id": script_id,
+                    "metadata": metadata
+                })
+
+            except HTTPException:
+                if os.path.exists(temp_script_path):
+                    os.remove(temp_script_path)
+                raise
+
+            except (OSError, IOError):
+                if os.path.exists(temp_script_path):
+                    os.remove(temp_script_path)
+                app.logger.error(
+                    "Failed to import script %s from ZIP",
+                    script_id,
+                    exc_info=True
+                )
+                continue
+
+        if not imported_scripts:
+            raise BadRequest("No valid scripts found to import.")
+
+    except zipfile.BadZipFile:
+        raise BadRequest("Invalid ZIP file.")
+
+    finally:
+        if os.path.exists(temp_zip_path):
+            os.remove(temp_zip_path)
+        if os.path.exists(extract_dir):
+            shutil.rmtree(extract_dir, ignore_errors=True)
+
+    return jsonify({
+        "message": "Scripts imported successfully",
+        "imported_count": len(imported_scripts),
+        "scripts": imported_scripts
+    }), 200
 
 # Script Execution Endpoints
 
