@@ -137,10 +137,17 @@ export default function LayerSettingsWindow({
       
       // Determine extension based on layer type
       let extension = '';
+      let acceptType = '';
+      let description = '';
+      
       if (layer.kind === 'vector' || layer.vectorData) {
         extension = '.gpkg';
+        acceptType = 'application/geopackage+sqlite3';
+        description = 'GeoPackage';
       } else if (layer.kind === 'raster' || layer.rasterData) {
         extension = '.tif';
+        acceptType = 'image/tiff';
+        description = 'GeoTIFF';
       } else if (layer.fileName) {
         // Fallback to original file extension
         const lastDot = layer.fileName.lastIndexOf('.');
@@ -160,6 +167,38 @@ export default function LayerSettingsWindow({
       }
       
       const blob = await response.blob();
+      
+      // Try to use File System Access API (save picker)
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const anyWindow = window as any;
+        
+        if (typeof anyWindow.showSaveFilePicker === "function") {
+          const handle = await anyWindow.showSaveFilePicker({
+            suggestedName: filename,
+            types: [
+              {
+                description: description || 'Layer file',
+                accept: { [acceptType || 'application/octet-stream']: [extension] },
+              },
+            ],
+          });
+          
+          const writable = await handle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          return;
+        }
+      } catch (pickerErr: unknown) {
+        // User cancelled or picker not supported - fall through to regular download
+        const maybeDomEx = pickerErr as { name?: string };
+        if (maybeDomEx?.name === "AbortError") {
+          // User cancelled, just return without error
+          return;
+        }
+      }
+      
+      // Fallback: regular download (no path selection)
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
