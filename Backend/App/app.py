@@ -391,7 +391,7 @@ def export_script(script_id):
 @app.route('/scripts/export/all', methods=['GET'])
 def export_all_scripts():
 
-    return jsonify({"message": "Export all scripts - Not implemented yet"}), 200    
+    return jsonify({"message": "Export all scripts - Not implemented yet"}), 200
 
 @app.route('/scripts/import', methods=['POST'])
 def import_scripts():
