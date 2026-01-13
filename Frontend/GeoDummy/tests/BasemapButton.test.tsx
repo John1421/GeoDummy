@@ -1,6 +1,6 @@
 // BaseMapSettings.test.tsx
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import BaseMapSettings from '../src/Header/BaseMapSettings';
 
@@ -66,9 +66,16 @@ describe('BaseMapSettings', () => {
     const dropdown = await screen.findByTestId('basemap-dropdown');
     expect(dropdown).toHaveTextContent(/osm standard/i);
 
-    // botão Save deve ficar enabled após o efeito correr
+    // abrir dropdown, verificar opções e selecionar uma
+    await user.click(dropdown);
+    const osmStandardOption = await screen.findByTestId('basemap-option-osm_standard');
+    expect(osmStandardOption).toBeInTheDocument();
+    await user.click(osmStandardOption);
+
     const saveButton = await screen.findByTestId('basemap-save');
-    expect(saveButton).not.toBeDisabled();
+    await waitFor(() => {
+      expect(saveButton).not.toBeDisabled();
+    });
 
     // clicar Save
     await user.click(saveButton);
