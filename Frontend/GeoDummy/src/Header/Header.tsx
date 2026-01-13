@@ -342,7 +342,7 @@ function Header({
       {/* EXPORT ERROR MODAL */}
       <WindowTemplate
         isOpen={exportErrorOpen}
-        title="Export scripts"
+        title="Export all scripts"
         onClose={() => setExportErrorOpen(false)}
         widthClassName="w-[520px] max-w-[95%]"
         disableOverlayClose={false}
@@ -365,7 +365,7 @@ function Header({
       {/* EXPORT LAYERS ERROR MODAL */}
       <WindowTemplate
         isOpen={exportLayersErrorOpen}
-        title="Export layers"
+        title="Export all layers"
         onClose={() => setExportLayersErrorOpen(false)}
         widthClassName="w-[520px] max-w-[95%]"
         disableOverlayClose={false}
