@@ -389,7 +389,7 @@ class LayerManager:
         :return: Full path to the raster file.
         :raises ValueError: If the raster does not exist.
         """
-        raster_path = self._is_raster(layer_name)
+        raster_path = self.is_raster(layer_name)
 
         if raster_path:
             return raster_path
@@ -416,7 +416,7 @@ class LayerManager:
             pass
 
 
-        if self._is_raster(new_name):
+        if self.is_raster(new_name):
             exists = True
 
         return exists
@@ -433,8 +433,8 @@ class LayerManager:
         layers_dir = os.path.join(file_manager.layers_dir)
         gpkg_path = os.path.join(layers_dir, layer_id + ".gpkg")
 
-        raster_path = self._is_raster(layer_id)
-        raster_path = self._is_raster(layer_id)
+        raster_path = self.is_raster(layer_id)
+        raster_path = self.is_raster(layer_id)
         if raster_path:
             with rasterio.open(raster_path) as src:
                 return {
@@ -473,7 +473,7 @@ class LayerManager:
         :return: Path to the layer file, or None if not found.
         """
 
-        raster_path = self._is_raster(layer_id)
+        raster_path = self.is_raster(layer_id)
 
         if raster_path:
             return raster_path
@@ -600,6 +600,26 @@ class LayerManager:
             raise e
         except Exception as e:
             raise ValueError(f"Error reading GeoPackage: {e}") from e
+
+    def is_raster(self, layer_id):
+        """
+        Docstring for is_raster
+
+        :param layer_id: Description
+
+        Returns raster_path or None
+        """
+        possible_exts = [".tif", ".tiff"]
+        possible_exts += [ext.upper() for ext in possible_exts]
+
+        raster_path = None
+        for ext in possible_exts:
+            candidate = os.path.join(file_manager.layers_dir, layer_id + ext)
+            if os.path.isfile(candidate):
+                raster_path = candidate
+                break
+
+        return raster_path
 
     #=====================================================================================
     #                               HELPER METHODS
@@ -845,26 +865,6 @@ class LayerManager:
                 json.dump(clean_metadata, f, indent=4, allow_nan=False)
         except Exception as e:
             raise ValueError(f"Failed to save layer metadata: {e}") from e
-
-    def _is_raster(self, layer_id):
-        """
-        Docstring for is_raster
-
-        :param layer_id: Description
-
-        Returns raster_path or None
-        """
-        possible_exts = [".tif", ".tiff"]
-        possible_exts += [ext.upper() for ext in possible_exts]
-
-        raster_path = None
-        for ext in possible_exts:
-            candidate = os.path.join(file_manager.layers_dir, layer_id + ext)
-            if os.path.isfile(candidate):
-                raster_path = candidate
-                break
-
-        return raster_path
 
     def process_layer_file(
         self,

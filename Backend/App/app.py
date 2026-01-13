@@ -405,7 +405,7 @@ def delete_script(script_id):
 
     try:
         script_manager.delete_script(script_id)
-        
+
         app.logger.info(
             "[%s] %s",
             g.request_id,
@@ -472,11 +472,11 @@ def export_script(script_id):
         raise InternalServerError(
             f"Failed to create ZIP archive: {e}"
         ) from e
-    
+
     export_file_abs = os.path.abspath(zip_path)
     if not os.path.isfile(export_file_abs):
         raise InternalServerError(f"Exported file not found: {export_file_abs}")
-    
+
     app.logger.info(
         "[%s] %s",
         g.request_id,
@@ -511,9 +511,9 @@ def export_all_scripts():
     """
     scripts_ids, _ = script_manager.list_scripts()
 
-    scripts_metadata = script_manager._load_metadata()
+    scripts_metadata = script_manager.load_metadata()
 
-    
+
     zip_filename = "all_scripts_export.zip"
     zip_path = os.path.join(file_manager.temp_dir, zip_filename)
 
@@ -542,11 +542,11 @@ def export_all_scripts():
         raise InternalServerError(
             f"Failed to create ZIP archive: {e}"
         ) from e
-    
+
     export_file_abs = os.path.abspath(zip_path)
     if not os.path.isfile(export_file_abs):
         raise InternalServerError(f"Exported file not found: {export_file_abs}")
-    
+
     app.logger.info(
         "[%s] %s",
         g.request_id,
@@ -1252,7 +1252,7 @@ def extract_data_from_layer_for_table_view(layer_id):
     if not layer_id:
         raise BadRequest("layer_id parameter is required")
 
-    if layer_manager._is_raster(layer_id):
+    if layer_manager.is_raster(layer_id):
         raise BadRequest("Raster doesn't have attributes")
 
 

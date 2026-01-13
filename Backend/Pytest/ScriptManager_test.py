@@ -403,7 +403,7 @@ class TestScriptManager:
 
         # Mock 'open' to return our JSON string
         with patch("builtins.open", mock_open(read_data=mock_json_content)):
-            result = script_manager._load_metadata()
+            result = script_manager.load_metadata()
 
         assert result == mock_data
         assert script_manager.metadata == mock_data

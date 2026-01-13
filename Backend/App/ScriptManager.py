@@ -92,7 +92,7 @@ class ScriptManager:
             self.metadata["scripts"] = {}
 
         self.metadata["scripts"][script_id] = parsed_metadata
-        self._save_metadata()
+        self.save_metadata()
 
     def run_script(self, script_path, script_id, execution_id, data):
         """
@@ -236,15 +236,7 @@ class ScriptManager:
 
         return response
 
-    def _save_metadata(self):
-        """
-        Persist metadata to disk.
-        """
-
-        with open(self.metadata_path, 'w', encoding="utf-8") as f:
-            json.dump(self.metadata, f, indent=4)
-
-    def _load_metadata(self):
+    def load_metadata(self):
         """
         Load metadata from disk.
 
@@ -255,6 +247,15 @@ class ScriptManager:
             self.metadata = json.load(f)
         return self.metadata
 
+    def save_metadata(self):
+        """
+        Persist metadata to disk.
+        """
+
+        with open(self.metadata_path, 'w', encoding="utf-8") as f:
+            json.dump(self.metadata, f, indent=4)
+
+
     def get_metadata(self, script_id):
         """
         Retrieve metadata for a specific script.
@@ -263,9 +264,9 @@ class ScriptManager:
         :return: Dictionary containing script metadata.
         """
 
-        self.metadata = self._load_metadata()
+        self.metadata = self.load_metadata()
         return self.metadata["scripts"][script_id]
-    
+
     def delete_script(self, script_id):
         """
         Remove a script entry from the metadata registry.
@@ -276,7 +277,7 @@ class ScriptManager:
         try:
             if script_id in self.metadata.get("scripts", {}):
                 del self.metadata["scripts"][script_id]
-                self._save_metadata()
+                self.save_metadata()
 
             os.remove(os.path.join(file_manager.scripts_dir, f"{script_id}.py"))
         except Exception as e:
@@ -303,7 +304,7 @@ class ScriptManager:
 
         # Save updated metadata if any scripts were removed
         if removed_scripts:
-            self._save_metadata()
+            self.save_metadata()
             print(f"Removed missing scripts from metadata: {', '.join(removed_scripts)}")
 
     @staticmethod
