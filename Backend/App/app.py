@@ -1155,16 +1155,23 @@ def export_all_layers():
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             # Add layers at ZIP root
             for layer_id in layer_ids:
-                layer_name = layer_manager.get_metadata(layer_id)["layer_name"]
+                metadata = layer_manager.get_metadata(layer_id)
+                if not metadata:
+                    continue
+                
+                extension= layer_manager.get_layer_extension(layer_id)
+
+                layer_name = metadata.get("layer_name", layer_id)
+                
                 layer_path = os.path.join(
                     file_manager.layers_dir,
-                    f"{layer_id}.gpkg"
+                    f"{layer_id}{extension}"
                 )
 
                 if os.path.exists(layer_path):
                     zipf.write(
                         layer_path,
-                        arcname=f"{layer_name}.gpkg"
+                        arcname=f"{layer_name}{extension}"
                     )
 
     except Exception as e:
@@ -1179,7 +1186,7 @@ def export_all_layers():
     app.logger.info(
         "[%s] %s",
         g.request_id,
-        f"Exported all scripts into {zip_filename} with {len(layer_ids)} layers"
+        f"Exported all layers into {zip_filename} with {len(layer_ids)} layers"
     )
 
     return send_file(export_file_abs,as_attachment=True,download_name='all_layers_export.zip')

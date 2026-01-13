@@ -41,6 +41,33 @@ async function fetchExportAllScriptsZip(): Promise<Blob> {
   return await response.blob();
 }
 
+async function fetchExportAllLayersZip(): Promise<Blob> {
+  const response = await fetch("http://localhost:5050/layers/export/all", {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    // Try to parse JSON error, otherwise fallback to text
+    let details = "";
+    try {
+      const maybeJson = await response.json();
+      details = JSON.stringify(maybeJson);
+    } catch {
+      try {
+        details = await response.text();
+      } catch {
+        details = "";
+      }
+    }
+
+    throw new Error(
+      `Export failed (HTTP ${response.status}). ${details ? `Details: ${details}` : ""}`.trim()
+    );
+  }
+
+  return await response.blob();
+}
+
 function ensureZipExtension(name: string): string {
   const trimmed = name.trim();
   if (!trimmed) return "all_scripts_export.zip";
@@ -110,6 +137,10 @@ function Header({
   const [exportErrorOpen, setExportErrorOpen] = useState(false);
   const [exportErrorMsg, setExportErrorMsg] = useState<string>("");
 
+  const [exportingLayers, setExportingLayers] = useState(false);
+  const [exportLayersErrorOpen, setExportLayersErrorOpen] = useState(false);
+  const [exportLayersErrorMsg, setExportLayersErrorMsg] = useState<string>("");
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
@@ -165,6 +196,42 @@ function Header({
     }
   }
 
+  async function handleExportLayers() {
+    setOpenFileMenu(false);
+    setExportingLayers(true);
+
+    const defaultFilename = "all_layers_export.zip";
+
+    try {
+      const zipBlob = await fetchExportAllLayersZip();
+
+      // Prefer save picker (folder + filename change in OS dialog)
+      try {
+        await saveBlobWithPicker(zipBlob, defaultFilename);
+      } catch (pickerErr: unknown) {
+        // If user cancels the picker, we must show the error modal
+        // DOMException name commonly "AbortError"
+        const maybeDomEx = pickerErr as { name?: string; message?: string };
+        if (maybeDomEx?.name === "AbortError") {
+          setExportLayersErrorMsg("Export canceled. The file was not saved.");
+          setExportLayersErrorOpen(true);
+          return;
+        }
+
+        // If picker not supported, fall back to normal download
+        // (cannot reliably detect user cancelling the Save As dialog in this fallback)
+        const filename = ensureZipExtension(defaultFilename);
+        downloadBlobFallback(zipBlob, filename);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Unknown error exporting layers.";
+      setExportLayersErrorMsg(msg);
+      setExportLayersErrorOpen(true);
+    } finally {
+      setExportingLayers(false);
+    }
+  }
+
   return (
     <div className="w-full bg-linear-to-r from-[#0D73A5] to-[#99E0B9] text-white px-4 py-2 flex items-center justify-between">
       <div className="flex gap-4 relative">
@@ -178,7 +245,7 @@ function Header({
             }}
             onMouseDown={(e) => e.stopPropagation()}
             className={BUTTON_STYLE}
-            disabled={exporting}
+            disabled={exporting || exportingLayers}
             aria-label="File menu"
           >
             File
@@ -188,10 +255,17 @@ function Header({
             <div className="absolute top-full left-0 mt-2 bg-white rounded-lg shadow-xl p-2 z-50 min-w-[220px]">
               <button
                 onClick={handleExportScripts}
-                disabled={exporting}
+                disabled={exporting || exportingLayers}
                 className="w-full text-left px-3 py-2 rounded-md text-gray-800 hover:bg-gray-100 disabled:opacity-60"
               >
                 {exporting ? "Exporting..." : "Export scripts"}
+              </button>
+              <button
+                onClick={handleExportLayers}
+                disabled={exporting || exportingLayers}
+                className="w-full text-left px-3 py-2 rounded-md text-gray-800 hover:bg-gray-100 disabled:opacity-60"
+              >
+                {exportingLayers ? "Exporting..." : "Export layers"}
               </button>
             </div>
           )}
@@ -280,6 +354,29 @@ function Header({
           <div className="flex justify-end pt-2">
             <button
               onClick={() => setExportErrorOpen(false)}
+              className="rounded-lg bg-[#0D73A5] text-white hover:bg-[#39AC73] px-4 py-2"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      </WindowTemplate>
+
+      {/* EXPORT LAYERS ERROR MODAL */}
+      <WindowTemplate
+        isOpen={exportLayersErrorOpen}
+        title="Export layers"
+        onClose={() => setExportLayersErrorOpen(false)}
+        widthClassName="w-[520px] max-w-[95%]"
+        disableOverlayClose={false}
+      >
+        <div className="space-y-3">
+          <p style={{ color: "#b91c1c", fontWeight: 600 }}>Não foi possível guardar o ficheiro.</p>
+          <p style={{ color: "#111827" }}>{exportLayersErrorMsg}</p>
+
+          <div className="flex justify-end pt-2">
+            <button
+              onClick={() => setExportLayersErrorOpen(false)}
               className="rounded-lg bg-[#0D73A5] text-white hover:bg-[#39AC73] px-4 py-2"
             >
               OK
