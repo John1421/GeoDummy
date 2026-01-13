@@ -22,7 +22,7 @@ export default function NewLayerWindow({ isOpen, onClose, onSelect, onSelectGpkg
   const [isLoadingLayers, setIsLoadingLayers] = useState(false);
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const allowedExtensions = [".geojson", ".zip", ".tiff", ".tif", ".gpkg"];
-  const MAX_UPLOAD_SIZE = 200 * 1024 * 1024; // 5 MB
+  const MAX_UPLOAD_SIZE = 200 * 1024 * 1024; // 200 MB
   const isGpkgFile = selectedFile?.name?.toLowerCase().endsWith(".gpkg") ?? false;
 
   // Helper function to check if file is duplicate
@@ -79,7 +79,7 @@ export default function NewLayerWindow({ isOpen, onClose, onSelect, onSelectGpkg
     }
     if (file.size > MAX_UPLOAD_SIZE) {
       setSelectedFile(null);
-      setError("File size exceeds the 5 MB limit.");
+      setError("File size exceeds the 200 MB limit.");
       return;
     }
 
