@@ -590,46 +590,6 @@ def stop_script(script_id):
 
     return jsonify({"message": f"Script {script_id} stopped"}), 200
 
-@app.route('/execute_script/<script_id>', methods=['GET'])
-def get_script_status(script_id):
-    if not script_id:
-        raise BadRequest("script_id parameter is required")
-
-    '''
-    Implementação proposta por Esteves:
-
-def get_script_status(script_id):
-    with running_scripts_lock:
-        info = running_scripts.get(script_id)
-
-    if not info:
-        return jsonify({
-            "script_id": script_id,
-            "status": "not running"
-        }), 200
-
-    return jsonify({
-        "script_id": script_id,
-        "execution_id": info["execution_id"],
-        "status": info["status"],
-        "start_time": info["start_time"].isoformat()
-    }), 200
-
-    '''
-
-    # TODO: check execution status
-
-    return jsonify({"script_id": script_id, "status": "running"}), 200
-
-@app.route('/execute_script/<script_id>/output', methods=['GET'])
-def get_script_output(script_id):
-    if not script_id:
-        raise BadRequest("script_id parameter is required")
-
-    # TODO: retrieve output
-
-    return jsonify({"script_id": script_id, "output": "Sample output here"}), 200
-
 # Map Interaction Endpoints
 
 @app.route('/basemaps/<basemap_id>', methods=['GET'])
@@ -1095,18 +1055,6 @@ def remove_layer(layer_id):
         raise InternalServerError(f"Failed to remove layer {layer_id}: {str(e)}") from e
 
     return jsonify({"message": f"Layer {layer_id} removed"}), 200
-
-@app.route('/layers/<layer_id>/<priority>', methods=['POST'])
-def set_layer_priority(layer_id,priority):
-    data = request.get_json()
-    if not layer_id:
-        raise BadRequest("layer_id is required")
-    if not priority:
-        raise BadRequest("No priority provided")
-
-    # TODO: set new layer priorities
-
-    return jsonify({"message": "Layer priority updated", "New priority": priority}), 200
 
 
 # Layer Information Endpoints
