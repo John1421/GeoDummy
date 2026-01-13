@@ -388,8 +388,71 @@ def list_scripts():
 
 @app.route('/scripts/export/<script_id>', methods=['GET'])
 def export_script(script_id):
+    """
+    Export a single registered script and its metadata as a ZIP archive.
 
-    return jsonify({"message": f"Export script {script_id} - Not implemented yet"}), 200
+    This endpoint packages the specified Python script together with its
+    associated metadata into a ZIP file stored in the application's temporary
+    directory. The resulting archive is then returned to the client as a
+    downloadable attachment.
+
+    ZIP contents:
+        - scripts_metadata.json : JSON file containing metadata for the script
+        - <script_id>.py        : The exported Python script file
+
+    :param script_id:
+        Unique identifier of the script to export.
+
+    :raises InternalServerError:
+        - If the ZIP archive cannot be created
+        - If the exported file cannot be found after creation
+
+    :return:
+        Flask response sending the ZIP archive as an attachment
+        (application/zip).
+    """
+
+    script_metadata = script_manager.get_metadata(script_id)
+
+    zip_filename = f"{script_id}_export.zip"
+    zip_path = os.path.join(file_manager.temp_dir, zip_filename)
+
+    try:
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            # Add metadata
+            zipf.writestr(
+                "scripts_metadata.json",
+                json.dumps(script_metadata, indent=2)
+            )
+
+            # Add scripts at ZIP root
+            script_path = os.path.join(
+                file_manager.scripts_dir,
+                f"{script_id}.py"
+            )
+
+            if os.path.exists(script_path):
+                zipf.write(
+                    script_path,
+                    arcname=f"{script_id}.py"
+                )
+
+    except Exception as e:
+        raise InternalServerError(
+            f"Failed to create ZIP archive: {e}"
+        ) from e
+    
+    export_file_abs = os.path.abspath(zip_path)
+    if not os.path.isfile(export_file_abs):
+        raise InternalServerError(f"Exported file not found: {export_file_abs}")
+    
+    app.logger.info(
+        "[%s] %s",
+        g.request_id,
+        f"Exported script {script_id} into {zip_filename}"
+    )
+
+    return send_file(export_file_abs,as_attachment=True,download_name=f"{script_id}_export.zip")
 
 @app.route('/scripts/export/all', methods=['GET'])
 def export_all_scripts():
