@@ -208,7 +208,8 @@ class ScriptManager:
                 filesize_bytes = os.path.getsize(file_path)
                 if filesize_bytes > layer_manager.MAX_LAYER_FILE_SIZE:
                     raise BadRequest(
-                        f"Output file {file_path.name} exceeds the maximum allowed size of {layer_manager.MAX_LAYER_FILE_SIZE} MB."
+                        f"Output file {file_path.name} exceeds the maximum "
+                        f"allowed size of {layer_manager.MAX_LAYER_FILE_SIZE} MB."
                         )
 
                 layer_ids, metadata = self.__add_output_to_existing_layers(file_path)
@@ -322,7 +323,10 @@ class ScriptManager:
             case ".shp":
                 if os.path.exists(file_path):
                     os.remove(file_path)
-                raise BadRequest("Please upload shapefiles as a .zip containing all necessary components (.shp, .shx, .dbf, optional .prj).")
+                raise BadRequest(
+                    "Please upload shapefiles as a .zip containing all necessary"
+                    "components (.shp, .shx, .dbf, optional .prj)."
+                    )
 
             case ".zip":
                 layer_id, metadata = layer_manager.add_shapefile_zip(file_path,file_name)

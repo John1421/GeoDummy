@@ -597,7 +597,6 @@ def run_script(script_id):
                     "execution_id": running_scripts[script_id]["execution_id"]
                 }), 409
 
-
         execution_id = str(uuid.uuid4())
         running_scripts[script_id] = {
             "execution_id": execution_id,
@@ -633,89 +632,72 @@ def run_script(script_id):
             data=data,
         )
 
-
-
         exec_status = output.get("status")
         layer_ids = output.get("layer_ids", [])
         metadatas = output.get("metadatas", [])
         log_path = output.get("log_path")
 
-        # Handle timeout (504 Gateway Timeout)
-        if exec_status == "timeout":
-            with running_scripts_lock:
-                running_scripts[script_id]["status"] = "failed"
-
-            return jsonify({
-                "error": "Gateway Timeout",
-                "message": "Script execution exceeded the maximum allowed time of 30 seconds",
-                "script_id": script_id,
-                "execution_id": execution_id,
-                "timeout_seconds": 30,
-                "log_path": log_path
-            }), 504
-
-        # Handle failure (500 Internal Server Error)
-        if exec_status == "failure":
-            with running_scripts_lock:
-                running_scripts[script_id]["status"] = "failed"
-
-            return jsonify({
-                "error": "Internal Server Error",
-                "message": "Script execution failed with errors",
-                "script_id": script_id,
-                "execution_id": execution_id,
-                "log_path": log_path,
-                "details": "Check log file for error details"
-            }), 500
-
-        # Handle success
-        if exec_status == "success":
-            # Mark as finished
-            with running_scripts_lock:
-                running_scripts[script_id]["status"] = "finished"
-
-
-            # Check if output is a file
-            # if outputs and isinstance(outputs[0], str) and os.path.isfile(outputs[0]):
-            #     file_path = outputs[0]
-            #     file_name, file_extension = os.path.splitext(file_path)
-            #     layer_id = os.path.basename(file_name)
-
-            #     file_path_abs = os.path.abspath(file_path)
-            #     if not os.path.isfile(file_path_abs):
-            #         raise InternalServerError(f"Exported file not found: {file_path_abs}")
-
-            #     return send_file(file_path_abs, as_attachment=True, download_name=f"{layer_id}{file_extension}")
-
-            # Return JSON response
-            if layer_ids is not None:
-                return jsonify({
+        status_handlers = {
+            "timeout": lambda: (
+                504,
+                {
+                    "error": "Gateway Timeout",
+                    "message": "Script execution exceeded 30 seconds",
+                    "script_id": script_id,
+                    "execution_id": execution_id,
+                    "timeout_seconds": 30,
+                    "log_path": log_path
+                }
+            ),
+            "failure": lambda: (
+                500,
+                {
+                    "error": "Internal Server Error",
+                    "message": "Script execution failed with errors",
+                    "script_id": script_id,
+                    "execution_id": execution_id,
+                    "log_path": log_path,
+                    "details": "Check log file for error details"
+                }
+            ),
+            "success": lambda: (
+                200,
+                {
                     "message": f"Script '{script_id}' executed successfully",
                     "execution_id": execution_id,
                     "layer_ids": layer_ids,
                     "metadatas": metadatas,
                     "log_path": log_path
-                }), 200
+                } if layer_ids else
+                {
+                    "message": f"Script '{script_id}' executed successfully with no output",
+                    "execution_id": execution_id,
+                    "log_path": log_path
+                }
+            )
+        }
 
-            # No output produced
-            return jsonify({
-                "message": f"Script '{script_id}' executed successfully with no output",
+        handler = status_handlers.get(exec_status, lambda: (
+            500,
+            {
+                "error": "Internal Server Error",
+                "message": f"Unknown execution status: {exec_status}",
+                "script_id": script_id,
                 "execution_id": execution_id,
                 "log_path": log_path
-            }), 200
+            }
+        ))
 
-        # Unknown status (shouldn't happen, but handle anyway)
+        status_code, response_json = handler()
+
+        # Update running_scripts status
         with running_scripts_lock:
-            running_scripts[script_id]["status"] = "failed"
+            if status_code >= 400:
+                running_scripts[script_id]["status"] = "failed"
+            else:
+                running_scripts[script_id]["status"] = "finished"
 
-        return jsonify({
-            "error": "Internal Server Error",
-            "message": f"Unknown execution status: {exec_status}",
-            "script_id": script_id,
-            "execution_id": execution_id,
-            "log_path": log_path
-        }), 500
-
+        return jsonify(response_json), status_code
 
     except BadRequest:
         # Client errors (4xx) - re-raise to be handled by Flask
@@ -852,45 +834,31 @@ def add_layer():
     temp_path = os.path.join(file_manager.temp_dir, added_file.filename)
     added_file.save(temp_path)
 
-    if os.path.getsize(temp_path) > layer_manager.MAX_LAYER_FILE_SIZE:
-        os.remove(temp_path)
-        raise BadRequest("The uploaded file exceeds the maximum allowed size.")
+    try:
+        if os.path.getsize(temp_path) > layer_manager.MAX_LAYER_FILE_SIZE:
+            raise BadRequest("The uploaded file exceeds the maximum allowed size.")
 
-    file_name, file_extension = os.path.splitext(added_file.filename)
+        file_name, extension = os.path.splitext(added_file.filename)
 
-    if layer_manager.check_layer_name_exists(file_name):
+        if layer_manager.check_layer_name_exists(file_name):
+            raise BadRequest("A Layer with the same name already exists")
+
+        layer_id, metadata = layer_manager.process_layer_file(
+            temp_path=temp_path,
+            file_name=file_name,
+            extension=extension,
+            selected_layers=selected_layers
+        )
+
+        if layer_id is None and metadata is None:
+            raise BadRequest(f"File extension '{extension}' is not supported.")
+
+    finally:
+        # Ensure temp file is always cleaned up
         if os.path.exists(temp_path):
             os.remove(temp_path)
-        raise BadRequest("A Layer with the same name already exists")
 
-
-    match file_extension.lower():
-        case ".shp":
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-            raise BadRequest(
-                "Please upload shapefiles as a .zip containing all necessary components (.shp, .shx, .dbf, optional .prj)."
-                )
-
-        case ".zip":
-            layer_id, metadata = layer_manager.add_shapefile_zip(temp_path,file_name)
-
-        case ".geojson":
-            layer_id, metadata = layer_manager.add_geojson(temp_path,file_name)
-
-        case ".tif" | ".tiff":
-            layer_id, metadata = layer_manager.add_raster(temp_path,file_name)
-
-        case ".gpkg":
-            selected_layers = selected_layers if selected_layers else None
-            layer_id, metadata = layer_manager.add_gpkg_layers(temp_path, selected_layers=selected_layers)
-
-        case _:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-            raise BadRequest("File extension not supported")
-
-
+    # Normalize return types
     if not isinstance(layer_id, list):
         layer_id = [layer_id]
 
@@ -898,6 +866,7 @@ def add_layer():
         metadata = [metadata]
 
     return jsonify({"layer_id": layer_id, "metadata": metadata}), 200
+
 
 @app.route('/layers/preview/geopackage', methods=['POST'])
 def preview_geopackage_layers():
@@ -972,12 +941,12 @@ def get_layer(layer_id):
 
     return send_file(export_file_abs, as_attachment=True, download_name=f"{layer_id}{extension}")
 
-'''
-@app.route('/layers', methods=['GET'])
-def list_layer_ids_endpoint():
-    ids, metadata = layer_manager.list_layer_ids()
-    return jsonify({"layer_ids": ids, "metadata": metadata}), 200
-'''
+#
+#@app.route('/layers', methods=['GET'])
+#def list_layer_ids_endpoint():
+#    ids, metadata = layer_manager.list_layer_ids()
+#    return jsonify({"layer_ids": ids, "metadata": metadata}), 200
+#
 
 
 @app.route("/layers/<layer_id>/tiles/<int:z>/<int:x>/<int:y>.png")
@@ -1283,7 +1252,7 @@ def extract_data_from_layer_for_table_view(layer_id):
     if not layer_id:
         raise BadRequest("layer_id parameter is required")
 
-    if layer_manager.is_raster(layer_id):
+    if layer_manager._is_raster(layer_id):
         raise BadRequest("Raster doesn't have attributes")
 
 
