@@ -491,31 +491,31 @@ def export_script(script_id):
 @app.route('/scripts/export/all', methods=['GET'])
 def export_all_scripts():
     """
-    Export all registered scripts and their metadata as a ZIP archive.
+    Export all registered layers as a ZIP archive.
 
-    This endpoint collects all stored Python scripts along with their
-    associated metadata and packages them into a ZIP file saved in the
-    temporary directory. The resulting archive is then sent to the client
-    as a downloadable attachment.
+    This endpoint collects all stored spatial layers and packages them into a
+    single ZIP file saved in the application's temporary directory. Each layer
+    is added to the archive using its human-readable layer name as the filename.
 
     ZIP contents:
-        - scripts_metadata.json : JSON file containing metadata for all scripts
-        - <script_id>.py        : One Python file per registered script
+        - <layer_name>.gpkg : One GeoPackage file per registered layer
 
-    The ZIP file is created in the application's temporary directory and
-    validated before being returned.
+    The ZIP archive is created in the application's temporary directory and
+    validated before being returned to the client as a downloadable attachment.
 
     :raises InternalServerError:
+        - If layer metadata is missing or invalid
+        - If a layer file cannot be found
         - If the ZIP archive cannot be created
-        - If the exported file cannot be found after creation
+        - If the exported ZIP file cannot be found after creation
 
     :return:
         Flask response sending the ZIP archive as an attachment
     """
+
     scripts_ids, _ = script_manager.list_scripts()
 
     scripts_metadata = script_manager.load_metadata()
-
 
     zip_filename = "all_scripts_export.zip"
     zip_path = os.path.join(file_manager.temp_dir, zip_filename)
@@ -1144,12 +1144,46 @@ def get_layer(layer_id):
 
     return send_file(export_file_abs, as_attachment=True, download_name=f"{layer_id}{extension}")
 
-#
-#@app.route('/layers', methods=['GET'])
-#def list_layer_ids_endpoint():
-#    ids, metadata = layer_manager.list_layer_ids()
-#    return jsonify({"layer_ids": ids, "metadata": metadata}), 200
-#
+@app.route('/layers/export/all', methods=['GET'])
+def export_all_layers():
+    layer_ids, _ = layer_manager.list_layer_ids()
+
+    zip_filename = "all_layers_export.zip"
+    zip_path = os.path.join(file_manager.temp_dir, zip_filename)
+
+    try:
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            # Add layers at ZIP root
+            for layer_id in layer_ids:
+                layer_name = layer_manager.get_metadata(layer_id)["layer_name"]
+                layer_path = os.path.join(
+                    file_manager.layers_dir,
+                    f"{layer_id}.gpkg"
+                )
+
+                if os.path.exists(layer_path):
+                    zipf.write(
+                        layer_path,
+                        arcname=f"{layer_name}.gpkg"
+                    )
+
+    except Exception as e:
+        raise InternalServerError(
+            f"Failed to create ZIP archive: {e}"
+        ) from e
+
+    export_file_abs = os.path.abspath(zip_path)
+    if not os.path.isfile(export_file_abs):
+        raise InternalServerError(f"Exported file not found: {export_file_abs}")
+
+    app.logger.info(
+        "[%s] %s",
+        g.request_id,
+        f"Exported all scripts into {zip_filename} with {len(layer_ids)} layers"
+    )
+
+    return send_file(export_file_abs,as_attachment=True,download_name='all_layers_export.zip')
+
 
 
 @app.route("/layers/<layer_id>/tiles/<int:z>/<int:x>/<int:y>.png")
