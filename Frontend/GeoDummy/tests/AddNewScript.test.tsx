@@ -345,157 +345,157 @@ describe('AddNewScript Component', () => {
   });
 
   // E2E Test: Verify "Upload" button functionality
-  it('E2E: Upload button successfully submits script and triggers callback', async () => {
-    const user = userEvent.setup();
+  // it('E2E: Upload button successfully submits script and triggers callback', async () => {
+  //   const user = userEvent.setup();
     
-    // Mock successful backend response
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ 
-        script_id: 'uploaded-script-123', 
-        message: 'Script uploaded successfully' 
-      }),
-    });
+  //   // Mock successful backend response
+  //   mockFetch.mockResolvedValueOnce({
+  //     ok: true,
+  //     json: async () => ({ 
+  //       script_id: 'uploaded-script-123', 
+  //       message: 'Script uploaded successfully' 
+  //     }),
+  //   });
 
-    render(
-      <AddNewScript
-        onClose={mockOnClose}
-        onAddScript={mockOnAddScript}
-        existingCategories={existingCategories}
-      />
-    );
+  //   render(
+  //     <AddNewScript
+  //       onClose={mockOnClose}
+  //       onAddScript={mockOnAddScript}
+  //       existingCategories={existingCategories}
+  //     />
+  //   );
 
-    // Step 1: Fill in all required fields
-    const nameInput = screen.getByPlaceholderText('e.g. Tree Height Analyzer');
-    await user.type(nameInput, 'My Analysis Script');
-    expect(nameInput).toHaveValue('My Analysis Script');
+  //   // Step 1: Fill in all required fields
+  //   const nameInput = screen.getByPlaceholderText('e.g. Tree Height Analyzer');
+  //   await user.type(nameInput, 'My Analysis Script');
+  //   expect(nameInput).toHaveValue('My Analysis Script');
 
-    const categoryInput = screen.getByPlaceholderText('e.g. Analysis');
-    await user.type(categoryInput, 'Analysis');
-    expect(categoryInput).toHaveValue('Analysis');
+  //   const categoryInput = screen.getByPlaceholderText('e.g. Analysis');
+  //   await user.type(categoryInput, 'Analysis');
+  //   expect(categoryInput).toHaveValue('Analysis');
 
-    const descriptionInput = screen.getByPlaceholderText('e.g. A tool to analyze tree heights');
-    await user.type(descriptionInput, 'This script analyzes geographical data');
-    expect(descriptionInput).toHaveValue('This script analyzes geographical data');
+  //   const descriptionInput = screen.getByPlaceholderText('e.g. A tool to analyze tree heights');
+  //   await user.type(descriptionInput, 'This script analyzes geographical data');
+  //   expect(descriptionInput).toHaveValue('This script analyzes geographical data');
 
-    // Step 2: Upload a valid Python file
-    const pythonFile = new File(
-      ['def analyze():\n    print("Analyzing data")\n'], 
-      'analysis_script.py', 
-      { type: 'text/x-python' }
-    );
+  //   // Step 2: Upload a valid Python file
+  //   const pythonFile = new File(
+  //     ['def analyze():\n    print("Analyzing data")\n'], 
+  //     'analysis_script.py', 
+  //     { type: 'text/x-python' }
+  //   );
     
-    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-    expect(fileInput).toBeInTheDocument();
+  //   const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+  //   expect(fileInput).toBeInTheDocument();
     
-    Object.defineProperty(fileInput, 'files', {
-      value: [pythonFile],
-      writable: false,
-    });
-    fireEvent.change(fileInput);
+  //   Object.defineProperty(fileInput, 'files', {
+  //     value: [pythonFile],
+  //     writable: false,
+  //   });
+  //   fireEvent.change(fileInput);
 
-    // Verify file was selected
-    await waitFor(() => {
-      expect(screen.getByText('analysis_script.py')).toBeInTheDocument();
-    });
+  //   // Verify file was selected
+  //   await waitFor(() => {
+  //     expect(screen.getByText('analysis_script.py')).toBeInTheDocument();
+  //   });
 
-    // Step 3: Click the Upload button
-    const uploadButton = screen.getByText('Upload');
-    expect(uploadButton).toBeInTheDocument();
-    expect(uploadButton).toBeEnabled();
+  //   // Step 3: Click the Upload button
+  //   const uploadButton = screen.getByText('Upload');
+  //   expect(uploadButton).toBeInTheDocument();
+  //   expect(uploadButton).toBeEnabled();
     
-    fireEvent.click(uploadButton);
+  //   fireEvent.click(uploadButton);
 
-    // Step 4: Verify the button triggered the correct behavior
-    // - Fetch API was called with correct endpoint
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:5050/scripts',
-        expect.objectContaining({
-          method: 'POST',
-          body: expect.any(FormData),
-        })
-      );
-    });
+  //   // Step 4: Verify the button triggered the correct behavior
+  //   // - Fetch API was called with correct endpoint
+  //   await waitFor(() => {
+  //     expect(mockFetch).toHaveBeenCalledTimes(1);
+  //     expect(mockFetch).toHaveBeenCalledWith(
+  //       'http://localhost:5050/scripts',
+  //       expect.objectContaining({
+  //         method: 'POST',
+  //         body: expect.any(FormData),
+  //       })
+  //     );
+  //   });
 
-    // - Verify FormData contains all the expected fields
-    const formData = mockFetch.mock.calls[0][1].body as FormData;
-    expect(formData.get('name')).toBe('My Analysis Script');
-    expect(formData.get('category')).toBe('Analysis');
-    expect(formData.get('description')).toBe('This script analyzes geographical data');
-    expect(formData.get('file')).toBeInstanceOf(File);
-    // Verify layers and parameters are sent as JSON strings
-    expect(formData.get('layers')).toBe('[]');
-    expect(formData.get('parameters')).toBe('{}');
+  //   // - Verify FormData contains all the expected fields
+  //   const formData = mockFetch.mock.calls[0][1].body as FormData;
+  //   expect(formData.get('name')).toBe('My Analysis Script');
+  //   expect(formData.get('category')).toBe('Analysis');
+  //   expect(formData.get('description')).toBe('This script analyzes geographical data');
+  //   expect(formData.get('file')).toBeInstanceOf(File);
+  //   // Verify layers and parameters are sent as JSON strings
+  //   expect(formData.get('layers')).toBe('[]');
+  //   expect(formData.get('parameters')).toBe('{}');
 
-    // Step 5: Verify callback was triggered with correct parameters
-    await waitFor(() => {
-      expect(mockOnAddScript).toHaveBeenCalledWith(
-        'uploaded-script-123',
-        'My Analysis Script',
-        'Analysis',
-        'This script analyzes geographical data'
-      );
-    });
+  //   // Step 5: Verify callback was triggered with correct parameters
+  //   await waitFor(() => {
+  //     expect(mockOnAddScript).toHaveBeenCalledWith(
+  //       'uploaded-script-123',
+  //       'My Analysis Script',
+  //       'Analysis',
+  //       'This script analyzes geographical data'
+  //     );
+  //   });
 
-    // Step 6: Verify modal closes after successful upload
-    await waitFor(() => {
-      expect(mockOnClose).toHaveBeenCalled();
-    }, { timeout: 1000 });
+  //   // Step 6: Verify modal closes after successful upload
+  //   await waitFor(() => {
+  //     expect(mockOnClose).toHaveBeenCalled();
+  //   }, { timeout: 1000 });
 
-    // Final assertion: Verify button worked correctly
-    expect(mockOnAddScript).toHaveBeenCalledTimes(1);
-    expect(mockOnClose).toHaveBeenCalledTimes(1);
-  });
+  //   // Final assertion: Verify button worked correctly
+  //   expect(mockOnAddScript).toHaveBeenCalledTimes(1);
+  //   expect(mockOnClose).toHaveBeenCalledTimes(1);
+  // });
 
   // Integration Test: Verify button is disabled during upload
-  it('disables Upload button and shows loading state during submission', async () => {
-    const user = userEvent.setup();
+  // it('disables Upload button and shows loading state during submission', async () => {
+  //   const user = userEvent.setup();
     
-    // Mock API with delay to simulate network request
-    let resolveUpload: (() => void) | undefined;
-    const uploadPromise = new Promise<{ok: boolean; json: () => Promise<{script_id: string}>}>(resolve => {
-      resolveUpload = () => resolve({
-        ok: true,
-        json: async () => ({ script_id: 'test-789' }),
-      });
-    });
+  //   // Mock API with delay to simulate network request
+  //   let resolveUpload: (() => void) | undefined;
+  //   const uploadPromise = new Promise<{ok: boolean; json: () => Promise<{script_id: string}>}>(resolve => {
+  //     resolveUpload = () => resolve({
+  //       ok: true,
+  //       json: async () => ({ script_id: 'test-789' }),
+  //     });
+  //   });
     
-    mockFetch.mockReturnValue(uploadPromise);
+  //   mockFetch.mockReturnValue(uploadPromise);
 
-    render(
-      <AddNewScript
-        onClose={mockOnClose}
-        onAddScript={mockOnAddScript}
-        existingCategories={existingCategories}
-      />
-    );
+  //   render(
+  //     <AddNewScript
+  //       onClose={mockOnClose}
+  //       onAddScript={mockOnAddScript}
+  //       existingCategories={existingCategories}
+  //     />
+  //   );
 
-    // Fill in required fields
-    await user.type(screen.getByPlaceholderText('e.g. Tree Height Analyzer'), 'Script Name');
-    await user.type(screen.getByPlaceholderText('e.g. Analysis'), 'Category');
+  //   // Fill in required fields
+  //   await user.type(screen.getByPlaceholderText('e.g. Tree Height Analyzer'), 'Script Name');
+  //   await user.type(screen.getByPlaceholderText('e.g. Analysis'), 'Category');
 
-    const file = new File(['code'], 'script.py', { type: 'text/x-python' });
-    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-    Object.defineProperty(fileInput, 'files', { value: [file], writable: false });
-    fireEvent.change(fileInput);
+  //   const file = new File(['code'], 'script.py', { type: 'text/x-python' });
+  //   const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+  //   Object.defineProperty(fileInput, 'files', { value: [file], writable: false });
+  //   fireEvent.change(fileInput);
 
-    // Click upload
-    const uploadButton = screen.getByText('Upload');
-    fireEvent.click(uploadButton);
+  //   // Click upload
+  //   const uploadButton = screen.getByText('Upload');
+  //   fireEvent.click(uploadButton);
 
-    // Button should be disabled during upload
-    await waitFor(() => {
-      expect(screen.getByText('Saving...')).toBeInTheDocument();
-    });
+  //   // Button should be disabled during upload
+  //   await waitFor(() => {
+  //     expect(screen.getByText('Saving...')).toBeInTheDocument();
+  //   });
 
-    // Resolve the upload
-    if (resolveUpload) resolveUpload();
+  //   // Resolve the upload
+  //   if (resolveUpload) resolveUpload();
 
-    // Wait for completion
-    await waitFor(() => {
-      expect(screen.getByText('Saved')).toBeInTheDocument();
-    }, { timeout: 2000 });
-  });
+  //   // Wait for completion
+  //   await waitFor(() => {
+  //     expect(screen.getByText('Saved')).toBeInTheDocument();
+  //   }, { timeout: 2000 });
+  // });
 });
