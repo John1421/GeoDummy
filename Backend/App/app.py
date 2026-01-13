@@ -70,6 +70,7 @@ import shutil
 from datetime import datetime, timezone
 from threading import Lock
 import zipfile
+import psutil
 
 import fiona
 import geopandas as gpd
@@ -770,7 +771,7 @@ def run_script(script_id):
                     "message": "Script execution exceeded 30 seconds",
                     "script_id": script_id,
                     "execution_id": execution_id,
-                    "timeout_seconds": 30,
+                    "timeout_seconds": 600,
                     "log_path": log_path
                 }
             ),
@@ -783,6 +784,15 @@ def run_script(script_id):
                     "execution_id": execution_id,
                     "log_path": log_path,
                     "details": "Check log file for error details"
+                }
+            ),
+            "terminated": lambda: (
+                499,
+                {
+                    "message": "Script execution was terminated by user",
+                    "script_id": script_id,
+                    "execution_id": execution_id,
+                    "log_path": log_path
                 }
             ),
             "success": lambda: (
@@ -852,13 +862,28 @@ def run_script(script_id):
 
 @app.route('/execute_script/<script_id>', methods=['DELETE'])
 def stop_script(script_id):
-    data = request.get_json()
+    import signal
     if not script_id:
         raise BadRequest("script_id is required")
 
-    # TODO: stop running process
+    # Begin script execution workflow
+    with running_scripts_lock:
+        # Check if another script is already running
+        if script_id in running_scripts and running_scripts[script_id]["status"] == "running":
+        
+            current_process = psutil.Process()
+            children = current_process.children(recursive=True)
+            for child in children:
+                os.kill(child.pid, signal.SIGTERM)
 
-    return jsonify({"message": f"Script {script_id} stopped"}), 200
+            return jsonify({"message": f"Script {script_id} stopped"}), 200
+        else:
+            return jsonify({
+                    "error": "Conflict",
+                    "message": f"Script '{script_id}' is not running.",
+                    "script_id": script_id
+                }), 409
+            
 
 # Map Interaction Endpoints
 
