@@ -1,6 +1,6 @@
 // BaseMapSettings.test.tsx
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import BaseMapSettings from '../src/Header/BaseMapSettings';
 
@@ -25,6 +25,14 @@ describe('BaseMapSettings', () => {
   let onCloseMock: ReturnType<typeof vi.fn<() => void>>;
 
   beforeEach(() => {
+    // limpar localStorage entre testes
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+      clear: vi.fn(),
+    } as unknown as Storage);
+
     setBaseMapUrlMock = vi.fn();
     setBaseMapAttributionMock = vi.fn();
     onCloseMock = vi.fn();
@@ -33,11 +41,13 @@ describe('BaseMapSettings', () => {
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
-        status: 200,
-        statusText: 'OK',
         json: async () => basemapsMock,
       } as unknown as Response),
     );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('Change the basemap to osm_standard and save.', async () => {
@@ -52,30 +62,30 @@ describe('BaseMapSettings', () => {
       />,
     );
 
-    await waitFor(() =>
-      expect(screen.getByTestId('basemap-dropdown')).toHaveTextContent(
-        /selecionar basemap/i,
-      ),
-    );
+    // dropdown já deve mostrar o primeiro basemap (OSM Standard)
+    const dropdown = await screen.findByTestId('basemap-dropdown');
+    expect(dropdown).toHaveTextContent(/osm standard/i);
 
-    await user.click(screen.getByTestId('basemap-dropdown'));
-    await user.click(screen.getByTestId('basemap-option-osm_standard'));
-
-    expect(setBaseMapUrlMock).toHaveBeenLastCalledWith(
-      'https://tiles.osm.org/{z}/{x}/{y}.png',
-    );
-    expect(setBaseMapAttributionMock).toHaveBeenLastCalledWith('© OSM');
-
-    const saveButton = screen.getByTestId('basemap-save');
+    // botão Save deve ficar enabled após o efeito correr
+    const saveButton = await screen.findByTestId('basemap-save');
     expect(saveButton).not.toBeDisabled();
 
-
+    // clicar Save
     await user.click(saveButton);
 
+    // setters chamados com o URL e attribution do basemap atual
     expect(setBaseMapUrlMock).toHaveBeenLastCalledWith(
       'https://tiles.osm.org/{z}/{x}/{y}.png',
     );
     expect(setBaseMapAttributionMock).toHaveBeenLastCalledWith('© OSM');
+
+    // localStorage atualizado
+    expect(localStorage.setItem).toHaveBeenCalledWith(
+      'selectedBasemapId',
+      'osm_standard',
+    );
+
+    // modal fechado
     expect(onCloseMock).toHaveBeenCalled();
   });
 });
