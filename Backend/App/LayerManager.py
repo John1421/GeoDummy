@@ -389,7 +389,7 @@ class LayerManager:
         :return: Full path to the raster file.
         :raises ValueError: If the raster does not exist.
         """
-        raster_path = self.is_raster(layer_name)
+        raster_path = self._is_raster(layer_name)
 
         if raster_path:
             return raster_path
@@ -416,7 +416,7 @@ class LayerManager:
             pass
 
 
-        if self.is_raster(new_name):
+        if self._is_raster(new_name):
             exists = True
 
         return exists
@@ -433,8 +433,8 @@ class LayerManager:
         layers_dir = os.path.join(file_manager.layers_dir)
         gpkg_path = os.path.join(layers_dir, layer_id + ".gpkg")
 
-        raster_path = self.is_raster(layer_id)
-        raster_path = self.is_raster(layer_id)
+        raster_path = self._is_raster(layer_id)
+        raster_path = self._is_raster(layer_id)
         if raster_path:
             with rasterio.open(raster_path) as src:
                 return {
@@ -473,7 +473,7 @@ class LayerManager:
         :return: Path to the layer file, or None if not found.
         """
 
-        raster_path = self.is_raster(layer_id)
+        raster_path = self._is_raster(layer_id)
 
         if raster_path:
             return raster_path
@@ -537,7 +537,7 @@ class LayerManager:
         lat_deg_max = math.degrees(lat_rad_max)
         return lon_deg_min, lat_deg_min, lon_deg_max, lat_deg_max
 
-    def clean_raster_cache(self, cache_dir, CACHE_MAX_BYTES=500*1024*1024):
+    def clean_raster_cache(self, cache_dir, cache_max_bytes=500*1024*1024):
         """
         Remove oldest cached raster tiles to keep total cache size under a limit.
 
@@ -558,7 +558,7 @@ class LayerManager:
         files.sort(key=lambda x: x[1])  # oldest first
         total_size = sum(f[2] for f in files)
 
-        while total_size > CACHE_MAX_BYTES and files:
+        while total_size > cache_max_bytes and files:
             file_path, _, size = files.pop(0)
             os.remove(file_path)
             total_size -= size
@@ -846,7 +846,7 @@ class LayerManager:
         except Exception as e:
             raise ValueError(f"Failed to save layer metadata: {e}") from e
 
-    def is_raster(self, layer_id):
+    def _is_raster(self, layer_id):
         """
         Docstring for is_raster
 
@@ -865,3 +865,42 @@ class LayerManager:
                 break
 
         return raster_path
+
+    def process_layer_file(
+        self,
+        temp_path: str,
+        file_name: str,
+        extension: str,
+        selected_layers: list | None
+    ):
+        """
+        Process an uploaded spatial layer file according to its format.
+
+        Dispatches the uploaded file to the appropriate layer import routine based on
+        its file extension (e.g., GeoJSON, Shapefile ZIP, GeoPackage, or raster).
+        This method encapsulates all format-specific handling and validation logic.
+
+        :param temp_path: Absolute path to the temporarily stored uploaded file.
+        :param file_name: Base name of the layer to be registered (without extension).
+        :param extension: File extension of the uploaded layer (e.g., '.geojson', '.zip').
+        :param selected_layers: Optional list of layer names to import from a
+                                GeoPackage file. Ignored for other formats.
+        :return: A tuple (layer_id, metadata), where each element may be a single
+                value or a list, depending on the layer type.  Returns (None, None)
+             if the file extension is unsupported.
+        """
+
+        match extension.lower():
+            case ".zip":
+                return self.add_shapefile_zip(temp_path, file_name)
+            case ".geojson":
+                return self.add_geojson(temp_path, file_name)
+            case ".tif" | ".tiff":
+                return self.add_raster(temp_path, file_name)
+            case ".gpkg":
+                return self.add_gpkg_layers(
+                    temp_path,
+                    selected_layers=selected_layers
+                )
+            case _:
+                return None, None
