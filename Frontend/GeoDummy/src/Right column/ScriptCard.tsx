@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { colors, typography, radii, shadows } from "../Design/DesignTokens";
-import { FileCode, Play } from "lucide-react";
+import { FileCode, Play, Square } from "lucide-react";
 import { ThreeDot } from "react-loading-indicators"
 import RunScriptWindow from "./RunScriptWindow";
 import type { BackendLayerMetadata } from "../LeftColumn/LayerSidebar";
@@ -19,6 +19,12 @@ function ScriptCard({ id, name, description, loading, setLoading, onAddLayer }: 
 
   const handleRun = () => {
     setIsRunScriptWindowOpen(true);
+  };
+
+  const handleStop = () => {
+    // TODO: Add backend call to stop the script
+    setLoading(false);
+    console.log(`Stopping script ${id}`);
   };
 
   // Mock de execução no backend recebendo o scriptId
@@ -123,6 +129,36 @@ function ScriptCard({ id, name, description, loading, setLoading, onAddLayer }: 
             </>
           )}
         </button>
+
+        {loading && (
+          <button
+            onClick={handleStop}
+            style={{
+              marginTop: 8,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "6px 12px",
+              backgroundColor: "#DC2626",
+              color: "white",
+              border: "none",
+              borderRadius: radii.sm,
+              fontSize: typography.sizeSm,
+              cursor: "pointer",
+              transition: "0.2s",
+              height: 32,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "#B91C1C";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "#DC2626";
+            }}
+          >
+            <Square size={16} style={{ marginRight: 8 }} />
+            Stop Script
+          </button>
+        )}
       </div>
       <RunScriptWindow
         isOpen={isRunScriptWindowOpen}
