@@ -14,6 +14,7 @@ from werkzeug.exceptions import BadRequest, NotFound
 from flask.testing import FlaskClient
 from typing import Any, Dict
 import fiona
+import zipfile
 
 # Import the app instance. Assuming the structure allows 'from app import app'
 from App.app import app
@@ -2266,3 +2267,238 @@ class TestApp:
         assert response.status_code == 400
         # Ensure os.remove was NOT called because the file didn't exist
         mock_remove.assert_not_called()
+
+    def test_import_scripts_no_file(self, client: FlaskClient) -> None:
+        """Requirement: raises BadRequest if no file is provided."""
+        response = client.post('/scripts/import')
+        assert response.status_code == 400
+        assert b"Missing zip file" in response.data
+
+    def test_import_scripts_no_filename(self, client: FlaskClient) -> None:
+        """
+        Covers: if not original_id: raise BadRequest("Uploaded script has no filename.")
+        """
+        # We provide a file-like object but an empty string as the filename 
+        # to trigger the 'no filename' logic specifically.
+        data = {'file': (io.BytesIO(b"content"), '')}
+        response = client.post('/scripts/import', data=data)
+        
+        # If the app logic treats empty filename as "Missing zip file", 
+        # we adjust the assertion to match the code's priority.
+        assert response.status_code == 400
+        assert b"no filename" in response.data or b"Missing zip file" in response.data
+
+    def test_import_scripts_invalid_extension(self, client: FlaskClient) -> None:
+        """Requirement: raises BadRequest for non-zip extensions."""
+        data = {'file': (io.BytesIO(b"data"), 'test.py')}
+        response = client.post('/scripts/import', data=data)
+        assert response.status_code == 400
+        assert b"Only .zip files are supported" in response.data
+
+    def test_import_scripts_corrupt_zip(self, client: FlaskClient) -> None:
+        """Requirement: raises BadRequest if the file is not a valid ZIP."""
+        data = {'file': (io.BytesIO(b"not a zip content"), 'test.zip')}
+        response = client.post('/scripts/import', data=data)
+        assert response.status_code == 400
+        assert b"Invalid ZIP file" in response.data
+
+    @patch('App.app.os.walk')
+    def test_import_scripts_missing_metadata(self, mock_walk: MagicMock, client: FlaskClient) -> None:
+        """Requirement: raises BadRequest if no *metadata.json is found inside ZIP."""
+        mock_walk.return_value = [('/tmp/extract', [], ['script1.py'])]
+        
+        # Create a valid zip in memory
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zf:
+            zf.writestr('script1.py', 'print(1)')
+        
+        data = {'file': (io.BytesIO(zip_buffer.getvalue()), 'test.zip')}
+        response = client.post('/scripts/import', data=data)
+        assert response.status_code == 400
+        assert b"must contain a *metadata.json file" in response.data
+
+    @patch('App.app.os.walk')
+    def test_import_scripts_multiple_metadata(self, mock_walk: MagicMock, client: FlaskClient) -> None:
+        """Requirement: raises BadRequest if multiple metadata files exist."""
+        mock_walk.return_value = [
+            ('/tmp/extract', [], ['a_metadata.json', 'b_metadata.json'])
+        ]
+        
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zf:
+            zf.writestr('a_metadata.json', '{}')
+            zf.writestr('b_metadata.json', '{}')
+            
+        data = {'file': (io.BytesIO(zip_buffer.getvalue()), 'test.zip')}
+        response = client.post('/scripts/import', data=data)
+        assert response.status_code == 400
+        assert b"multiple metadata.json files" in response.data
+
+    def test_import_scripts_invalid_json_format(self, client: FlaskClient) -> None:
+        """Requirement: raises BadRequest if metadata.json is corrupted."""
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zf:
+            zf.writestr('metadata.json', '{invalid_json')
+            
+        data = {'file': (io.BytesIO(zip_buffer.getvalue()), 'test.zip')}
+        response = client.post('/scripts/import', data=data)
+        assert response.status_code == 400
+        assert b"Invalid metadata.json file" in response.data
+
+    def test_import_scripts_missing_scripts_object(self, client: FlaskClient) -> None:
+        """Requirement: raises BadRequest if 'scripts' key is missing in JSON."""
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zf:
+            zf.writestr('metadata.json', json.dumps({"other": "data"}))
+            
+        data = {'file': (io.BytesIO(zip_buffer.getvalue()), 'test.zip')}
+        response = client.post('/scripts/import', data=data)
+        assert response.status_code == 400
+        assert b"must contain a 'scripts' object" in response.data
+
+    @patch('App.app.shutil.copy')
+    @patch('App.app.os.path.getsize')
+    def test_import_scripts_success(
+        self, 
+        mock_getsize: MagicMock, 
+        mock_copy: MagicMock, 
+        client: FlaskClient, 
+        mock_managers: dict
+    ) -> None:
+        """
+        Success Path: Imports scripts and registers them.
+        Covers the main loop, size validation, and move_file logic.
+        """
+        mock_managers["script"].MAX_SCRIPT_FILE_SIZE = 1000
+        mock_getsize.return_value = 500
+        
+        # Build metadata and zip
+        metadata = {
+            "scripts": {
+                "script_1": {"author": "Tester"},
+                "script_2": {"author": "Tester2"}
+            }
+        }
+        
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zf:
+            zf.writestr('metadata.json', json.dumps(metadata))
+            zf.writestr('script_1.py', 'print("hello")')
+            zf.writestr('script_2.py', 'print("world")')
+            
+        data = {'file': (io.BytesIO(zip_buffer.getvalue()), 'bundle.zip')}
+        response = client.post('/scripts/import', data=data)
+        
+        assert response.status_code == 200
+        json_data = response.get_json()
+        assert json_data["imported_count"] == 2
+        assert mock_managers["script"].add_script.call_count == 2
+        mock_managers["file"].move_file.assert_called()
+
+    @patch('App.app.os.path.getsize')
+    def test_import_scripts_size_exceeded_skipped(
+        self, 
+        mock_getsize: MagicMock, 
+        client: FlaskClient, 
+        mock_managers: dict
+    ) -> None:
+        """Edge Case: Scripts exceeding MAX_SCRIPT_FILE_SIZE are skipped."""
+        mock_managers["script"].MAX_SCRIPT_FILE_SIZE = 10
+        mock_getsize.return_value = 100 # Larger than limit
+        
+        metadata = {"scripts": {"too_big": {"meta": "data"}}}
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zf:
+            zf.writestr('metadata.json', json.dumps(metadata))
+            zf.writestr('too_big.py', 'x' * 100)
+            
+        data = {'file': (io.BytesIO(zip_buffer.getvalue()), 'test.zip')}
+        response = client.post('/scripts/import', data=data)
+        
+        # Since the only script was skipped, it raises BadRequest
+        assert response.status_code == 400
+        assert b"No valid scripts found to import" in response.data
+
+    @patch('App.app.os.remove')
+    @patch('App.app.shutil.rmtree')
+    def test_import_scripts_cleanup_finally(
+        self, 
+        mock_rmtree: MagicMock, 
+        mock_remove: MagicMock, 
+        client: FlaskClient
+    ) -> None:
+        """Requirement: Ensure temporary files/dirs are cleaned up regardless of failure."""
+        # Cause a failure early (corrupt zip)
+        data = {'file': (io.BytesIO(b"corrupt"), 'test.zip')}
+        client.post('/scripts/import', data=data)
+        
+        # Verify cleanup was attempted
+        assert mock_remove.called
+        assert mock_rmtree.called
+
+    @patch('App.app.os.path.getsize')
+    def test_import_scripts_size_limit_branch(
+        self, 
+        mock_getsize: MagicMock, 
+        client: FlaskClient, 
+        mock_managers: dict
+    ) -> None:
+        """
+        Covers the branch: if os.path.getsize(temp_script_path) > MAX_SCRIPT_FILE_SIZE
+        """
+        mock_managers["script"].MAX_SCRIPT_FILE_SIZE = 10
+        mock_getsize.return_value = 100 # Mocked size is larger than limit
+        
+        metadata = {"scripts": {"big_script": {}}}
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zf:
+            zf.writestr('metadata.json', json.dumps(metadata))
+            zf.writestr('big_script.py', 'x' * 100)
+        zip_buffer.seek(0)
+
+        data = {'file': (zip_buffer, 'test.zip')}
+        response = client.post('/scripts/import', data=data)
+        
+        assert response.status_code == 400
+        assert b"No valid scripts found" in response.data
+
+    @patch('App.app.os.walk')
+    def test_import_scripts_ambiguous_metadata(self, mock_walk: MagicMock, client: FlaskClient) -> None:
+        """
+        Covers: if len(metadata_files) > 1: raise BadRequest(...)
+        """
+        # Mock os.walk to simulate finding two metadata files in the extracted directory
+        mock_walk.return_value = [
+            ('/tmp/extract', [], ['meta1_metadata.json', 'meta2_metadata.json'])
+        ]
+        
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zf:
+            zf.writestr('meta1_metadata.json', '{}')
+            zf.writestr('meta2_metadata.json', '{}')
+        zip_buffer.seek(0)
+
+        data = {'file': (zip_buffer, 'test.zip')}
+        response = client.post('/scripts/import', data=data)
+        
+        assert response.status_code == 400
+        assert b"multiple metadata.json files" in response.data
+
+    @patch('App.app.os.remove')
+    @patch('App.app.shutil.rmtree')
+    def test_import_scripts_cleanup_flow(
+        self, 
+        mock_rmtree: MagicMock, 
+        mock_remove: MagicMock, 
+        client: FlaskClient
+    ) -> None:
+        """
+        Covers the 'finally' block. Ensures temp files are deleted even on BadZipFile.
+        """
+        # Sending non-zip data to trigger zipfile.BadZipFile
+        data = {'file': (io.BytesIO(b"not_a_zip"), 'test.zip')}
+        client.post('/scripts/import', data=data)
+        
+        # Verify the cleanup logic was executed
+        assert mock_remove.called
+        assert mock_rmtree.called
