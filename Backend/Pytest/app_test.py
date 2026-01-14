@@ -1,3 +1,4 @@
+import signal
 from urllib import response
 import pytest
 import json
@@ -8,7 +9,7 @@ import geopandas as gpd
 import pandas as pd
 import numpy as np
 from unittest.mock import MagicMock, mock_open, patch
-from flask import Flask, jsonify
+from flask import Flask, Response, jsonify
 from werkzeug.exceptions import BadRequest, NotFound
 from flask.testing import FlaskClient
 from typing import Any, Dict
@@ -317,6 +318,19 @@ class TestApp:
         
         # If the route matches but script_id is empty/missing
         assert response.status_code in [400, 404]
+
+    @patch("App.app.script_manager")
+    def test_script_metadata_bad_request_empty_id(mock_script_manager: MagicMock, client: Any) -> None:
+        """
+        Branch: if not script_id (True).
+        Expect: BadRequest with 'script_id parameter is required'.
+        """
+        from App.app import script_metadata
+
+        with pytest.raises(BadRequest) as excinfo:
+            script_metadata("")  # empty script_id passed directly
+
+        assert "script_id parameter is required" in str(excinfo.value)
     
     # --- Tests for GET /layers/<layer_id>/tiles/<z>/<x>/<y>.png ---
 
@@ -757,7 +771,15 @@ class TestApp:
     #     mock_managers["layer"].add_raster.assert_called_once()
 
     # --- Corrected Raster Preview (get_layer_preview) Tests ---
+    def test_get_layer_preview_bad_request_empty_id(self, client: FlaskClient) -> None:
+        """
+        Branch: if not layer_id (True) in get_layer_preview.
+        """
+        with pytest.raises(BadRequest) as excinfo:
+            from App.app import get_layer_preview
+            get_layer_preview("")  # call view directly with empty ID
 
+        assert "layer_id is required" in str(excinfo.value)
     def test_get_preview_missing_params(self, client: FlaskClient) -> None:
         """
         Test Case: Request missing required bounding box query parameters.
@@ -1093,6 +1115,16 @@ class TestApp:
 
     # TESTS FOR extract_data_from_layer_for_table_view
 
+    def test_extract_table_bad_request_empty_id(self, client: FlaskClient) -> None:
+        """
+        Branch: if not layer_id (True) in extract_data_from_layer_for_table_view.
+        """
+        with pytest.raises(BadRequest) as excinfo:
+            from App.app import extract_data_from_layer_for_table_view
+            extract_data_from_layer_for_table_view("")  # direct call with empty id
+
+        assert "layer_id parameter is required" in str(excinfo.value)
+
     @patch('fiona.listlayers')  # Patch the library directly
     @patch('geopandas.read_file')
     @patch('os.path.isfile')
@@ -1334,6 +1366,78 @@ class TestApp:
         # Verify finally block cleaned up the temp file
         mock_remove.assert_called_once()
 
+### DELETE SCRIPT TESTS
+
+
+
+    @patch("App.app.script_manager")
+    def test_delete_script_bad_request_empty_id(self, mock_script_manager: MagicMock, client: FlaskClient) -> None:
+        """
+        Branch: if not script_id (True).
+        """
+        from App.app import delete_script
+
+        with pytest.raises(BadRequest) as excinfo:
+            delete_script("")  # direct function call
+
+        assert "script_id parameter is required" in str(excinfo.value)
+
+    def test_delete_script_success(self, client: FlaskClient, mock_managers) -> None:
+        """
+        Branch: try-block, no exception.
+        """
+        mock_managers["script"].delete_script.return_value = None
+
+        response = client.delete("/scripts/abc123")
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["message"] == "Script deleted successfully"
+        mock_managers["script"].delete_script.assert_called_once_with("abc123")
+
+
+    def test_delete_script_not_found(self, client: FlaskClient, mock_managers) -> None:
+        """
+        Branch: except FileNotFoundError.
+        """
+        mock_managers["script"].delete_script.side_effect = FileNotFoundError("missing")
+
+        response = client.delete("/scripts/missing-id")
+
+        assert response.status_code == 404
+        assert "Script not found for deletion" in response.get_json()["error"]["description"]
+        mock_managers["script"].delete_script.assert_called_once_with("missing-id")
+
+    def test_delete_script_internal_error(self, client: FlaskClient, mock_managers) -> None:
+        """
+        Branch: except Exception.
+        """
+        mock_managers["script"].delete_script.side_effect = RuntimeError("boom")
+
+        response = client.delete("/scripts/boom")
+
+        assert response.status_code == 500
+        assert "Failed to delete script" in response.get_json()["error"]["description"]
+        mock_managers["script"].delete_script.assert_called_once_with("boom")
+
+    def test_list_scripts_returns_ids_and_metadata(self, client: FlaskClient, mock_managers) -> None:
+        # Arrange
+        mock_managers["script"].list_scripts.return_value = (
+            ["id1", "id2"],
+            [{"name": "s1"}, {"name": "s2"}],
+        )
+
+        # Act
+        response = client.get("/scripts")
+
+        # Assert
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["scripts_ids"] == ["id1", "id2"]
+        assert data["scripts_metadata"] == [{"name": "s1"}, {"name": "s2"}]
+        mock_managers["script"].list_scripts.assert_called_once()
+    # 
+    # 
     # =================================================================================
     # TESTS FOR add_script (Branch & Exception Focus)
     # =================================================================================
@@ -1444,6 +1548,33 @@ class TestApp:
         assert response.status_code == 400
         assert "'layers' must be a JSON list" in response.get_json()["error"]["description"]
 
+    def test_script_metadata_bad_request_empty_id(self) -> None:
+        """
+        Branch: if not script_id (True).
+        Expect: BadRequest with 'script_id parameter is required'.
+        """
+        from App.app import run_script
+
+        with pytest.raises(BadRequest) as excinfo:
+            run_script("")  # empty script_id passed directly
+
+        assert "script_id is required" in str(excinfo.value)
+    
+    def test_run_script_missing_json_body(self, client: FlaskClient) -> None:
+        """
+        Missing / invalid JSON body should result in a 400 error.
+        """
+        script_id = "test-script"
+
+        # No JSON body
+        response = client.post(f"/scripts/{script_id}")
+
+        assert response.status_code == 415
+        # optionally check structure if your error handler wraps it
+        data = response.get_json()
+        assert data["error"]["code"] == 415
+
+
     @patch('App.app.running_scripts', {})
     @patch('os.path.isfile', return_value=True)
     def test_run_script_success_with_layer_ids(self, mock_isfile: MagicMock, client: FlaskClient, mock_managers: dict) -> None:
@@ -1540,8 +1671,160 @@ class TestApp:
         assert data["error"]["code"] == 500
         assert data["error"]["message"] == "Internal Server Error"
         assert data["error"]["details"] == "Unexpected System Error"
+# Export all layers tests 
+    def test_export_all_layers_success(self, client: FlaskClient, mock_managers) -> None:
+        # Arrange layer ids and metadata
+        mock_managers["layer"].list_layer_ids.return_value = (["l1", "l2"], None)
+        mock_managers["layer"].get_metadata.side_effect = [
+            {"layer_name": "LayerOne"},
+            {"layer_name": "LayerTwo"},
+        ]
+        mock_managers["layer"].get_layer_extension.side_effect = [".gpkg", ".tif"]
 
+        # Plain strings for dirs
+        mock_managers["file"].temp_dir = "/tmp"
+        mock_managers["file"].layers_dir = "/layers"
+
+        fake_zip_path = "/tmp/all_layers_export.zip"
+
+        with patch("App.app.os.path.exists", return_value=True), \
+            patch("App.app.os.path.abspath", return_value=fake_zip_path), \
+            patch("App.app.os.path.isfile", return_value=True), \
+            patch("App.app.zipfile.ZipFile") as mock_zipfile, \
+            patch("App.app.send_file") as mock_send_file:
+
+            # When the view calls send_file(export_file_abs, ...),
+            # have it return a simple Response-like object
+            from flask import Response
+            mock_send_file.return_value = Response(b"zip-bytes", status=200)
+
+            mock_zip = mock_zipfile.return_value.__enter__.return_value
+
+            response = client.get("/layers/export/all")
+
+        assert response.status_code == 200
+        # ZipFile context was created
+        mock_zipfile.assert_called_once()
+        # Two files written into the zip
+        assert mock_zip.write.call_count == 2
+        mock_managers["layer"].list_layer_ids.assert_called_once()
+
+    def test_export_all_layers_skips_missing_metadata(self, client: FlaskClient, mock_managers) -> None:
+        # Two layer IDs, but first has no metadata
+        mock_managers["layer"].list_layer_ids.return_value = (["l1", "l2"], None)
+        mock_managers["layer"].get_metadata.side_effect = [
+            None,                              # -> triggers `if not metadata: continue`
+            {"layer_name": "LayerTwo"},        # processed
+        ]
+        mock_managers["layer"].get_layer_extension.return_value = ".gpkg"
+
+        mock_managers["file"].temp_dir = "/tmp"
+        mock_managers["file"].layers_dir = "/layers"
+        fake_zip_path = "/tmp/all_layers_export.zip"
+
+        with patch("App.app.os.path.exists", return_value=True), \
+            patch("App.app.os.path.abspath", return_value=fake_zip_path), \
+            patch("App.app.os.path.isfile", return_value=True), \
+            patch("App.app.zipfile.ZipFile") as mock_zipfile, \
+            patch("App.app.send_file") as mock_send_file:
+
+            from flask import Response
+            mock_send_file.return_value = Response(b"zip-bytes", status=200)
+            mock_zip = mock_zipfile.return_value.__enter__.return_value
+
+            response = client.get("/layers/export/all")
+
+        assert response.status_code == 200
+
+        # First metadata falsy → skipped; only second layer written
+        assert mock_zip.write.call_count == 1
+        # get_metadata was called twice (for l1 and l2)
+        assert mock_managers["layer"].get_metadata.call_count == 2
+
+
+    def test_export_all_layers_export_file_missing(self, client: FlaskClient, mock_managers) -> None:
+        mock_managers["layer"].list_layer_ids.return_value = ([], None)
+        mock_managers["file"].temp_dir = "/tmp"
+
+        with patch("App.app.zipfile.ZipFile") as mock_zipfile, \
+            patch("App.app.os.path.abspath", side_effect=lambda p: p), \
+            patch("App.app.os.path.isfile", return_value=False):
+            # ZipFile completes normally, but final file check fails
+            response = client.get("/layers/export/all")
+
+        assert response.status_code == 500
+        data = response.get_json()
+        assert "Exported file not found" in data["error"]["description"]
+
+    def test_export_all_layers_zip_creation_error(self, client: FlaskClient, mock_managers) -> None:
+        mock_managers["layer"].list_layer_ids.return_value = (["l1"], None)
+        mock_managers["file"].temp_dir = "/tmp"
+
+        # Make ZipFile.__enter__ raise an exception
+        with patch("App.app.zipfile.ZipFile") as mock_zipfile, \
+            patch("App.app.os.path.abspath", side_effect=lambda p: p):
+            mock_zipfile.side_effect = RuntimeError("disk error")
+
+            response = client.get("/layers/export/all")
+
+        assert response.status_code == 500
+        data = response.get_json()
+        assert "Failed to create ZIP archive" in data["error"]["description"]
+# Tests for stop script execution
+    def test_stop_script_bad_request_empty_id(self, client: FlaskClient) -> None:
+        with pytest.raises(BadRequest) as excinfo:
+            from App.app import stop_script
+            stop_script("")  # bypass routing, hit `if not script_id`
+
+        assert "script_id is required" in str(excinfo.value)
     # --- Tests for GET /layers/<layer_id>/information ---
+    @patch("App.app.running_scripts", {})
+    def test_stop_script_running(self, client: FlaskClient) -> None:
+        script_id = "running-script"
+        from App.app import running_scripts
+        running_scripts.clear()
+        running_scripts[script_id] = {
+            "execution_id": "exec-1",
+            "start_time": None,
+            "status": "running",
+        }
+
+        fake_child = MagicMock()
+        fake_child.pid = 1234
+
+        with patch("App.app.psutil.Process") as mock_proc_cls, \
+            patch("App.app.os.kill") as mock_kill:
+
+            mock_proc = mock_proc_cls.return_value
+            mock_proc.children.return_value = [fake_child]
+
+            response = client.delete(f"/execute_script/{script_id}")
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["message"] == f"Script {script_id} stopped"
+
+        mock_proc_cls.assert_called_once()
+        mock_proc.children.assert_called_once_with(recursive=True)
+        mock_kill.assert_called_once_with(1234, signal.SIGTERM)
+
+    def test_stop_script_not_running(self, client: FlaskClient) -> None:
+        script_id = "idle-script"
+        from App.app import running_scripts
+        running_scripts.clear()
+        running_scripts[script_id] = {
+            "execution_id": "exec-2",
+            "start_time": None,
+            "status": "finished",  # not "running"
+        }
+
+        response = client.delete(f"/execute_script/{script_id}")
+
+        assert response.status_code == 409
+        data = response.get_json()
+        assert data["error"] == "Conflict"
+        assert f"Script '{script_id}' is not running." in data["message"]
+        assert data["script_id"] == script_id
 
     def test_identify_layer_information_success(self, client: FlaskClient, mock_managers: dict) -> None:
         """
@@ -1606,6 +1889,15 @@ class TestApp:
 
     # --- Tests for GET /layers/<layer_id>/attributes ---
 
+    def test_get_layer_attributes_bad_request_empty_id(self, client: FlaskClient) -> None:
+        """
+        Branch: if not layer_id (True) in get_layer_attributes.
+        """
+        with pytest.raises(BadRequest) as excinfo:
+            from App.app import get_layer_attributes
+            get_layer_attributes("")  # direct call with empty id
+
+        assert "layer_id parameter is required" in str(excinfo.value)
     def test_get_layer_attributes_success(self, client: FlaskClient, mock_managers: Dict[str, Any]) -> None:
         """
         Test Case: Successfully retrieve attributes for a valid layer.
