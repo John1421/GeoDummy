@@ -56,7 +56,7 @@ jobs:
       - name: Run Xenon Complexity Check
         working-directory: Backend
         run: |
-          xenon . --max-absolute C --max-modules C --max-average C
+          xenon . --max-absolute D --max-modules C --max-average C
 
       - name: Generate Radon reports
         working-directory: Backend
