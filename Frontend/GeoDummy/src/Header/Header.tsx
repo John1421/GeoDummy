@@ -297,7 +297,7 @@ function Header({
               >
                 Change basemap
               </button>
-              
+
               <div className="border-t border-gray-200 pt-3 space-y-3">
                 <div className="flex items-center gap-3">
                   <input

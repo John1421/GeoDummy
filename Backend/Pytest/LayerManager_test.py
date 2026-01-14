@@ -1187,7 +1187,7 @@ class TestLayerManager:
             mock_size.side_effect = size_side_effect
 
             # Execute: Limit is 500MB, Total is 600MB
-            layer_manager.clean_raster_cache(cache_dir, CACHE_MAX_BYTES=500 * 1024 * 1024)
+            layer_manager.clean_raster_cache(cache_dir, cache_max_bytes=500 * 1024 * 1024)
 
             # Verification:
             # Check that remove was called for the oldest file
