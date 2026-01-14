@@ -113,7 +113,7 @@ class TestScriptManager:
             "simple_text": "plain_string"
         }
         
-        with patch.object(script_manager, '_save_metadata'):
+        with patch.object(script_manager, 'save_metadata'):
             script_manager.add_script("test_script_1", form_data)
         
         # Verify JSON was parsed into a dictionary, not left as a string
@@ -325,7 +325,7 @@ class TestScriptManager:
         # Simulate that both files exist
         mock_isfile.return_value = True
         
-        with patch.object(script_manager, '_save_metadata') as mock_save:
+        with patch.object(script_manager, 'save_metadata') as mock_save:
             script_manager._validate_script_files()
             
             # Assertions
@@ -337,7 +337,7 @@ class TestScriptManager:
         """
         Tests the scenario where some scripts are missing from the disk.
         Covers: the branch where 'if not os.path.isfile' is True, script deletion,
-        and the final 'if removed_scripts' is True (triggering _save_metadata).
+        and the final 'if removed_scripts' is True (triggering save_metadata).
         """
         # Setup metadata: script_1 exists, script_2 is missing
         script_manager.metadata = {
@@ -350,7 +350,7 @@ class TestScriptManager:
         # side_effect returns True for script_1 and False for script_2
         mock_isfile.side_effect = lambda path: "script_1.py" in path
         
-        with patch.object(script_manager, '_save_metadata') as mock_save:
+        with patch.object(script_manager, 'save_metadata') as mock_save:
             script_manager._validate_script_files()
             
             # Assertions
@@ -366,7 +366,7 @@ class TestScriptManager:
         # Setup empty metadata
         script_manager.metadata = {"scripts": {}}
         
-        with patch.object(script_manager, '_save_metadata') as mock_save:
+        with patch.object(script_manager, 'save_metadata') as mock_save:
             script_manager._validate_script_files()
             
             assert script_manager.metadata["scripts"] == {}
@@ -387,7 +387,7 @@ class TestScriptManager:
         # All files are missing
         mock_isfile.return_value = False
         
-        with patch.object(script_manager, '_save_metadata') as mock_save:
+        with patch.object(script_manager, 'save_metadata') as mock_save:
             script_manager._validate_script_files()
             
             assert len(script_manager.metadata["scripts"]) == 0
@@ -422,7 +422,7 @@ class TestScriptManager:
         }
 
         # Mock _load_metadata to return our controlled dictionary
-        with patch.object(ScriptManager, '_load_metadata', return_value=mock_metadata) as mock_load:
+        with patch.object(ScriptManager, 'load_metadata', return_value=mock_metadata) as mock_load:
             result = script_manager.get_metadata(valid_id)
             
             # Assertions
