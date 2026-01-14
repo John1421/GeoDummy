@@ -235,42 +235,6 @@ function Header({
   return (
     <div className="w-full bg-linear-to-r from-[#0D73A5] to-[#99E0B9] text-white px-4 py-2 flex items-center justify-between">
       <div className="flex gap-4 relative">
-        {/* FILE MENU */}
-        <div className="relative" ref={fileRef}>
-          <button
-            onClick={() => {
-              setOpenFileMenu(!openFileMenu);
-              setOpenBasemapMenu(false);
-              setOpenSettings(false);
-            }}
-            onMouseDown={(e) => e.stopPropagation()}
-            className={BUTTON_STYLE}
-            disabled={exporting || exportingLayers}
-            aria-label="File menu"
-          >
-            File
-          </button>
-
-          {openFileMenu && (
-            <div className="absolute top-full left-0 mt-2 bg-white rounded-lg shadow-xl p-2 z-50 min-w-[220px]">
-              <button
-                onClick={handleExportScripts}
-                disabled={exporting || exportingLayers}
-                className="w-full text-left px-3 py-2 rounded-md text-gray-800 hover:bg-gray-100 disabled:opacity-60"
-              >
-                {exporting ? "Exporting..." : "Export scripts"}
-              </button>
-              <button
-                onClick={handleExportLayers}
-                disabled={exporting || exportingLayers}
-                className="w-full text-left px-3 py-2 rounded-md text-gray-800 hover:bg-gray-100 disabled:opacity-60"
-              >
-                {exportingLayers ? "Exporting..." : "Export layers"}
-              </button>
-            </div>
-          )}
-        </div>
-
         {/* BASEMAP MENU */}
         <div className="relative" ref={basemapRef}>
           <button
@@ -283,7 +247,7 @@ function Header({
             onMouseDown={(e) => e.stopPropagation()}
             className={BUTTON_STYLE}
           >
-            Basemap
+            Settings
           </button>
 
           {openBasemapMenu && (
@@ -335,7 +299,44 @@ function Header({
           setBaseMapUrl={setBaseMapUrl}
           setBaseMapAttribution={setBaseMapAttribution}
         />
+
+        {/* FILE MENU */}
+        <div className="relative" ref={fileRef}>
+          <button
+            onClick={() => {
+              setOpenFileMenu(!openFileMenu);
+              setOpenBasemapMenu(false);
+              setOpenSettings(false);
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            className={BUTTON_STYLE}
+            disabled={exporting || exportingLayers}
+            aria-label="File menu"
+          >
+            File
+          </button>
+
+          {openFileMenu && (
+            <div className="absolute top-full left-0 mt-2 bg-white rounded-lg shadow-xl p-2 z-50 min-w-[220px]">
+              <button
+                onClick={handleExportScripts}
+                disabled={exporting || exportingLayers}
+                className="w-full text-left px-3 py-2 rounded-md text-gray-800 hover:bg-gray-100 disabled:opacity-60"
+              >
+                {exporting ? "Exporting..." : "Export scripts"}
+              </button>
+              <button
+                onClick={handleExportLayers}
+                disabled={exporting || exportingLayers}
+                className="w-full text-left px-3 py-2 rounded-md text-gray-800 hover:bg-gray-100 disabled:opacity-60"
+              >
+                {exportingLayers ? "Exporting..." : "Export layers"}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+
 
       <img src={logo} alt="Logo" className="h-10 w-20 object-contain transform scale-250 mr-10" />
 
