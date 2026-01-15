@@ -15,6 +15,7 @@ describe('RunScriptWindow', () => {
     let onScriptStartMock: ReturnType<typeof vi.fn<() => void>>;
     let onScriptEndMock: ReturnType<typeof vi.fn<() => void>>;
     let onCloseMock: ReturnType<typeof vi.fn<() => void>>;
+    let abortControllerRef: React.RefObject<AbortController | null>;
 
     beforeEach(() => {
         fetchMock = vi.fn();
@@ -25,6 +26,7 @@ describe('RunScriptWindow', () => {
         onScriptStartMock = vi.fn();
         onScriptEndMock = vi.fn();
         onCloseMock = vi.fn();
+        abortControllerRef = { current: null };
     });
 
     it('The script runs, performs a POST request, and calls onAddLayer.', async () => {
@@ -68,6 +70,7 @@ describe('RunScriptWindow', () => {
                 onAddLayer={onAddLayerMock}
                 onScriptStart={onScriptStartMock}
                 onScriptEnd={onScriptEndMock}
+                abortControllerRef={abortControllerRef}
             />,
         );
 
