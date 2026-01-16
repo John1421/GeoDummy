@@ -4,6 +4,7 @@ import LayerCardList from "./LayerCardList";
 import NewLayerWindow from "./NewLayerWindow";
 import SidebarPanel from "../TemplateModals/SidebarModal";
 import LayerSettingsWindow from "./LayerSettingsWindow";
+import PopUpWindowModal from "../TemplateModals/PopUpWindowModal";
 import { colors, icons } from "../Design/DesignTokens";
 
 /**
@@ -218,12 +219,43 @@ interface LayerSidebarProps {
   onAddLayerRef?: (addLayerFn: (layer_id: string, metadata: BackendLayerMetadata) => Promise<void>) => void;
 }
 
+async function fetchWithRetry(
+    url: string,
+    options: RequestInit = {},
+    retries = 5,
+    delayMs = 1000
+): Promise<Response> {
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            const response = await fetch(url, options);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            return response;
+        } catch (error) {
+            lastError = error;
+
+            if (attempt === retries) {
+                break;
+            }
+
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+    }
+
+    throw lastError;
+}
+
 // Fetch existing layers on app load
 async function fetchExistingLayers(): Promise<{
   ids: string[];
   metadata: BackendLayerMetadata[];
 }> {
-  const res = await fetch("http://localhost:5050/layers");
+  const res = await fetchWithRetry("http://localhost:5050/layers");
 
   if (!res.ok) throw new Error("Failed to fetch layers");
 
@@ -296,6 +328,7 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
   const [isWindowOpen, setIsWindowOpen] = useState(false);
   const [settingsLayerId, setSettingsLayerId] = useState<string | null>(null);
   const [isLoadingLayers, setIsLoadingLayers] = useState(true);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const selectedSettingsLayer = useMemo(
     () => layers.find((l) => l.id === settingsLayerId) ?? null,
@@ -1017,9 +1050,27 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
 
   /** Delete layer. */
   const handleDeleteLayer = useCallback(
-    (layerId: string) => {
-      setLayers((prev) => prev.filter((l) => l.id !== layerId));
-      setSettingsLayerId(null);
+    async (layerId: string) => {
+      try {
+        const response = await fetch(`http://localhost:5050/layers/${layerId}`, {
+          method: 'DELETE',
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          const errorMessage = errorData.error?.description || 'Failed to delete layer';
+          throw new Error(errorMessage);
+        }
+
+        // Only remove from UI if backend deletion succeeded
+        setLayers((prev) => prev.filter((l) => l.id !== layerId));
+        setSettingsLayerId(null);
+      } catch (error) {
+        // Keep layer in sidebar, show error message in popup
+        console.error('Error deleting layer:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred while deleting layer';
+        setDeleteError(errorMessage);
+      }
     },
     [setLayers]
   );
@@ -1163,6 +1214,17 @@ export default function LayerSidebar({ layers, setLayers, selectedLayerId, setSe
         existingFileNames={layers.map(l => l.fileName || '').filter(Boolean)}
         existingFileLastModified={layers.map(l => l.fileLastModified || 0).filter(Boolean)}
       />
+
+      <PopUpWindowModal
+        title="Error Deleting Layer"
+        isOpen={deleteError !== null}
+        onClose={() => setDeleteError(null)}
+        disableOverlayClose
+      >
+        <div style={{ fontSize: 14, color: colors.error }}>
+          {deleteError}
+        </div>
+      </PopUpWindowModal>
     </>
   );
 }

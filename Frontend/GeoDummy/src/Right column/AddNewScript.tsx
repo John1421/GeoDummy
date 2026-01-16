@@ -603,7 +603,7 @@ export default function AddNewScript({ onClose, onAddScript, existingCategories 
                                                         {[
                                                             { value: "raster", label: "Raster" },
                                                             { value: "vetorial", label: "Vetorial" },
-                                                            { value: "both", label: "Ambos" },
+                                                            { value: "both", label: "Both" },
                                                         ].map((option) => (
                                                             <div
                                                                 key={option.value}

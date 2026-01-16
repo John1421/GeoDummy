@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { colors, typography, radii, shadows } from "../Design/DesignTokens";
-import { FileCode, Play } from "lucide-react";
+import { FileCode, Play, Square } from "lucide-react";
 import { ThreeDot } from "react-loading-indicators"
 import RunScriptWindow from "./RunScriptWindow";
 import type { BackendLayerMetadata } from "../LeftColumn/LayerSidebar";
@@ -16,9 +16,36 @@ interface ScriptCardProps {
 
 function ScriptCard({ id, name, description, loading, setLoading, onAddLayer }: ScriptCardProps) {
   const [isRunScriptWindowOpen, setIsRunScriptWindowOpen] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const handleRun = () => {
     setIsRunScriptWindowOpen(true);
+  };
+
+  const handleStop = async () => {
+    // Abort the ongoing fetch request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:5050/execute_script/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Script stopped:', data.message);
+      } else {
+        const errorData = await response.json().catch(() => null);
+        console.error('Failed to stop script:', errorData);
+      }
+    } catch (err) {
+      console.error('Error stopping script:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Mock de execução no backend recebendo o scriptId
@@ -123,6 +150,36 @@ function ScriptCard({ id, name, description, loading, setLoading, onAddLayer }: 
             </>
           )}
         </button>
+
+        {loading && (
+          <button
+            onClick={handleStop}
+            style={{
+              marginTop: 8,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "6px 12px",
+              backgroundColor: "#DC2626",
+              color: "white",
+              border: "none",
+              borderRadius: radii.sm,
+              fontSize: typography.sizeSm,
+              cursor: "pointer",
+              transition: "0.2s",
+              height: 32,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "#B91C1C";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "#DC2626";
+            }}
+          >
+            <Square size={16} style={{ marginRight: 8 }} />
+            Stop Script
+          </button>
+        )}
       </div>
       <RunScriptWindow
         isOpen={isRunScriptWindowOpen}
@@ -131,6 +188,7 @@ function ScriptCard({ id, name, description, loading, setLoading, onAddLayer }: 
         onAddLayer={onAddLayer}
         onScriptStart={() => setLoading(true)}
         onScriptEnd={() => setLoading(false)}
+        abortControllerRef={abortControllerRef}
       />
     </div>
   );

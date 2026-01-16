@@ -46,4 +46,3 @@ class BasemapManager:
         """
 
         return self._basemap_lookup.get(basemap_id)
-    

@@ -9,7 +9,7 @@ from typing import Generator
 from werkzeug.exceptions import BadRequest, NotFound
 
 # Assuming ScriptManager is defined in ScriptManager.py
-from App.ScriptManager import ScriptManager
+from App.ScriptManager import ScriptManager, layer_manager
 
 class TestScriptManager:
     """
@@ -34,8 +34,8 @@ class TestScriptManager:
             # Fix TypeError: Ensure MAX_LAYER_FILE_SIZE is an int, not a Mock
             mock_lm.MAX_LAYER_FILE_SIZE = 100 * 1024 * 1024 
             
-            # Fix OSError: Ensure get_layer_for_script returns a string path
-            mock_lm.get_layer_for_script.return_value = None 
+            # Fix OSError: Ensure get_layer_path returns a string path
+            mock_lm.get_layer_path.return_value = None 
             
             yield mock_fm, mock_lm
 
@@ -113,7 +113,7 @@ class TestScriptManager:
             "simple_text": "plain_string"
         }
         
-        with patch.object(script_manager, '_save_metadata'):
+        with patch.object(script_manager, 'save_metadata'):
             script_manager.add_script("test_script_1", form_data)
         
         # Verify JSON was parsed into a dictionary, not left as a string
@@ -259,7 +259,7 @@ class TestScriptManager:
         
         # Setup mock layer paths
         execution_dir = "/tmp/exec/inputs"
-        mock_lm.get_layer_for_script.side_effect = ["/data/layer1.geojson", "/data/layer2.tif"]
+        mock_lm.get_layer_path.side_effect = ["/data/layer1.geojson", "/data/layer2.tif"]
         
         data = {"layers": ["id1", "id2"], "other_param": 123}
         
@@ -283,7 +283,7 @@ class TestScriptManager:
         """
         _, mock_lm = mock_deps
         mock_isdir.return_value = True
-        mock_lm.get_layer_for_script.return_value = None
+        mock_lm.get_layer_path.return_value = None
         
         data = {"layers": ["missing_layer"]}
         execution_dir = "/tmp/exec/inputs"
@@ -325,7 +325,7 @@ class TestScriptManager:
         # Simulate that both files exist
         mock_isfile.return_value = True
         
-        with patch.object(script_manager, '_save_metadata') as mock_save:
+        with patch.object(script_manager, 'save_metadata') as mock_save:
             script_manager._validate_script_files()
             
             # Assertions
@@ -337,7 +337,7 @@ class TestScriptManager:
         """
         Tests the scenario where some scripts are missing from the disk.
         Covers: the branch where 'if not os.path.isfile' is True, script deletion,
-        and the final 'if removed_scripts' is True (triggering _save_metadata).
+        and the final 'if removed_scripts' is True (triggering save_metadata).
         """
         # Setup metadata: script_1 exists, script_2 is missing
         script_manager.metadata = {
@@ -350,7 +350,7 @@ class TestScriptManager:
         # side_effect returns True for script_1 and False for script_2
         mock_isfile.side_effect = lambda path: "script_1.py" in path
         
-        with patch.object(script_manager, '_save_metadata') as mock_save:
+        with patch.object(script_manager, 'save_metadata') as mock_save:
             script_manager._validate_script_files()
             
             # Assertions
@@ -366,7 +366,7 @@ class TestScriptManager:
         # Setup empty metadata
         script_manager.metadata = {"scripts": {}}
         
-        with patch.object(script_manager, '_save_metadata') as mock_save:
+        with patch.object(script_manager, 'save_metadata') as mock_save:
             script_manager._validate_script_files()
             
             assert script_manager.metadata["scripts"] == {}
@@ -387,7 +387,7 @@ class TestScriptManager:
         # All files are missing
         mock_isfile.return_value = False
         
-        with patch.object(script_manager, '_save_metadata') as mock_save:
+        with patch.object(script_manager, 'save_metadata') as mock_save:
             script_manager._validate_script_files()
             
             assert len(script_manager.metadata["scripts"]) == 0
@@ -403,7 +403,7 @@ class TestScriptManager:
 
         # Mock 'open' to return our JSON string
         with patch("builtins.open", mock_open(read_data=mock_json_content)):
-            result = script_manager._load_metadata()
+            result = script_manager.load_metadata()
 
         assert result == mock_data
         assert script_manager.metadata == mock_data
@@ -422,7 +422,7 @@ class TestScriptManager:
         }
 
         # Mock _load_metadata to return our controlled dictionary
-        with patch.object(ScriptManager, '_load_metadata', return_value=mock_metadata) as mock_load:
+        with patch.object(ScriptManager, 'load_metadata', return_value=mock_metadata) as mock_load:
             result = script_manager.get_metadata(valid_id)
             
             # Assertions
@@ -519,3 +519,359 @@ class TestScriptManager:
         ids, _ = script_manager._ScriptManager__add_output_to_existing_layers(file_path)
         assert ids == ["id"]
         mock_lm.add_raster.assert_called_once()
+
+    def test_init_raises_if_scripts_dir_missing(self, mock_deps) -> None:
+        """
+        Branch: if not os.path.isdir(file_manager.scripts_dir) -> FileNotFoundError.
+        """
+        mock_fm, _ = mock_deps
+
+        # Point scripts_dir somewhere, but force isdir to return False
+        mock_fm.scripts_dir = "/nonexistent/scripts"
+
+        with patch("App.ScriptManager.os.path.isdir", return_value=False):
+            with pytest.raises(FileNotFoundError) as excinfo:
+                ScriptManager(scripts_metadata="test_metadata.json")
+
+        assert "Script directory does not exist" in str(excinfo.value)
+    
+
+    def test_check_script_name_exists_true(self, script_manager: ScriptManager) -> None:
+        # Arrange: ensure metadata has a script_123 entry
+        script_manager.metadata.setdefault("scripts", {})
+        script_manager.metadata["scripts"]["script_123"] = {}
+        
+        # Act
+        result = script_manager.check_script_name_exists("script_123")
+        
+        # Assert
+        assert result is True
+
+    def test_check_script_name_exists_false(self, script_manager: ScriptManager) -> None:
+        # Arrange: scripts dict is empty or missing
+        script_manager.metadata["scripts"] = {}
+
+        # Act
+        result = script_manager.check_script_name_exists("nonexistent")
+
+        # Assert
+        assert result is False
+
+    def test_add_script_initializes_scripts_dict(self, script_manager: ScriptManager, tmp_path) -> None:
+        """
+        Branch: 'scripts' not in self.metadata → self.metadata['scripts'] = {}.
+        """
+        # Simulate metadata without 'scripts' key
+        script_manager.metadata = {}
+
+        metadata_form = {
+            "name": "My Script",
+            "version": "1.0"
+        }
+
+        # Exercise
+        script_manager.add_script("script_123", metadata_form)
+
+        # Assertions
+        assert "scripts" in script_manager.metadata
+        assert "script_123" in script_manager.metadata["scripts"]
+        assert script_manager.metadata["scripts"]["script_123"]["name"] == "My Script"
+        assert script_manager.metadata["scripts"]["script_123"]["version"] == 1.0
+
+    def test_add_script_does_not_overwrite_existing_scripts(self, script_manager: ScriptManager) -> None:
+        """
+        Complementary check: branch when 'scripts' already exists.
+        """
+        script_manager.metadata = {"scripts": {"existing": {"name": "Old"}}}
+
+        metadata_form = {"name": "New Script"}
+
+        script_manager.add_script("new_id", metadata_form)
+
+        assert "existing" in script_manager.metadata["scripts"]
+        assert "new_id" in script_manager.metadata["scripts"]
+
+    def test_list_scripts_success(self, script_manager: ScriptManager) -> None:
+        """
+        Happy path: returns ids and their metadata list.
+        """
+        # Setup: two scripts registered in in-memory metadata
+        script_manager.metadata = {
+            "scripts": {
+                "s1": {},
+                "s2": {},
+            }
+        }
+
+        # Mock get_metadata so it returns specific values without touching disk
+        with patch.object(script_manager, "get_metadata") as mock_get_meta:
+            mock_get_meta.side_effect = [
+                {"name": "one"},
+                {"name": "two"},
+            ]
+
+            ids, metas = script_manager.list_scripts()
+
+        assert ids == ["s1", "s2"]
+        assert metas == [{"name": "one"}, {"name": "two"}]
+        assert mock_get_meta.call_args_list[0].args[0] == "s1"
+        assert mock_get_meta.call_args_list[1].args[0] == "s2"
+
+    def test_list_scripts_error_wraps_in_value_error(self, script_manager: ScriptManager) -> None:
+        """
+        Error in get_metadata is wrapped as ValueError('Error retrieving scripts: ...').
+        """
+        script_manager.metadata = {"scripts": {"bad": {}}}
+
+        with patch.object(script_manager, "get_metadata") as mock_get_meta:
+            mock_get_meta.side_effect = RuntimeError("boom")
+
+            with pytest.raises(ValueError) as excinfo:
+                script_manager.list_scripts()
+
+        assert "Error retrieving scripts: boom" in str(excinfo.value)
+        mock_get_meta.assert_called_once_with("bad")
+
+    def test_clean_temp_layer_files_removes_existing_files(self, tmp_path: Path) -> None:
+        """
+        Branch: for layer in layers, os.path.isfile(layer) is True and os.remove is called.
+        """
+        # Create two temp files, plus one non-existent path
+        f1 = tmp_path / "layer1.tif"
+        f2 = tmp_path / "layer2.tif"
+        f1.write_text("data")
+        f2.write_text("data")
+        missing = tmp_path / "missing.tif"
+
+        layers = [str(f1), str(f2), str(missing)]
+
+        # Act
+        ScriptManager._ScriptManager__clean_temp_layer_files(layers)
+
+        # Assert: existing files removed, missing one ignored
+        assert not f1.exists()
+        assert not f2.exists()
+        assert not missing.exists()
+
+    @patch("App.ScriptManager.file_manager")
+    def test_run_script_terminated_status(self, mock_fm, script_manager: ScriptManager, tmp_path: Path) -> None:
+        """
+        Branch: subprocess.CalledProcessError with returncode == 15 → status 'terminated'.
+        """
+        mock_fm.execution_dir = str(tmp_path)
+
+        # Real script file (content irrelevant because subprocess.run is patched)
+        script_path = tmp_path / "dummy.py"
+        script_path.write_text("print('hello')")
+
+        script_id = "script1"
+        execution_id = "exec1"
+        data = {}
+
+        with patch.object(script_manager, "_validate_script_integrity"), \
+             patch.object(script_manager, "_ScriptManager__prepare_parameters_for_script", return_value=data), \
+             patch("App.ScriptManager.subprocess.run") as mock_run:
+
+            err = subprocess.CalledProcessError(
+                returncode=15,
+                cmd=["python"],
+                output="",
+                stderr="terminated",
+            )
+            mock_run.side_effect = err
+
+            result = script_manager.run_script(str(script_path), script_id, execution_id, data)
+
+        assert result["status"] == "terminated"
+
+    @patch("App.ScriptManager.file_manager")
+    def test_run_script_failure_status(self, mock_fm, script_manager: ScriptManager, tmp_path: Path) -> None:
+        """
+        Branch: subprocess.CalledProcessError with returncode != 15 → status 'failure'.
+        """
+        mock_fm.execution_dir = str(tmp_path)
+
+        script_path = tmp_path / "dummy2.py"
+        script_path.write_text("print('hello')")
+
+        script_id = "script2"
+        execution_id = "exec2"
+        data = {}
+
+        with patch.object(script_manager, "_validate_script_integrity"), \
+             patch.object(script_manager, "_ScriptManager__prepare_parameters_for_script", return_value=data), \
+             patch("App.ScriptManager.subprocess.run") as mock_run:
+
+            err = subprocess.CalledProcessError(
+                returncode=1,
+                cmd=["python"],
+                output="",
+                stderr="error",
+            )
+            mock_run.side_effect = err
+
+            result = script_manager.run_script(str(script_path), script_id, execution_id, data)
+
+        assert result["status"] == "failure"
+
+    @patch("App.ScriptManager.file_manager")
+    def test_delete_script_success(self, mock_fm, script_manager: ScriptManager, tmp_path: Path) -> None:
+        """
+        Happy path:
+        - script_id present in metadata -> removed and metadata saved.
+        - script file removed from scripts_dir.
+        """
+        script_id = "script_ok"
+
+        # Point scripts_dir to a temp dir and create a fake script file
+        mock_fm.scripts_dir = str(tmp_path)
+        script_path = tmp_path / f"{script_id}.py"
+        script_path.write_text("print('hello')")
+
+        # Metadata contains the script
+        script_manager.metadata = {"scripts": {script_id: {"name": "test"}}}
+
+        with patch.object(script_manager, "save_metadata") as mock_save:
+            script_manager.delete_script(script_id)
+
+        # Metadata entry removed
+        assert script_id not in script_manager.metadata["scripts"]
+        mock_save.assert_called_once()
+
+        # File removed
+        assert not script_path.exists()
+
+
+    @patch("App.ScriptManager.file_manager")
+    def test_delete_script_raises_value_error_on_failure(self, mock_fm, script_manager: ScriptManager, tmp_path: Path) -> None:
+        """
+        Error path:
+        - any exception in delete logic is wrapped as ValueError.
+        """
+        script_id = "script_fail"
+
+        mock_fm.scripts_dir = str(tmp_path)
+        script_path = tmp_path / f"{script_id}.py"
+        script_path.write_text("print('hello')")
+
+        # Ensure script_id in metadata so branch is taken
+        script_manager.metadata = {"scripts": {script_id: {"name": "test"}}}
+
+        # Make os.remove fail
+        with patch("App.ScriptManager.os.remove") as mock_remove:
+            mock_remove.side_effect = OSError("disk error")
+
+            with pytest.raises(ValueError) as excinfo:
+                script_manager.delete_script(script_id)
+
+        assert f"Error deleting script {script_id}: disk error" in str(excinfo.value)
+        mock_remove.assert_called_once_with(os.path.join(mock_fm.scripts_dir, f"{script_id}.py"))
+
+    @patch("App.ScriptManager.file_manager")
+    def test_run_script_processes_output_files(self, mock_fm, script_manager: ScriptManager, tmp_path: Path) -> None:
+        """
+        Branch: for file_path in output_files, is_file() True,
+        size under limit, __add_output_to_existing_layers called.
+        """
+        mock_fm.execution_dir = str(tmp_path)
+
+        # Dummy script file
+        script_path = tmp_path / "dummy.py"
+        script_path.write_text("print('hello')")
+
+        script_id = "script_out"
+        execution_id = "exec_out"
+        data = {"layers": []}
+
+        # Prepare expected output file inside the outputs folder created by run_script
+        outputs_root = tmp_path / str(execution_id) / "outputs"
+        outputs_root.mkdir(parents=True, exist_ok=True)
+        out_file = outputs_root / "result.geojson"
+        out_file.write_text("dummy")
+
+        # Patch non-tested internals + os.path.getsize to keep under limit
+        with patch.object(script_manager, "_validate_script_integrity"), \
+             patch.object(script_manager, "_ScriptManager__prepare_parameters_for_script", return_value=data), \
+             patch("App.ScriptManager.subprocess.run") as mock_run, \
+             patch("App.ScriptManager.os.path.getsize", return_value=100), \
+             patch.object(script_manager, "_ScriptManager__clean_temp_layer_files") as mock_clean, \
+             patch.object(script_manager, "_ScriptManager__add_output_to_existing_layers") as mock_add:
+
+            # Simulate successful subprocess
+            proc = subprocess.CompletedProcess(args=["python"], returncode=0, stdout="OK", stderr="")
+            mock_run.return_value = proc
+
+            # __add_output_to_existing_layers returns one layer_id + metadata
+            mock_add.return_value = (["layer1"], [{"name": "Layer 1"}])
+
+            result = script_manager.run_script(str(script_path), script_id, execution_id, data)
+
+        # Verify loop processed our output file
+        mock_add.assert_called_once()
+        assert result["status"] == "success"
+        assert result["layer_ids"] == ["layer1"]
+        assert result["metadatas"] == [{"name": "Layer 1"}]
+        mock_clean.assert_called_once_with([])
+
+    def test_run_script_output_file_too_large_raises(
+        self, script_manager: ScriptManager, tmp_path: Path, mock_deps
+    ) -> None:
+        """
+        Branch: filesize_bytes > layer_manager.MAX_LAYER_FILE_SIZE → BadRequest.
+        """
+        mock_fm, mock_lm = mock_deps
+
+        # Make limit small for this test
+        mock_lm.MAX_LAYER_FILE_SIZE = 100  # bytes
+
+        # Dummy script file
+        script_path = tmp_path / "dummy_big.py"
+        script_path.write_text("print('hello')")
+
+        script_id = "big_script"
+        execution_id = "exec_big"
+        data = {"layers": []}
+
+        # Ensure execution_dir points to our tmp path
+        mock_fm.execution_dir = str(tmp_path)
+
+        # Prepare outputs folder and one output file
+        outputs_root = tmp_path / str(execution_id) / "outputs"
+        outputs_root.mkdir(parents=True, exist_ok=True)
+        out_file = outputs_root / "huge_result.tif"
+        out_file.write_text("x")
+
+        with patch.object(ScriptManager, "_validate_script_integrity"), \
+             patch.object(ScriptManager, "_ScriptManager__prepare_parameters_for_script", return_value=data), \
+             patch("App.ScriptManager.subprocess.run") as mock_run, \
+             patch("App.ScriptManager.os.path.getsize", return_value=101), \
+             patch.object(ScriptManager, "_ScriptManager__clean_temp_layer_files"), \
+             patch.object(ScriptManager, "_ScriptManager__add_output_to_existing_layers") as mock_add:
+
+            proc = subprocess.CompletedProcess(args=["python"], returncode=0, stdout="OK", stderr="")
+            mock_run.return_value = proc
+
+            with pytest.raises(BadRequest) as excinfo:
+                script_manager.run_script(str(script_path), script_id, execution_id, data)
+
+        # We should fail due to size and never process the layer
+        mock_add.assert_not_called()
+        assert "huge_result.tif exceeds the maximum allowed size" in str(excinfo.value)
+
+    @patch("os.path.exists")
+    @patch("os.remove")
+    def test_add_output_to_existing_layers_unsupported_and_existing(
+        self, mock_remove, mock_exists, script_manager: ScriptManager
+    ):
+        """
+        Tests unsupported extensions and ensures remove IS called if file exists.
+        Covers: default case (_), os.path.exists == True branch.
+        """
+        file_path = "/tmp/output/wrong.exe"
+        mock_exists.return_value = True
+
+        with pytest.raises(BadRequest) as excinfo:
+            script_manager._ScriptManager__add_output_to_existing_layers(file_path)
+
+        assert "extension not supported" in str(excinfo.value)
+        mock_remove.assert_called_once_with(file_path)

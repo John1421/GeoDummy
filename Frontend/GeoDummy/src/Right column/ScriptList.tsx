@@ -44,14 +44,15 @@ export interface Script {
 
 interface ScriptListProps {
   onAddLayer: (layer_id: string, metadata: BackendLayerMetadata) => Promise<void>;
+  refetchTrigger?: number;
 }
 
-export default function ScriptList({ onAddLayer }: ScriptListProps) {
+export default function ScriptList({ onAddLayer, refetchTrigger }: ScriptListProps) {
   const [showAddNew, setShowAddNew] = useState(false);
   const [scripts, setScripts] = useState<Script[]>([]);
   const [loadingScripts, setLoadingScripts] = useState<Record<string, boolean>>({});
 
-  // Fetch scripts from backend on mount
+  // Fetch scripts from backend on mount and when refetchTrigger changes
   useEffect(() => {
     const fetchScripts = async () => {
       try {
@@ -82,7 +83,7 @@ export default function ScriptList({ onAddLayer }: ScriptListProps) {
     };
 
     fetchScripts();
-  }, []);
+  }, [refetchTrigger]);
 
   const handleAddScript = useCallback(
     (id: string, name: string, category: string, description: string) => {

@@ -26,13 +26,13 @@ RUN mkdir App
 COPY . ./App/
 
 # Create group and user before changing ownership
-RUN groupadd -r appgroup && useradd -r -g appgroup user
+#RUN groupadd -r appgroup && useradd -r -g appgroup user
 
 # Change ownership of the /app folder
-RUN chown -R user:appgroup /app
+#RUN chown -R user:appgroup /app
 
 # Switch to the new user
-USER user
+#USER user
 
 # Expor a porta do backend
 EXPOSE 5050

@@ -51,11 +51,11 @@ class ScriptManager:
         # If file does not exist, create it
         if not os.path.isfile(self.metadata_path):
             initial_structure = {"scripts": {}}
-            with open(self.metadata_path, 'w') as f:
+            with open(self.metadata_path, 'w', encoding="utf-8") as f:
                 json.dump(initial_structure, f, indent=4)
 
         # Load metadata
-        with open(self.metadata_path, 'r') as f:
+        with open(self.metadata_path, 'r', encoding="utf-8") as f:
             self.metadata = json.load(f)
 
         self._validate_script_files()
@@ -92,7 +92,7 @@ class ScriptManager:
             self.metadata["scripts"] = {}
 
         self.metadata["scripts"][script_id] = parsed_metadata
-        self._save_metadata()
+        self.save_metadata()
 
     def run_script(self, script_path, script_id, execution_id, data):
         """
@@ -172,7 +172,7 @@ class ScriptManager:
                 cwd=execution_folder,
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=600,
                 check=True
             )
             status = "success"
@@ -180,7 +180,10 @@ class ScriptManager:
             status = "timeout"
             result = None  # optional
         except subprocess.CalledProcessError as e:
-            status = "failure"
+            if e.returncode == 15:
+                status = "terminated"
+            else:    
+                status = "failure"
             result = e  # contains stdout/stderr
 
 
@@ -208,7 +211,8 @@ class ScriptManager:
                 filesize_bytes = os.path.getsize(file_path)
                 if filesize_bytes > layer_manager.MAX_LAYER_FILE_SIZE:
                     raise BadRequest(
-                        f"Output file {file_path.name} exceeds the maximum allowed size of {layer_manager.MAX_LAYER_FILE_SIZE} MB."
+                        f"Output file {file_path.name} exceeds the maximum "
+                        f"allowed size of {layer_manager.MAX_LAYER_FILE_SIZE} MB."
                         )
 
                 layer_ids, metadata = self.__add_output_to_existing_layers(file_path)
@@ -235,24 +239,25 @@ class ScriptManager:
 
         return response
 
-    def _save_metadata(self):
-        """
-        Persist metadata to disk.
-        """
-
-        with open(self.metadata_path, 'w') as f:
-            json.dump(self.metadata, f, indent=4)
-
-    def _load_metadata(self):
+    def load_metadata(self):
         """
         Load metadata from disk.
 
         :return: Dictionary containing all script metadata.
         """
 
-        with open(self.metadata_path, 'r') as f:
+        with open(self.metadata_path, 'r', encoding="utf-8") as f:
             self.metadata = json.load(f)
         return self.metadata
+
+    def save_metadata(self):
+        """
+        Persist metadata to disk.
+        """
+
+        with open(self.metadata_path, 'w', encoding="utf-8") as f:
+            json.dump(self.metadata, f, indent=4)
+
 
     def get_metadata(self, script_id):
         """
@@ -262,8 +267,24 @@ class ScriptManager:
         :return: Dictionary containing script metadata.
         """
 
-        self.metadata = self._load_metadata()
+        self.metadata = self.load_metadata()
         return self.metadata["scripts"][script_id]
+
+    def delete_script(self, script_id):
+        """
+        Remove a script entry from the metadata registry.
+
+        :param script_id: Unique identifier for the script.
+        """
+
+        try:
+            if script_id in self.metadata.get("scripts", {}):
+                del self.metadata["scripts"][script_id]
+                self.save_metadata()
+
+            os.remove(os.path.join(file_manager.scripts_dir, f"{script_id}.py"))
+        except Exception as e:
+            raise ValueError(f"Error deleting script {script_id}: {str(e)}") from e    
 
 
     def _validate_script_files(self):
@@ -286,7 +307,7 @@ class ScriptManager:
 
         # Save updated metadata if any scripts were removed
         if removed_scripts:
-            self._save_metadata()
+            self.save_metadata()
             print(f"Removed missing scripts from metadata: {', '.join(removed_scripts)}")
 
     @staticmethod
@@ -306,7 +327,10 @@ class ScriptManager:
             case ".shp":
                 if os.path.exists(file_path):
                     os.remove(file_path)
-                raise BadRequest("Please upload shapefiles as a .zip containing all necessary components (.shp, .shx, .dbf, optional .prj).")
+                raise BadRequest(
+                    "Please upload shapefiles as a .zip containing all necessary"
+                    "components (.shp, .shx, .dbf, optional .prj)."
+                    )
 
             case ".zip":
                 layer_id, metadata = layer_manager.add_shapefile_zip(file_path,file_name)
@@ -349,7 +373,7 @@ class ScriptManager:
                 script_metadata = self.get_metadata(script_id)
                 script_metadatas.append(script_metadata)
         except Exception as e:
-            raise ValueError(f"Error retrieving scripts: {str(e)}")
+            raise ValueError(f"Error retrieving scripts: {str(e)}") from e
 
         return script_ids, script_metadatas
 
@@ -376,7 +400,7 @@ class ScriptManager:
 
         # Process each argument
         for layer in layers:
-            layer = layer_manager.get_layer_for_script(layer)
+            layer = layer_manager.get_layer_path(layer)
 
             if layer is not None:
                 # Copy layer onto the execution_dir_input folder

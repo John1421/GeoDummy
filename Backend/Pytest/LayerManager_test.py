@@ -186,16 +186,16 @@ class TestLayerManager:
             with pytest.raises(ValueError, match="Error reading GeoPackage: Disk Error"):
                 layer_manager.get_layer_information("corrupt_layer")
 
-    # --- get_layer_for_script Method Tests ---
+    # --- get_layer_path Method Tests ---
 
-    def test_get_layer_for_script_raster(self, layer_manager: LayerManager) -> None:
+    def test_get_layer_path_raster(self, layer_manager: LayerManager) -> None:
         """Test that it returns the raster path immediately if the ID is a raster."""
         mock_path = "/path/to/raster.tif"
         with patch.object(layer_manager, 'is_raster', return_value=mock_path):
-            result = layer_manager.get_layer_for_script("my_raster")
+            result = layer_manager.get_layer_path("my_raster")
             assert result == mock_path
 
-    def test_get_layer_for_script_vector_extraction(self, layer_manager: LayerManager, mock_file_manager: MagicMock) -> None:
+    def test_get_layer_path_vector_extraction(self, layer_manager: LayerManager, mock_file_manager: MagicMock) -> None:
         """
         Fixed test: Normalizes both expected and actual paths to resolve OS-specific slash mismatches.
         """
@@ -206,14 +206,14 @@ class TestLayerManager:
         with patch('os.path.isfile', return_value=True), \
              patch('App.LayerManager.LayerManager.is_raster', return_value=None):
             
-            result = layer_manager.get_layer_for_script(layer_id)
+            result = layer_manager.get_layer_path(layer_id)
             
             # Use os.path.normpath on the result as well for a safe comparison
             assert os.path.normpath(result) == expected_path
             # Check that the directory part is correct
             assert os.path.normpath(mock_file_manager.layers_dir) in os.path.normpath(result)
 
-    def test_get_layer_for_script_vector_missing(self, layer_manager: LayerManager, mock_file_manager: MagicMock) -> None:
+    def test_get_layer_path_vector_missing(self, layer_manager: LayerManager, mock_file_manager: MagicMock) -> None:
         """
         Fixed test: Ensures it returns None when the specific .gpkg file is missing.
         """
@@ -223,7 +223,7 @@ class TestLayerManager:
         with patch('App.LayerManager.LayerManager.is_raster', return_value=None), \
              patch('os.path.isfile', return_value=False):
             
-            result = layer_manager.get_layer_for_script(layer_id)
+            result = layer_manager.get_layer_path(layer_id)
             
             # This should now pass as the source code returns None if the file isn't found
             assert result is None
@@ -1060,34 +1060,38 @@ class TestLayerManager:
     
     # --- __move_to_permanent Method Tests ---
 
-    def test_move_to_permanent_success(self, layer_manager: LayerManager, mock_file_manager: MagicMock) -> None:
+    @patch('os.path.isfile', return_value=True)
+    @patch('shutil.move')
+    @patch('builtins.open', new_callable=mock_open)
+    def test_move_to_permanent_success(
+        self, mock_file_open: MagicMock, mock_move: MagicMock, 
+        mock_isfile: MagicMock, layer_manager: LayerManager, mock_file_manager: MagicMock
+    ) -> None:
         """
-        Test successful move of a layer from temporary to permanent storage.
-        Note: Using the mangled name '_LayerManager__move_to_permanent' for the private method.
+        Test successful transition of a layer from temp to permanent storage.
+        Verifies:
+        1. File movement with shutil.move.
+        2. Metadata JSON serialization and writing.
         """
-        # 1. Setup test data
-        temp_layer_path = "/tmp/temp/new_layer.gpkg"
-        layer_id = "test_layer_123"
-        metadata = {"feature_count": 10, "crs": "EPSG:4326"}
+        temp_path = "/tmp/temp/new_layer.gpkg"
+        layer_id = "layer123"
+        metadata = {"type": "vector", "crs": "EPSG:4326"}
         
-        # Define expected destination paths based on your file_manager mock
-        expected_dest_path = os.path.join(mock_file_manager.layers_dir, f"{layer_id}.gpkg")
-        expected_meta_path = os.path.join(mock_file_manager.layers_dir, f"{layer_id}_metadata.json")
+        # Define expected paths based on mock_file_manager paths
+        expected_dest = os.path.join(mock_file_manager.layers_dir, "layer123.gpkg")
+        expected_meta = os.path.join(mock_file_manager.layers_dir, "layer123_metadata.json")
 
-        # 2. Patch dependencies: shutil.move and the built-in 'open' for metadata saving
-        with patch('shutil.move') as mock_shutil_move, \
-            patch('os.path.isfile', return_value=True), \
-            patch('builtins.open', mock_open()) as mock_file:
-            
-            # 3. Execute the private method using its mangled name
-            layer_manager._LayerManager__move_to_permanent(temp_layer_path, layer_id, metadata)
+        # Call the private method via name mangling
+        layer_manager._LayerManager__move_to_permanent(temp_path, layer_id, metadata)
 
-            # 4. Assertions
-            # Verify the file was moved to the permanent layers directory
-            mock_shutil_move.assert_called_once_with(temp_layer_path, expected_dest_path)
-            
-            # Verify the metadata JSON was saved to the correct path
-            mock_file.assert_called_once_with(expected_meta_path, 'w')
+        # Assertions
+        mock_move.assert_called_once_with(temp_path, expected_dest)
+        mock_file_open.assert_called_once_with(expected_meta, 'w', encoding="utf-8")
+        
+        # Verify JSON content was written
+        handle = mock_file_open()
+        # Check that json.dump was called (it calls .write() on the handle)
+        assert handle.write.called
 
     @patch('os.path.isfile', return_value=False)
     def test_move_to_permanent_source_not_found(
@@ -1183,7 +1187,7 @@ class TestLayerManager:
             mock_size.side_effect = size_side_effect
 
             # Execute: Limit is 500MB, Total is 600MB
-            layer_manager.clean_raster_cache(cache_dir, CACHE_MAX_BYTES=500 * 1024 * 1024)
+            layer_manager.clean_raster_cache(cache_dir, cache_max_bytes=500 * 1024 * 1024)
 
             # Verification:
             # Check that remove was called for the oldest file

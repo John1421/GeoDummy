@@ -1,6 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-//  MOCK – remover quando backend estiver estavel
-
 interface TableHeader {
   name: string;
   type: string;
@@ -24,44 +22,12 @@ const AttributeTable: React.FC<AttributeTableProps> = ({ layerId }) => {
   const [error, setError] = useState<string | null>(null);
 
   const [isOpen, setIsOpen] = useState(true);
-  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [sortConfig, setSortConfig] = useState<{
     key: string;
     direction: "asc" | "desc";
   } | null>(null);
 
-  /* MOCK- remover quando backend estiver estavel
   
-
-  useEffect(() => {
-    console.log(" AttributeTable em modo MOCK");
-
-    const headers: TableHeader[] = Object.keys(
-      sampleFeatures.features[0].properties
-    ).map((key) => ({
-      name: key,
-      type: typeof sampleFeatures.features[0].properties[key],
-      sortable: true,
-    }));
-
-    const rows = sampleFeatures.features.map((f) => f.properties);
-
-    const mockResponse: AttributeTableResponse = {
-      headers,
-      rows,
-      pagination: {
-        page: 1,
-        page_size: rows.length,
-        total: rows.length,
-        next: null,
-        prev: null,
-      },
-    };
-
-    console.log(" Mock AttributeTable:", mockResponse);
-    setData(mockResponse);
-  }, []);*/
-
   useEffect(() => {
     if (!layerId) {
       setData(null);
@@ -140,7 +106,7 @@ const AttributeTable: React.FC<AttributeTableProps> = ({ layerId }) => {
         prev?.key === col && prev.direction === "asc" ? "desc" : "asc",
     }));
   };
-  const handleCheckboxChange = (index: number) => {
+  /*const handleCheckboxChange = (index: number) => {
     setSelectedRows((prev) => {
       const next = new Set(prev);
 
@@ -163,7 +129,7 @@ const AttributeTable: React.FC<AttributeTableProps> = ({ layerId }) => {
     } else {
       setSelectedRows(new Set(processedRows.map((_, i) => i)));
     }
-  };
+  };*/
 
 
   /*COLLAPSED*/
@@ -177,7 +143,6 @@ const AttributeTable: React.FC<AttributeTableProps> = ({ layerId }) => {
         >
           <h3 className="text-sm font-semibold text-gray-800">
             Attribute Table
-            {selectedRows.size > 0 && ` (${selectedRows.size} selected)`}
           </h3>
           <span>▲</span>
         </div>
@@ -196,8 +161,7 @@ const AttributeTable: React.FC<AttributeTableProps> = ({ layerId }) => {
           >
             <h3 className="text-sm font-semibold text-gray-800">
               Attribute Table
-              {selectedRows.size > 0 && ` (${selectedRows.size} selected)`}
-            </h3>
+             </h3>
             <span>▼</span>
           </div>
 
@@ -205,10 +169,9 @@ const AttributeTable: React.FC<AttributeTableProps> = ({ layerId }) => {
           <div className="px-3 py-1 bg-gray-50 border-b border-[#DADFE7]">
             <span className="text-xs text-gray-600">
               {processedRows.length} elements
-              {selectedRows.size > 0 && ` | ${selectedRows.size} selected`}
             </span>
           </div>
-
+          
           {/* Loading in progress */}
           {loading && (
             <div className="p-4 text-sm text-gray-500">
@@ -227,16 +190,7 @@ const AttributeTable: React.FC<AttributeTableProps> = ({ layerId }) => {
             <table className="w-full text-sm">
               <thead className="bg-gray-100 sticky top-0">
                 <tr>
-                  <th className="p-2 w-12 border-b border-[#DADFE7]">
-                    {processedRows.length > 0 && (
-                      <input
-                        type="checkbox"
-                        checked={selectedRows.size === processedRows.length}
-                        onChange={handleSelectAll}
-                      />
-                    )}
-                  </th>
-
+                  
                   {data?.headers.map((h) => (
                     <th
                       key={h.name}
@@ -268,17 +222,9 @@ const AttributeTable: React.FC<AttributeTableProps> = ({ layerId }) => {
                   processedRows.map((row, idx) => (
                     <tr
                       key={idx}
-                      className={`border-b hover:bg-gray-50 ${selectedRows.has(idx) ? "bg-blue-50" : ""
-                        }`}
+                      
                     >
-                      <td className="p-2 border-b border-[#DADFE7]">
-                        <input
-                          type="checkbox"
-                          checked={selectedRows.has(idx)}
-                          onChange={() => handleCheckboxChange(idx)}
-                        />
-                      </td>
-
+                      
                       {data?.headers.map((h) => (
                         <td
                           key={h.name}

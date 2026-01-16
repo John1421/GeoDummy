@@ -19,6 +19,8 @@ function App() {
 
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
 
+  const [scriptRefetchTrigger, setScriptRefetchTrigger] = useState(0);
+
   type BackendLayerMetadata =
     | {
         type: "vector";
@@ -49,6 +51,7 @@ function App() {
         setEnableHoverHighlight={setEnableHoverHighlight}
         enableClickPopup={enableClickPopup}
         setEnableClickPopup={setEnableClickPopup}
+        onScriptsImported={() => setScriptRefetchTrigger(prev => prev + 1)}
       />
 
       <div className="flex flex-1 min-h-0">
@@ -90,11 +93,14 @@ function App() {
             borderLeft: `1px solid ${colors.borderStroke}`,
           }}
         >
-          <ScriptList onAddLayer={async (layer_id, metadata) => {
-            if (addLayerRef.current) {
-              await addLayerRef.current(layer_id, metadata);
-            }
-          }} />
+          <ScriptList 
+            onAddLayer={async (layer_id, metadata) => {
+              if (addLayerRef.current) {
+                await addLayerRef.current(layer_id, metadata);
+              }
+            }} 
+            refetchTrigger={scriptRefetchTrigger}
+          />
         </div>
       </div>
     </div>

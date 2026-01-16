@@ -1,6 +1,6 @@
 // LayerSettingsWindow.tsx
 import React, { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { X, Download } from "lucide-react";
 import type { Layer } from "./LayerSidebar";
 import { LAYER_COLOR_PALETTE } from "../Design/DesignTokens";
 import { colors, typography, radii, spacing } from "../Design/DesignTokens";
@@ -123,6 +123,94 @@ export default function LayerSettingsWindow({
 
   const handleDelete = () => {
     onDeleteLayer(layer.id);
+  };
+
+  const handleExport = async () => {
+    try {
+      const response = await fetch(`http://localhost:5050/layers/export/${layer.id}`, {
+        method: "GET",
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Export failed: ${response.statusText}`);
+      }
+      
+      // Determine extension based on layer type
+      let extension = '';
+      let acceptType = '';
+      let description = '';
+      
+      if (layer.kind === 'vector' || layer.vectorData) {
+        extension = '.gpkg';
+        acceptType = 'application/geopackage+sqlite3';
+        description = 'GeoPackage';
+      } else if (layer.kind === 'raster' || layer.rasterData) {
+        extension = '.tif';
+        acceptType = 'image/tiff';
+        description = 'GeoTIFF';
+      } else if (layer.fileName) {
+        // Fallback to original file extension
+        const lastDot = layer.fileName.lastIndexOf('.');
+        if (lastDot > 0) {
+          extension = layer.fileName.substring(lastDot);
+        }
+      }
+      
+      // Get filename from Content-Disposition header or construct from layer data
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = `${layer.title || layer.id}${extension}`;
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
+        }
+      }
+      
+      const blob = await response.blob();
+      
+      // Try to use File System Access API (save picker)
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const anyWindow = window as any;
+        
+        if (typeof anyWindow.showSaveFilePicker === "function") {
+          const handle = await anyWindow.showSaveFilePicker({
+            suggestedName: filename,
+            types: [
+              {
+                description: description || 'Layer file',
+                accept: { [acceptType || 'application/octet-stream']: [extension] },
+              },
+            ],
+          });
+          
+          const writable = await handle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          return;
+        }
+      } catch (pickerErr: unknown) {
+        // User cancelled or picker not supported - fall through to regular download
+        const maybeDomEx = pickerErr as { name?: string };
+        if (maybeDomEx?.name === "AbortError") {
+          // User cancelled, just return without error
+          return;
+        }
+      }
+      
+      // Fallback: regular download (no path selection)
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting layer:', error);
+      alert('Failed to export layer. Please try again.');
+    }
   };
 
   const handlePickColor = (c: string) => {
@@ -756,6 +844,38 @@ export default function LayerSettingsWindow({
               className="opacity-slider"
               style={sliderStyle}
             />
+
+
+          {/* Export button */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              paddingBlock: 8,
+            }}
+          >
+            <button
+              type="button"
+              onClick={handleExport}
+              aria-label="Export layer"
+              title="Export layer"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                padding: 8,
+                borderRadius: radii.sm,
+                border: `1px solid ${colors.borderStroke}`,
+                backgroundColor: colors.cardBackground,
+                cursor: "pointer",
+                color: colors.sidebarForeground,
+              }}
+            >
+              <span>Export layer</span>
+              <Download size={20} strokeWidth={2} />
+            </button>
+          </div>
 
             <div
               style={{
