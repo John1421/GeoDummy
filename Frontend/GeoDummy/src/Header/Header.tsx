@@ -12,6 +12,7 @@ type HeaderProps = {
   setEnableHoverHighlight: (enabled: boolean) => void;
   enableClickPopup: boolean;
   setEnableClickPopup: (enabled: boolean) => void;
+  onScriptsImported: () => void;
 };
 
 async function fetchExportAllScriptsZip(): Promise<Blob> {
@@ -68,6 +69,36 @@ async function fetchExportAllLayersZip(): Promise<Blob> {
   return await response.blob();
 }
 
+async function importScriptsZip(zipFile: File): Promise<{ imported_count: number; scripts: Array<{ script_id: string; metadata: unknown }> }> {
+  const formData = new FormData();
+  formData.append('file', zipFile);
+
+  const response = await fetch("http://localhost:5050/scripts/import", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let details = "";
+    try {
+      const maybeJson = await response.json();
+      details = maybeJson?.error?.description || JSON.stringify(maybeJson);
+    } catch {
+      try {
+        details = await response.text();
+      } catch {
+        details = "";
+      }
+    }
+
+    throw new Error(
+      `Import failed (HTTP ${response.status}). ${details ? `Details: ${details}` : ""}`.trim()
+    );
+  }
+
+  return await response.json();
+}
+
 function ensureZipExtension(name: string): string {
   const trimmed = name.trim();
   if (!trimmed) return "all_scripts_export.zip";
@@ -117,6 +148,7 @@ function Header({
   setEnableHoverHighlight,
   enableClickPopup,
   setEnableClickPopup,
+  onScriptsImported,
 }: HeaderProps) {
   const [openBaseMapSet, setOpenBaseMapSet] = useState(false);
 
@@ -140,6 +172,12 @@ function Header({
   const [exportingLayers, setExportingLayers] = useState(false);
   const [exportLayersErrorOpen, setExportLayersErrorOpen] = useState(false);
   const [exportLayersErrorMsg, setExportLayersErrorMsg] = useState<string>("");
+
+  // Import UX
+  const [importing, setImporting] = useState(false);
+  const [importErrorOpen, setImportErrorOpen] = useState(false);
+  const [importErrorMsg, setImportErrorMsg] = useState<string>("");
+  const importFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -232,6 +270,40 @@ function Header({
     }
   }
 
+  function handleImportScriptsClick() {
+    setOpenFileMenu(false);
+    importFileInputRef.current?.click();
+  }
+
+  async function handleImportScriptsFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file extension
+    if (!file.name.toLowerCase().endsWith('.zip')) {
+      setImportErrorMsg("Only .zip files are supported.");
+      setImportErrorOpen(true);
+      event.target.value = ''; // Reset input
+      return;
+    }
+
+    setImporting(true);
+
+    try {
+      const result = await importScriptsZip(file);
+      // Success - trigger script list refresh
+      console.log(`Successfully imported ${result.imported_count} scripts`);
+      onScriptsImported();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Unknown error importing scripts.";
+      setImportErrorMsg(msg);
+      setImportErrorOpen(true);
+    } finally {
+      setImporting(false);
+      event.target.value = ''; // Reset input so same file can be selected again
+    }
+  }
+
   return (
     <div className="w-full bg-linear-to-r from-[#0D73A5] to-[#99E0B9] text-white px-4 py-2 flex items-center justify-between">
       <div className="flex gap-4 relative">
@@ -310,7 +382,7 @@ function Header({
             }}
             onMouseDown={(e) => e.stopPropagation()}
             className={BUTTON_STYLE}
-            disabled={exporting || exportingLayers}
+            disabled={exporting || exportingLayers || importing}
             aria-label="File menu"
           >
             File
@@ -319,21 +391,38 @@ function Header({
           {openFileMenu && (
             <div className="absolute top-full left-0 mt-2 bg-white rounded-lg shadow-xl p-2 z-50 min-w-[220px]">
               <button
+                onClick={handleImportScriptsClick}
+                disabled={exporting || exportingLayers || importing}
+                className="w-full text-left px-3 py-2 rounded-md text-gray-800 hover:bg-gray-100 disabled:opacity-60"
+              >
+                {importing ? "Importing..." : "Import scripts"}
+              </button>
+              <button
                 onClick={handleExportScripts}
-                disabled={exporting || exportingLayers}
+                disabled={exporting || exportingLayers || importing}
                 className="w-full text-left px-3 py-2 rounded-md text-gray-800 hover:bg-gray-100 disabled:opacity-60"
               >
                 {exporting ? "Exporting..." : "Export scripts"}
               </button>
               <button
                 onClick={handleExportLayers}
-                disabled={exporting || exportingLayers}
+                disabled={exporting || exportingLayers || importing}
                 className="w-full text-left px-3 py-2 rounded-md text-gray-800 hover:bg-gray-100 disabled:opacity-60"
               >
                 {exportingLayers ? "Exporting..." : "Export layers"}
               </button>
             </div>
           )}
+          
+          {/* Hidden file input for importing scripts */}
+          <input
+            ref={importFileInputRef}
+            type="file"
+            accept=".zip"
+            onChange={handleImportScriptsFile}
+            style={{ display: 'none' }}
+            aria-hidden="true"
+          />
         </div>
       </div>
 
@@ -378,6 +467,29 @@ function Header({
           <div className="flex justify-end pt-2">
             <button
               onClick={() => setExportLayersErrorOpen(false)}
+              className="rounded-lg bg-[#0D73A5] text-white hover:bg-[#39AC73] px-4 py-2"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      </WindowTemplate>
+
+      {/* IMPORT SCRIPTS ERROR MODAL */}
+      <WindowTemplate
+        isOpen={importErrorOpen}
+        title="Import scripts"
+        onClose={() => setImportErrorOpen(false)}
+        widthClassName="w-[520px] max-w-[95%]"
+        disableOverlayClose={false}
+      >
+        <div className="space-y-3">
+          <p style={{ color: "#b91c1c", fontWeight: 600 }}>Failed to import scripts.</p>
+          <p style={{ color: "#111827" }}>{importErrorMsg}</p>
+
+          <div className="flex justify-end pt-2">
+            <button
+              onClick={() => setImportErrorOpen(false)}
               className="rounded-lg bg-[#0D73A5] text-white hover:bg-[#39AC73] px-4 py-2"
             >
               OK
